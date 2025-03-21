@@ -5,6 +5,7 @@ import { queryClient } from "./lib/queryClient";
 import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
+import SyllabusGeneratorPage from "@/pages/syllabus-generator-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -14,6 +15,7 @@ function Router() {
   return (
     <Switch>
       <ProtectedRoute path="/" component={HomePage} />
+      <ProtectedRoute path="/syllabus-generator" component={SyllabusGeneratorPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>

@@ -8,9 +8,11 @@ import {
   Users,
   Airplay,
   Settings,
-  LogOut
+  LogOut,
+  Wand2
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { Link } from "wouter";
 
 export default function Sidebar() {
   const { activeTab, setActiveTab } = useApp();
@@ -50,6 +52,14 @@ export default function Sidebar() {
       <div className="border-t border-slate-200 my-4"></div>
       
       <div className="space-y-1 px-2">
+        {/* Tools Section */}
+        <Link href="/syllabus-generator">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-purple-600 hover:bg-purple-50 transition-colors">
+            <Wand2 className="h-5 w-5" />
+            <span>AI Syllabus Generator</span>
+          </a>
+        </Link>
+        
         <MenuItem id="settings" icon={<Settings className="h-5 w-5" />} label="Settings" />
         
         <button
