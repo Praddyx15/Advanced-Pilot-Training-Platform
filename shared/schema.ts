@@ -11,6 +11,11 @@ export const users = pgTable("users", {
   lastName: text("last_name").notNull(),
   email: text("email").notNull(),
   role: text("role").notNull(), // 'instructor' or 'trainee'
+  organizationType: text("organization_type"), // 'ATO', 'Airline', 'Personal', 'Admin'
+  organizationName: text("organization_name"),
+  authProvider: text("auth_provider"), // 'local', 'google', 'microsoft'
+  authProviderId: text("auth_provider_id"),
+  profilePicture: text("profile_picture"),
 });
 
 export const insertUserSchema = createInsertSchema(users).pick({
@@ -20,6 +25,11 @@ export const insertUserSchema = createInsertSchema(users).pick({
   lastName: true,
   email: true,
   role: true,
+  organizationType: true,
+  organizationName: true,
+  authProvider: true,
+  authProviderId: true,
+  profilePicture: true,
 });
 
 // Training Program schema
