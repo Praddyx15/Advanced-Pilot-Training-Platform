@@ -22,6 +22,12 @@ import {
   Notification,
   InsertNotification
 } from "@shared/schema";
+import { 
+  SyllabusGenerationOptions, 
+  GeneratedSyllabus, 
+  ExtractedModule, 
+  ExtractedLesson 
+} from "@shared/syllabus-types";
 import session from "express-session";
 import createMemoryStore from "memorystore";
 
@@ -34,6 +40,10 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
+  
+  // Syllabus Generator methods
+  generateSyllabusFromDocument(documentId: number, options: SyllabusGenerationOptions): Promise<GeneratedSyllabus>;
+  saveSyllabusAsProgram(syllabus: GeneratedSyllabus, createdById: number): Promise<TrainingProgram>;
 
   // Training Program methods
   getProgram(id: number): Promise<TrainingProgram | undefined>;
@@ -101,7 +111,7 @@ export interface IStorage {
   updateNotificationStatus(id: number, status: string): Promise<Notification | undefined>;
 
   // Session store for authentication
-  sessionStore: session.SessionStore;
+  sessionStore: session.Store;
 }
 
 export class MemStorage implements IStorage {
@@ -116,7 +126,7 @@ export class MemStorage implements IStorage {
   private documents: Map<number, Document>;
   private resources: Map<number, Resource>;
   private notifications: Map<number, Notification>;
-  public sessionStore: session.SessionStore;
+  public sessionStore: session.Store;
 
   private userIdCounter: number;
   private programIdCounter: number;
@@ -158,6 +168,275 @@ export class MemStorage implements IStorage {
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
     });
+  }
+
+  // Syllabus Generator methods
+  async generateSyllabusFromDocument(documentId: number, options: SyllabusGenerationOptions): Promise<GeneratedSyllabus> {
+    // Get the document
+    const document = await this.getDocument(documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    // In a real implementation, this would use NLP/ML to extract content from the document
+    // For this prototype, we'll generate a sample syllabus based on the options
+    
+    // Create modules based on program type
+    let modules: ExtractedModule[] = [];
+    let lessons: ExtractedLesson[] = [];
+    let totalDuration = options.defaultDuration;
+    
+    if (options.programType === 'initial_type_rating') {
+      // Sample modules for initial type rating
+      modules = [
+        {
+          name: "Aircraft Systems Knowledge",
+          description: "Overview of aircraft systems including hydraulics, electrical, and avionics",
+          type: "ground",
+          competencies: [
+            {
+              name: "Systems Knowledge",
+              description: "Understanding of aircraft systems operation and limitations",
+              assessmentCriteria: ["Can explain system components", "Can describe normal operation", "Can identify failure modes"]
+            }
+          ],
+          recommendedDuration: 40,
+          regulatoryRequirements: ["FAR 61.31", "EASA FCL.725"]
+        },
+        {
+          name: "Normal Procedures",
+          description: "Standard operating procedures for normal flight operations",
+          type: "simulator",
+          competencies: [
+            {
+              name: "SOP Application",
+              description: "Correct application of standard operating procedures",
+              assessmentCriteria: ["Follows checklist sequence", "Performs procedures accurately", "Maintains appropriate CRM"]
+            }
+          ],
+          recommendedDuration: 24,
+          regulatoryRequirements: ["FAR 61.31(a)", "EASA FCL.725(a)"]
+        },
+        {
+          name: "Emergency Procedures",
+          description: "Procedures for handling aircraft emergencies and abnormal situations",
+          type: "simulator",
+          competencies: [
+            {
+              name: "Emergency Response",
+              description: "Effective handling of emergency situations",
+              assessmentCriteria: ["Correctly identifies emergency", "Follows appropriate checklist", "Maintains aircraft control"]
+            }
+          ],
+          recommendedDuration: 16,
+          regulatoryRequirements: ["FAR 61.31(b)", "EASA FCL.725(b)"]
+        }
+      ];
+      
+      // Sample lessons for each module
+      lessons = [
+        {
+          name: "Hydraulic System Overview",
+          description: "Detailed study of the aircraft hydraulic system",
+          content: "Content extracted from document page 24-36: hydraulic system description",
+          type: "document",
+          moduleIndex: 0,
+          duration: 120,
+          learningObjectives: ["Understand hydraulic system architecture", "Identify hydraulic system components"]
+        },
+        {
+          name: "Electrical System",
+          description: "Study of aircraft electrical systems",
+          content: "Content extracted from document page 37-48: electrical system description",
+          type: "document",
+          moduleIndex: 0,
+          duration: 120,
+          learningObjectives: ["Understand electrical system architecture", "Identify electrical failures"]
+        },
+        {
+          name: "Normal Takeoff Procedures",
+          description: "Procedures for normal takeoff operations",
+          content: "Content extracted from document page 112-115: takeoff procedures",
+          type: "video",
+          moduleIndex: 1,
+          duration: 90,
+          learningObjectives: ["Perform normal takeoff checklist", "Apply correct takeoff technique"]
+        },
+        {
+          name: "Engine Fire During Takeoff",
+          description: "Handling engine fire emergency during takeoff",
+          content: "Content extracted from document page 245-248: engine fire procedures",
+          type: "interactive",
+          moduleIndex: 2,
+          duration: 120,
+          learningObjectives: ["Identify engine fire indications", "Apply engine fire checklist", "Decision making for takeoff abort or continuation"]
+        }
+      ];
+    } else if (options.programType === 'recurrent') {
+      // Sample modules for recurrent training
+      modules = [
+        {
+          name: "Systems Review",
+          description: "Review of critical aircraft systems",
+          type: "ground",
+          competencies: [
+            {
+              name: "Systems Knowledge",
+              description: "Retention of aircraft systems knowledge",
+              assessmentCriteria: ["Recalls system components", "Explains system operation", "Describes failure modes"]
+            }
+          ],
+          recommendedDuration: 8,
+          regulatoryRequirements: ["FAR 61.58", "EASA FCL.740"]
+        },
+        {
+          name: "Emergency Procedures Review",
+          description: "Review of emergency and abnormal procedures",
+          type: "simulator",
+          competencies: [
+            {
+              name: "Emergency Management",
+              description: "Effective handling of emergency and abnormal situations",
+              assessmentCriteria: ["Correctly identifies situation", "Applies appropriate procedure", "Maintains aircraft control"]
+            }
+          ],
+          recommendedDuration: 4,
+          regulatoryRequirements: ["FAR 61.58(a)", "EASA FCL.740(a)"]
+        }
+      ];
+      
+      totalDuration = 3; // 3 days for recurrent
+      
+      // Add sample lessons for recurrent training
+      lessons = [
+        {
+          name: "Critical Systems Review",
+          description: "Review of critical aircraft systems",
+          content: "Content extracted from document page 10-15: critical systems summary",
+          type: "document",
+          moduleIndex: 0,
+          duration: 180,
+          learningObjectives: ["Recall hydraulic system architecture", "Recall electrical system operation"]
+        },
+        {
+          name: "Engine Failure Scenarios",
+          description: "Review of engine failure scenarios",
+          content: "Content extracted from document page 200-205: engine failure procedures",
+          type: "interactive",
+          moduleIndex: 1,
+          duration: 240,
+          learningObjectives: ["Review engine failure indications", "Practice engine failure checklists"]
+        }
+      ];
+    } else if (options.programType === 'joc_mcc') {
+      // Sample modules for JOC/MCC
+      modules = [
+        {
+          name: "Multi-Crew Cooperation Principles",
+          description: "Fundamentals of crew coordination and communication",
+          type: "ground",
+          competencies: [
+            {
+              name: "CRM Application",
+              description: "Effective application of CRM principles",
+              assessmentCriteria: ["Demonstrates clear communication", "Shows situational awareness", "Applies workload management"]
+            }
+          ],
+          recommendedDuration: 16,
+          regulatoryRequirements: ["EASA FCL.735.A"]
+        },
+        {
+          name: "Task Sharing and Crew Coordination",
+          description: "Practical application of task sharing in normal and abnormal situations",
+          type: "simulator",
+          competencies: [
+            {
+              name: "Task Management",
+              description: "Effective distribution and execution of flight deck tasks",
+              assessmentCriteria: ["Clear role definition", "Proper task handover", "Cross-verification procedures"]
+            }
+          ],
+          recommendedDuration: 20,
+          regulatoryRequirements: ["EASA FCL.735.A(b)"]
+        }
+      ];
+      
+      totalDuration = 10; // 10 days for JOC/MCC
+      
+      // Add sample lessons for JOC/MCC
+      lessons = [
+        {
+          name: "CRM Fundamentals",
+          description: "Fundamentals of Crew Resource Management",
+          content: "Content extracted from document page 50-65: CRM principles",
+          type: "interactive",
+          moduleIndex: 0,
+          duration: 240,
+          learningObjectives: ["Understand CRM principles", "Apply communication techniques"]
+        },
+        {
+          name: "PF/PM Coordination",
+          description: "Coordination between Pilot Flying and Pilot Monitoring",
+          content: "Content extracted from document page 70-85: PF/PM duties",
+          type: "video",
+          moduleIndex: 1,
+          duration: 180,
+          learningObjectives: ["Define PF/PM responsibilities", "Practice crew coordination"]
+        }
+      ];
+    }
+    
+    // Return the generated syllabus
+    return {
+      name: `${options.programType.charAt(0).toUpperCase() + options.programType.slice(1)} Training Program${options.aircraftType ? ` - ${options.aircraftType}` : ''}`,
+      description: `Training program generated from document "${document.title}"`,
+      programType: options.programType,
+      aircraftType: options.aircraftType,
+      regulatoryAuthority: options.regulatoryAuthority,
+      totalDuration,
+      modules,
+      lessons,
+      regulatoryCompliance: {
+        authority: options.regulatoryAuthority || 'easa',
+        requirementsMet: ['Basic training requirements', 'Minimum training hours'],
+        requirementsPartiallyMet: ['Specific aircraft procedures'],
+        requirementsNotMet: []
+      },
+      confidenceScore: 85 // 85% confidence in extraction accuracy
+    };
+  }
+  
+  async saveSyllabusAsProgram(syllabus: GeneratedSyllabus, createdById: number): Promise<TrainingProgram> {
+    // Create a new program
+    const program = await this.createProgram({
+      name: syllabus.name,
+      description: syllabus.description,
+      createdById
+    });
+    
+    // Create modules for the program
+    for (let i = 0; i < syllabus.modules.length; i++) {
+      const moduleData = syllabus.modules[i];
+      const module = await this.createModule({
+        name: moduleData.name,
+        programId: program.id
+      });
+      
+      // Find lessons for this module
+      const moduleLessons = syllabus.lessons.filter(l => l.moduleIndex === i);
+      
+      // Create lessons for the module
+      for (const lessonData of moduleLessons) {
+        await this.createLesson({
+          name: lessonData.name,
+          moduleId: module.id,
+          type: lessonData.type,
+          content: lessonData.content
+        });
+      }
+    }
+    
+    return program;
   }
 
   // User methods
