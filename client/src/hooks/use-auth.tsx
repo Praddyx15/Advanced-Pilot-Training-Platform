@@ -14,11 +14,35 @@ type AuthContextType = {
   isLoading: boolean;
   error: Error | null;
   loginMutation: UseMutationResult<SelectUser, Error, LoginData>;
+  socialLoginMutation: UseMutationResult<SelectUser, Error, SocialLoginData>;
   logoutMutation: UseMutationResult<void, Error, void>;
   registerMutation: UseMutationResult<SelectUser, Error, InsertUser>;
 };
 
-type LoginData = Pick<InsertUser, "username" | "password">;
+type LoginData = Pick<InsertUser, "username" | "password"> & {
+  organizationType?: string;
+};
+
+type SocialProfile = {
+  id?: string;
+  sub?: string;
+  email: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+  avatar?: string;
+};
+
+type SocialLoginData = {
+  provider: 'google' | 'microsoft';
+  token: string;
+  profile: SocialProfile;
+  organizationType?: 'ATO' | 'Airline' | 'Personal' | 'Admin';
+  organizationName?: string;
+};
 
 // Extended schema for registration with validation
 export const registerSchema = insertUserSchema.extend({
@@ -86,6 +110,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const socialLoginMutation = useMutation({
+    mutationFn: async (data: SocialLoginData) => {
+      const res = await apiRequest("POST", "/api/social-login", data);
+      return await res.json();
+    },
+    onSuccess: (user: SelectUser) => {
+      queryClient.setQueryData(["/api/user"], user);
+      toast({
+        title: "Login successful",
+        description: `Welcome, ${user.firstName}!`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Social login failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await apiRequest("POST", "/api/logout");
@@ -113,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         error,
         loginMutation,
+        socialLoginMutation,
         logoutMutation,
         registerMutation,
       }}
