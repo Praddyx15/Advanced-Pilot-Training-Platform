@@ -1,111 +1,65 @@
-import { Link, useLocation } from "wouter";
-import { useAuth } from "@/hooks/use-auth";
+import { useApp } from "@/contexts/app-context";
 import { cn } from "@/lib/utils";
-import { 
-  Home, 
-  Book, 
-  Calendar, 
-  FileText, 
-  Airplay, 
-  FileArchive, 
-  Settings, 
-  LogOut 
+import {
+  BarChart,
+  Book,
+  Monitor,
+  FileText,
+  Users,
+  Airplay,
+  Settings,
+  LogOut
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
-interface SidebarProps {
-  isMobile?: boolean;
-  onClose?: () => void;
-}
+export default function Sidebar() {
+  const { activeTab, setActiveTab } = useApp();
+  const { logoutMutation } = useAuth();
 
-export default function Sidebar({ isMobile = false, onClose }: SidebarProps) {
-  const [location] = useLocation();
-  const { user, logoutMutation } = useAuth();
-  
   const handleLogout = () => {
     logoutMutation.mutate();
   };
-  
-  const links = [
-    { href: "/", icon: Home, label: "Dashboard" },
-    { href: "/programs", icon: Book, label: "Programs" },
-    { href: "/sessions", icon: Calendar, label: "Sessions" },
-    { href: "/assessments", icon: FileText, label: "Assessments" },
-    { href: "/resources", icon: Airplay, label: "Resources" },
-    { href: "/documents", icon: FileArchive, label: "Documents" },
-  ];
-  
-  const handleLinkClick = () => {
-    if (isMobile && onClose) {
-      onClose();
-    }
-  };
-  
+
+  const MenuItem = ({ id, icon, label }: { id: string; icon: React.ReactNode; label: string }) => (
+    <button
+      className={cn(
+        "sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium transition-colors",
+        activeTab === id 
+          ? "bg-blue-100 text-blue-800" 
+          : "text-slate-600 hover:bg-slate-100"
+      )}
+      onClick={() => setActiveTab(id)}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
+  );
+
   return (
-    <aside className="flex flex-col bg-slate-950 text-white h-full">
-      <div className="flex items-center justify-center h-16 border-b border-slate-800">
-        <span className="text-2xl font-bold text-primary-400 font-heading">AviationTrain</span>
+    <div className="w-64 hidden md:block bg-white border-r border-slate-200 py-4 px-2 overflow-y-auto">
+      <div className="space-y-1 px-2">
+        <MenuItem id="dashboard" icon={<BarChart className="h-5 w-5" />} label="Dashboard" />
+        <MenuItem id="programs" icon={<Book className="h-5 w-5" />} label="Training Programs" />
+        <MenuItem id="sessions" icon={<Monitor className="h-5 w-5" />} label="Sessions" />
+        <MenuItem id="assessments" icon={<FileText className="h-5 w-5" />} label="Assessments" />
+        <MenuItem id="trainees" icon={<Users className="h-5 w-5" />} label="Trainees" />
+        <MenuItem id="resources" icon={<Airplay className="h-5 w-5" />} label="Resources" />
+        <MenuItem id="documents" icon={<FileText className="h-5 w-5" />} label="Documents" />
       </div>
       
-      <div className="flex-1 overflow-y-auto py-4">
-        {/* User info */}
-        <div className="px-4 py-2 mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-full bg-slate-800 flex items-center justify-center text-primary-400">
-              <span>{user?.firstName?.[0]}{user?.lastName?.[0]}</span>
-            </div>
-            <div>
-              <div className="font-medium">{user?.firstName} {user?.lastName}</div>
-              <div className="text-xs text-slate-500 capitalize">{user?.role}</div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Navigation */}
-        <nav className="px-2 space-y-1">
-          {links.map((link) => {
-            const isActive = location === link.href;
-            const Icon = link.icon;
-            
-            return (
-              <Link key={link.href} href={link.href}>
-                <a
-                  className={cn(
-                    "flex items-center px-4 py-3 text-sm rounded-md group",
-                    isActive 
-                      ? "bg-primary-500 text-white" 
-                      : "text-white hover:bg-slate-800"
-                  )}
-                  onClick={handleLinkClick}
-                >
-                  <Icon className="h-5 w-5 mr-3" />
-                  {link.label}
-                </a>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+      <div className="border-t border-slate-200 my-4"></div>
       
-      <div className="p-4 border-t border-slate-800">
-        <Button
-          variant="ghost"
-          className="flex w-full items-center justify-start px-4 py-2 text-sm rounded-md text-white hover:bg-slate-800"
-          onClick={() => {}}
-        >
-          <Settings className="h-5 w-5 mr-3" />
-          Settings
-        </Button>
+      <div className="space-y-1 px-2">
+        <MenuItem id="settings" icon={<Settings className="h-5 w-5" />} label="Settings" />
         
-        <Button
-          variant="ghost"
-          className="flex w-full items-center justify-start px-4 py-2 text-sm rounded-md text-white hover:bg-slate-800 mt-2"
+        <button
+          className="sidebar-item text-red-600 hover:bg-red-50 flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium transition-colors w-full"
           onClick={handleLogout}
         >
-          <LogOut className="h-5 w-5 mr-3" />
-          Logout
-        </Button>
+          <LogOut className="h-5 w-5" />
+          <span>Logout</span>
+        </button>
       </div>
-    </aside>
+    </div>
   );
 }

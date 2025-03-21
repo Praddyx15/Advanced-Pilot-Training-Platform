@@ -1,28 +1,18 @@
-import { Switch, Route } from "wouter";
-import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { Switch, Route } from "wouter";
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from "@/hooks/use-auth";
-import { ProtectedRoute } from "./lib/protected-route";
-
+import { queryClient } from "./lib/queryClient";
 import NotFound from "@/pages/not-found";
+import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
-import DashboardPage from "@/pages/dashboard-page";
-import ProgramsPage from "@/pages/programs-page";
-import SessionsPage from "@/pages/sessions-page";
-import AssessmentsPage from "@/pages/assessments-page";
-import ResourcesPage from "@/pages/resources-page";
-import DocumentsPage from "@/pages/documents-page";
+import { ProtectedRoute } from "./lib/protected-route";
+import { AuthProvider } from "./hooks/use-auth";
+import { AppProvider } from "./contexts/app-context";
 
 function Router() {
   return (
     <Switch>
-      <ProtectedRoute path="/" component={DashboardPage} />
-      <ProtectedRoute path="/programs" component={ProgramsPage} />
-      <ProtectedRoute path="/sessions" component={SessionsPage} />
-      <ProtectedRoute path="/assessments" component={AssessmentsPage} />
-      <ProtectedRoute path="/resources" component={ResourcesPage} />
-      <ProtectedRoute path="/documents" component={DocumentsPage} />
+      <ProtectedRoute path="/" component={HomePage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
@@ -33,8 +23,10 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
-        <Toaster />
+        <AppProvider>
+          <Router />
+          <Toaster />
+        </AppProvider>
       </AuthProvider>
     </QueryClientProvider>
   );

@@ -1,596 +1,579 @@
-import type { Express, Request, Response } from "express";
+import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
-import { 
-  insertTrainingProgramSchema, insertModuleSchema, insertLessonSchema,
-  insertSessionSchema, insertSessionTraineeSchema, insertAssessmentSchema,
-  insertGradeSchema, insertDocumentSchema, insertResourceSchema, insertNotificationSchema 
-} from "@shared/schema";
+import { extendedSessionSchema, insertProgramSchema, insertModuleSchema, insertLessonSchema, insertAssessmentSchema, insertGradeSchema, insertDocumentSchema, insertResourceSchema, insertNotificationSchema } from "@shared/schema";
 import { z } from "zod";
 
-// Middleware to ensure user is authenticated
-function ensureAuthenticated(req: Request, res: Response, next: Function) {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ message: "Unauthorized" });
-}
-
-// Middleware to ensure user is an instructor
-function ensureInstructor(req: Request, res: Response, next: Function) {
-  if (req.isAuthenticated() && req.user?.role === 'instructor') {
-    return next();
-  }
-  res.status(403).json({ message: "Forbidden - Instructor access required" });
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication routes
+  // Set up authentication routes and middleware
   setupAuth(app);
 
-  // Training programs routes
-  app.get("/api/programs", ensureAuthenticated, async (req, res) => {
+  // Initialize with seed data if no users exist
+  const seedDatabase = async () => {
+    const users = await storage.getAllUsers();
+    if (users.length === 0) {
+      // TODO: Initialize with seed data here if needed
+    }
+  };
+
+  seedDatabase();
+
+  // === Training Programs API ===
+  app.get("/api/programs", async (req, res) => {
     try {
-      const programs = await storage.getTrainingPrograms();
+      const programs = await storage.getAllPrograms();
       res.json(programs);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching training programs" });
+      res.status(500).json({ message: "Failed to fetch programs" });
     }
   });
 
-  app.get("/api/programs/:id", ensureAuthenticated, async (req, res) => {
+  app.get("/api/programs/:id", async (req, res) => {
     try {
-      const program = await storage.getTrainingProgramWithModules(parseInt(req.params.id));
+      const programId = parseInt(req.params.id);
+      const program = await storage.getProgram(programId);
+      
       if (!program) {
-        return res.status(404).json({ message: "Training program not found" });
+        return res.status(404).json({ message: "Program not found" });
       }
-      res.json(program);
+      
+      // Get modules for this program
+      const modules = await storage.getModulesByProgram(programId);
+      
+      // Get lessons for each module
+      const modulesWithLessons = await Promise.all(
+        modules.map(async (module) => {
+          const lessons = await storage.getLessonsByModule(module.id);
+          return {
+            ...module,
+            lessons,
+          };
+        })
+      );
+      
+      res.json({
+        ...program,
+        modules: modulesWithLessons,
+      });
     } catch (error) {
-      res.status(500).json({ message: "Error fetching training program" });
+      res.status(500).json({ message: "Failed to fetch program details" });
     }
   });
 
-  app.post("/api/programs", ensureInstructor, async (req, res) => {
+  app.post("/api/protected/programs", async (req, res) => {
     try {
-      const programData = insertTrainingProgramSchema.parse(req.body);
-      const program = await storage.createTrainingProgram(programData);
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const validatedData = insertProgramSchema.parse({
+        ...req.body,
+        createdById: req.user.id,
+      });
+      
+      const program = await storage.createProgram(validatedData);
       res.status(201).json(program);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating training program" });
+      res.status(500).json({ message: "Failed to create program" });
     }
   });
 
-  app.put("/api/programs/:id", ensureInstructor, async (req, res) => {
+  app.put("/api/protected/programs/:id", async (req, res) => {
     try {
-      const programData = insertTrainingProgramSchema.partial().parse(req.body);
-      const program = await storage.updateTrainingProgram(parseInt(req.params.id), programData);
+      const programId = parseInt(req.params.id);
+      const program = await storage.getProgram(programId);
+      
       if (!program) {
-        return res.status(404).json({ message: "Training program not found" });
+        return res.status(404).json({ message: "Program not found" });
       }
-      res.json(program);
+      
+      const validatedData = insertProgramSchema.partial().parse(req.body);
+      const updatedProgram = await storage.updateProgram(programId, validatedData);
+      
+      res.json(updatedProgram);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error updating training program" });
+      res.status(500).json({ message: "Failed to update program" });
     }
   });
 
-  app.delete("/api/programs/:id", ensureInstructor, async (req, res) => {
+  app.delete("/api/protected/programs/:id", async (req, res) => {
     try {
-      const result = await storage.deleteTrainingProgram(parseInt(req.params.id));
-      if (!result) {
-        return res.status(404).json({ message: "Training program not found" });
+      const programId = parseInt(req.params.id);
+      const program = await storage.getProgram(programId);
+      
+      if (!program) {
+        return res.status(404).json({ message: "Program not found" });
       }
+      
+      await storage.deleteProgram(programId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Error deleting training program" });
+      res.status(500).json({ message: "Failed to delete program" });
     }
   });
 
-  // Modules routes
-  app.get("/api/modules", ensureAuthenticated, async (req, res) => {
+  // === Modules API ===
+  app.post("/api/protected/modules", async (req, res) => {
     try {
-      const programId = req.query.programId ? parseInt(req.query.programId as string) : undefined;
-      const modules = await storage.getModules(programId);
-      res.json(modules);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching modules" });
-    }
-  });
-
-  app.get("/api/modules/:id", ensureAuthenticated, async (req, res) => {
-    try {
-      const module = await storage.getModuleWithLessons(parseInt(req.params.id));
-      if (!module) {
-        return res.status(404).json({ message: "Module not found" });
+      const validatedData = insertModuleSchema.parse(req.body);
+      
+      // Check if program exists
+      const program = await storage.getProgram(validatedData.programId);
+      if (!program) {
+        return res.status(404).json({ message: "Program not found" });
       }
-      res.json(module);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching module" });
-    }
-  });
-
-  app.post("/api/modules", ensureInstructor, async (req, res) => {
-    try {
-      const moduleData = insertModuleSchema.parse(req.body);
-      const module = await storage.createModule(moduleData);
+      
+      const module = await storage.createModule(validatedData);
       res.status(201).json(module);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating module" });
+      res.status(500).json({ message: "Failed to create module" });
     }
   });
 
-  app.put("/api/modules/:id", ensureInstructor, async (req, res) => {
+  app.put("/api/protected/modules/:id", async (req, res) => {
     try {
-      const moduleData = insertModuleSchema.partial().parse(req.body);
-      const module = await storage.updateModule(parseInt(req.params.id), moduleData);
+      const moduleId = parseInt(req.params.id);
+      const module = await storage.getModule(moduleId);
+      
       if (!module) {
         return res.status(404).json({ message: "Module not found" });
       }
-      res.json(module);
+      
+      const validatedData = insertModuleSchema.partial().parse(req.body);
+      const updatedModule = await storage.updateModule(moduleId, validatedData);
+      
+      res.json(updatedModule);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error updating module" });
+      res.status(500).json({ message: "Failed to update module" });
     }
   });
 
-  app.delete("/api/modules/:id", ensureInstructor, async (req, res) => {
+  app.delete("/api/protected/modules/:id", async (req, res) => {
     try {
-      const result = await storage.deleteModule(parseInt(req.params.id));
-      if (!result) {
+      const moduleId = parseInt(req.params.id);
+      const module = await storage.getModule(moduleId);
+      
+      if (!module) {
         return res.status(404).json({ message: "Module not found" });
       }
+      
+      await storage.deleteModule(moduleId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Error deleting module" });
+      res.status(500).json({ message: "Failed to delete module" });
     }
   });
 
-  // Lessons routes
-  app.get("/api/lessons", ensureAuthenticated, async (req, res) => {
+  // === Lessons API ===
+  app.post("/api/protected/lessons", async (req, res) => {
     try {
-      const moduleId = req.query.moduleId ? parseInt(req.query.moduleId as string) : undefined;
-      const lessons = await storage.getLessons(moduleId);
-      res.json(lessons);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching lessons" });
-    }
-  });
-
-  app.get("/api/lessons/:id", ensureAuthenticated, async (req, res) => {
-    try {
-      const lesson = await storage.getLesson(parseInt(req.params.id));
-      if (!lesson) {
-        return res.status(404).json({ message: "Lesson not found" });
+      const validatedData = insertLessonSchema.parse(req.body);
+      
+      // Check if module exists
+      const module = await storage.getModule(validatedData.moduleId);
+      if (!module) {
+        return res.status(404).json({ message: "Module not found" });
       }
-      res.json(lesson);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching lesson" });
-    }
-  });
-
-  app.post("/api/lessons", ensureInstructor, async (req, res) => {
-    try {
-      const lessonData = insertLessonSchema.parse(req.body);
-      const lesson = await storage.createLesson(lessonData);
+      
+      const lesson = await storage.createLesson(validatedData);
       res.status(201).json(lesson);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating lesson" });
+      res.status(500).json({ message: "Failed to create lesson" });
     }
   });
 
-  app.put("/api/lessons/:id", ensureInstructor, async (req, res) => {
+  // === Sessions API ===
+  app.get("/api/sessions", async (req, res) => {
     try {
-      const lessonData = insertLessonSchema.partial().parse(req.body);
-      const lesson = await storage.updateLesson(parseInt(req.params.id), lessonData);
-      if (!lesson) {
-        return res.status(404).json({ message: "Lesson not found" });
-      }
-      res.json(lesson);
+      const sessions = await storage.getAllSessions();
+      
+      // Get trainees for each session
+      const sessionsWithTrainees = await Promise.all(
+        sessions.map(async (session) => {
+          const trainees = await storage.getSessionTrainees(session.id);
+          return {
+            ...session,
+            trainees,
+          };
+        })
+      );
+      
+      res.json(sessionsWithTrainees);
     } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating lesson" });
+      res.status(500).json({ message: "Failed to fetch sessions" });
     }
   });
 
-  app.delete("/api/lessons/:id", ensureInstructor, async (req, res) => {
+  app.get("/api/sessions/:id", async (req, res) => {
     try {
-      const result = await storage.deleteLesson(parseInt(req.params.id));
-      if (!result) {
-        return res.status(404).json({ message: "Lesson not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Error deleting lesson" });
-    }
-  });
-
-  // Sessions routes
-  app.get("/api/sessions", ensureAuthenticated, async (req, res) => {
-    try {
-      const sessions = await storage.getSessions();
-      res.json(sessions);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching sessions" });
-    }
-  });
-
-  app.get("/api/sessions/:id", ensureAuthenticated, async (req, res) => {
-    try {
-      const session = await storage.getSessionWithDetails(parseInt(req.params.id));
+      const sessionId = parseInt(req.params.id);
+      const session = await storage.getSession(sessionId);
+      
       if (!session) {
         return res.status(404).json({ message: "Session not found" });
       }
-      res.json(session);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching session" });
-    }
-  });
-
-  app.post("/api/sessions", ensureInstructor, async (req, res) => {
-    try {
-      const sessionData = insertSessionSchema.parse(req.body);
-      const session = await storage.createSession(sessionData);
-      res.status(201).json(session);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error creating session" });
-    }
-  });
-
-  app.put("/api/sessions/:id", ensureInstructor, async (req, res) => {
-    try {
-      const sessionData = insertSessionSchema.partial().parse(req.body);
-      const session = await storage.updateSession(parseInt(req.params.id), sessionData);
-      if (!session) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-      res.json(session);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating session" });
-    }
-  });
-
-  app.delete("/api/sessions/:id", ensureInstructor, async (req, res) => {
-    try {
-      const result = await storage.deleteSession(parseInt(req.params.id));
-      if (!result) {
-        return res.status(404).json({ message: "Session not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Error deleting session" });
-    }
-  });
-
-  // Session trainees routes
-  app.post("/api/sessions/:sessionId/trainees", ensureInstructor, async (req, res) => {
-    try {
-      const sessionId = parseInt(req.params.sessionId);
-      const traineeData = insertSessionTraineeSchema.parse({
-        ...req.body,
-        sessionId,
+      
+      // Get trainees for this session
+      const trainees = await storage.getSessionTrainees(sessionId);
+      
+      res.json({
+        ...session,
+        trainees,
       });
-      const trainee = await storage.addTraineeToSession(traineeData);
-      res.status(201).json(trainee);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch session details" });
+    }
+  });
+
+  app.post("/api/protected/sessions", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const sessionData = extendedSessionSchema.parse({
+        ...req.body,
+        instructorId: req.user.id,
+      });
+      
+      // Create session first
+      const { trainees, ...sessionInsertData } = sessionData;
+      const createdSession = await storage.createSession(sessionInsertData);
+      
+      // Add trainees to session
+      if (trainees && trainees.length > 0) {
+        await Promise.all(
+          trainees.map(traineeId => 
+            storage.addTraineeToSession({
+              sessionId: createdSession.id,
+              traineeId
+            })
+          )
+        );
+      }
+      
+      res.status(201).json({
+        ...createdSession,
+        trainees: trainees || [],
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error adding trainee to session" });
+      res.status(500).json({ message: "Failed to create session" });
     }
   });
 
-  app.delete("/api/sessions/:sessionId/trainees/:traineeId", ensureInstructor, async (req, res) => {
+  app.put("/api/protected/sessions/:id", async (req, res) => {
     try {
-      const sessionId = parseInt(req.params.sessionId);
-      const traineeId = parseInt(req.params.traineeId);
-      const result = await storage.removeTraineeFromSession(sessionId, traineeId);
-      if (!result) {
-        return res.status(404).json({ message: "Trainee not found in session" });
+      const sessionId = parseInt(req.params.id);
+      const session = await storage.getSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
       }
+      
+      const sessionData = extendedSessionSchema.partial().parse(req.body);
+      
+      // Update session
+      const { trainees, ...sessionUpdateData } = sessionData;
+      const updatedSession = await storage.updateSession(sessionId, sessionUpdateData);
+      
+      // If trainees were provided, update the session's trainees
+      if (trainees) {
+        // Get current trainees
+        const currentTrainees = await storage.getSessionTrainees(sessionId);
+        
+        // Remove trainees that are no longer in the list
+        for (const traineeId of currentTrainees) {
+          if (!trainees.includes(traineeId)) {
+            await storage.removeTraineeFromSession(sessionId, traineeId);
+          }
+        }
+        
+        // Add new trainees
+        for (const traineeId of trainees) {
+          if (!currentTrainees.includes(traineeId)) {
+            await storage.addTraineeToSession({
+              sessionId,
+              traineeId
+            });
+          }
+        }
+      }
+      
+      // Get the updated list of trainees
+      const updatedTrainees = await storage.getSessionTrainees(sessionId);
+      
+      res.json({
+        ...updatedSession,
+        trainees: updatedTrainees,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to update session" });
+    }
+  });
+
+  app.delete("/api/protected/sessions/:id", async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.id);
+      const session = await storage.getSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      
+      await storage.deleteSession(sessionId);
       res.status(204).send();
     } catch (error) {
-      res.status(500).json({ message: "Error removing trainee from session" });
+      res.status(500).json({ message: "Failed to delete session" });
     }
   });
 
-  // Assessments routes
-  app.get("/api/assessments", ensureAuthenticated, async (req, res) => {
+  // === Users API ===
+  app.get("/api/protected/users", async (req, res) => {
     try {
-      const traineeId = req.query.traineeId ? parseInt(req.query.traineeId as string) : undefined;
-      const sessionId = req.query.sessionId ? parseInt(req.query.sessionId as string) : undefined;
-      const assessments = await storage.getAssessments(traineeId, sessionId);
-      res.json(assessments);
+      const users = await storage.getAllUsers();
+      
+      // Remove passwords from response
+      const sanitizedUsers = users.map(user => ({
+        ...user,
+        password: undefined,
+      }));
+      
+      res.json(sanitizedUsers);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching assessments" });
+      res.status(500).json({ message: "Failed to fetch users" });
     }
   });
 
-  app.get("/api/assessments/:id", ensureAuthenticated, async (req, res) => {
+  app.get("/api/protected/users/trainees", async (req, res) => {
     try {
-      const assessment = await storage.getAssessmentWithDetails(parseInt(req.params.id));
-      if (!assessment) {
-        return res.status(404).json({ message: "Assessment not found" });
+      const trainees = await storage.getUsersByRole("trainee");
+      
+      // Remove passwords from response
+      const sanitizedTrainees = trainees.map(trainee => ({
+        ...trainee,
+        password: undefined,
+      }));
+      
+      res.json(sanitizedTrainees);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch trainees" });
+    }
+  });
+
+  app.get("/api/protected/users/instructors", async (req, res) => {
+    try {
+      const instructors = await storage.getUsersByRole("instructor");
+      
+      // Remove passwords from response
+      const sanitizedInstructors = instructors.map(instructor => ({
+        ...instructor,
+        password: undefined,
+      }));
+      
+      res.json(sanitizedInstructors);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch instructors" });
+    }
+  });
+
+  // === Assessments API ===
+  app.get("/api/protected/assessments", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      let assessments;
+      if (req.user.role === "instructor") {
+        assessments = await storage.getAssessmentsByInstructor(req.user.id);
+      } else {
+        assessments = await storage.getAssessmentsByTrainee(req.user.id);
       }
       
-      // Only allow instructors or the assessed trainee to view
-      if (req.user?.role !== 'instructor' && req.user?.id !== assessment.traineeId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
+      // Get grades for each assessment
+      const assessmentsWithGrades = await Promise.all(
+        assessments.map(async (assessment) => {
+          const grades = await storage.getGradesByAssessment(assessment.id);
+          return {
+            ...assessment,
+            grades,
+          };
+        })
+      );
       
-      res.json(assessment);
+      res.json(assessmentsWithGrades);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching assessment" });
+      res.status(500).json({ message: "Failed to fetch assessments" });
     }
   });
 
-  app.post("/api/assessments", ensureInstructor, async (req, res) => {
+  app.post("/api/instructor/assessments", async (req, res) => {
     try {
-      const assessmentData = insertAssessmentSchema.parse(req.body);
-      const assessment = await storage.createAssessment(assessmentData);
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const validatedData = insertAssessmentSchema.parse({
+        ...req.body,
+        instructorId: req.user.id,
+      });
+      
+      const assessment = await storage.createAssessment(validatedData);
       res.status(201).json(assessment);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating assessment" });
+      res.status(500).json({ message: "Failed to create assessment" });
     }
   });
 
-  app.put("/api/assessments/:id", ensureInstructor, async (req, res) => {
-    try {
-      const assessmentData = insertAssessmentSchema.partial().parse(req.body);
-      const assessment = await storage.updateAssessment(parseInt(req.params.id), assessmentData);
-      if (!assessment) {
-        return res.status(404).json({ message: "Assessment not found" });
-      }
-      res.json(assessment);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating assessment" });
-    }
-  });
-
-  // Grades routes
-  app.get("/api/assessments/:assessmentId/grades", ensureAuthenticated, async (req, res) => {
+  app.post("/api/instructor/assessments/:assessmentId/grades", async (req, res) => {
     try {
       const assessmentId = parseInt(req.params.assessmentId);
+      
+      // Check if assessment exists
       const assessment = await storage.getAssessment(assessmentId);
-      
       if (!assessment) {
         return res.status(404).json({ message: "Assessment not found" });
       }
       
-      // Only allow instructors or the assessed trainee to view
-      if (req.user?.role !== 'instructor' && req.user?.id !== assessment.traineeId) {
-        return res.status(403).json({ message: "Forbidden" });
-      }
-      
-      const grades = await storage.getGrades(assessmentId);
-      res.json(grades);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching grades" });
-    }
-  });
-
-  app.post("/api/assessments/:assessmentId/grades", ensureInstructor, async (req, res) => {
-    try {
-      const assessmentId = parseInt(req.params.assessmentId);
-      const gradeData = insertGradeSchema.parse({
+      const validatedData = insertGradeSchema.parse({
         ...req.body,
         assessmentId,
       });
-      const grade = await storage.createGrade(gradeData);
       
-      // Update assessment status to graded if not already
-      const assessment = await storage.getAssessment(assessmentId);
-      if (assessment && assessment.status === 'pending') {
+      const grade = await storage.createGrade(validatedData);
+      
+      // Update assessment status to 'graded' if it was pending
+      if (assessment.status === 'pending') {
         await storage.updateAssessment(assessmentId, { status: 'graded' });
       }
       
       res.status(201).json(grade);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating grade" });
+      res.status(500).json({ message: "Failed to create grade" });
     }
   });
 
-  app.put("/api/grades/:id", ensureInstructor, async (req, res) => {
+  // === Documents API ===
+  app.get("/api/documents", async (req, res) => {
     try {
-      const gradeData = insertGradeSchema.partial().parse(req.body);
-      const grade = await storage.updateGrade(parseInt(req.params.id), gradeData);
-      if (!grade) {
-        return res.status(404).json({ message: "Grade not found" });
-      }
-      res.json(grade);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating grade" });
-    }
-  });
-
-  // Documents routes
-  app.get("/api/documents", ensureAuthenticated, async (req, res) => {
-    try {
-      const documents = await storage.getDocuments();
+      const documents = await storage.getAllDocuments();
       res.json(documents);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching documents" });
+      res.status(500).json({ message: "Failed to fetch documents" });
     }
   });
 
-  app.get("/api/documents/:id", ensureAuthenticated, async (req, res) => {
+  app.post("/api/protected/documents", async (req, res) => {
     try {
-      const document = await storage.getDocument(parseInt(req.params.id));
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
       }
-      res.json(document);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching document" });
-    }
-  });
 
-  app.post("/api/documents", ensureInstructor, async (req, res) => {
-    try {
-      const documentData = insertDocumentSchema.parse(req.body);
-      const document = await storage.createDocument(documentData);
+      const validatedData = insertDocumentSchema.parse({
+        ...req.body,
+        uploadedById: req.user.id,
+      });
+      
+      const document = await storage.createDocument(validatedData);
       res.status(201).json(document);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating document" });
+      res.status(500).json({ message: "Failed to create document" });
     }
   });
 
-  app.put("/api/documents/:id", ensureInstructor, async (req, res) => {
+  // === Resources API ===
+  app.get("/api/resources", async (req, res) => {
     try {
-      const documentData = insertDocumentSchema.partial().parse(req.body);
-      const document = await storage.updateDocument(parseInt(req.params.id), documentData);
-      if (!document) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-      res.json(document);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating document" });
-    }
-  });
-
-  app.delete("/api/documents/:id", ensureInstructor, async (req, res) => {
-    try {
-      const result = await storage.deleteDocument(parseInt(req.params.id));
-      if (!result) {
-        return res.status(404).json({ message: "Document not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Error deleting document" });
-    }
-  });
-
-  // Resources routes
-  app.get("/api/resources", ensureAuthenticated, async (req, res) => {
-    try {
-      const resources = await storage.getResources();
+      const resources = await storage.getAllResources();
       res.json(resources);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching resources" });
+      res.status(500).json({ message: "Failed to fetch resources" });
     }
   });
 
-  app.get("/api/resources/:id", ensureAuthenticated, async (req, res) => {
+  app.post("/api/protected/resources", async (req, res) => {
     try {
-      const resource = await storage.getResource(parseInt(req.params.id));
-      if (!resource) {
-        return res.status(404).json({ message: "Resource not found" });
-      }
-      res.json(resource);
-    } catch (error) {
-      res.status(500).json({ message: "Error fetching resource" });
-    }
-  });
-
-  app.post("/api/resources", ensureInstructor, async (req, res) => {
-    try {
-      const resourceData = insertResourceSchema.parse(req.body);
-      const resource = await storage.createResource(resourceData);
+      const validatedData = insertResourceSchema.parse(req.body);
+      const resource = await storage.createResource(validatedData);
       res.status(201).json(resource);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating resource" });
+      res.status(500).json({ message: "Failed to create resource" });
     }
   });
 
-  app.put("/api/resources/:id", ensureInstructor, async (req, res) => {
+  // === Notifications API ===
+  app.get("/api/protected/notifications", async (req, res) => {
     try {
-      const resourceData = insertResourceSchema.partial().parse(req.body);
-      const resource = await storage.updateResource(parseInt(req.params.id), resourceData);
-      if (!resource) {
-        return res.status(404).json({ message: "Resource not found" });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
       }
-      res.json(resource);
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
-      }
-      res.status(500).json({ message: "Error updating resource" });
-    }
-  });
 
-  app.delete("/api/resources/:id", ensureInstructor, async (req, res) => {
-    try {
-      const result = await storage.deleteResource(parseInt(req.params.id));
-      if (!result) {
-        return res.status(404).json({ message: "Resource not found" });
-      }
-      res.status(204).send();
-    } catch (error) {
-      res.status(500).json({ message: "Error deleting resource" });
-    }
-  });
-
-  // Notifications routes
-  app.get("/api/notifications", ensureAuthenticated, async (req, res) => {
-    try {
-      const notifications = await storage.getNotifications(req.user?.id);
+      const notifications = await storage.getNotificationsByUser(req.user.id);
       res.json(notifications);
     } catch (error) {
-      res.status(500).json({ message: "Error fetching notifications" });
+      res.status(500).json({ message: "Failed to fetch notifications" });
     }
   });
 
-  app.post("/api/notifications", ensureInstructor, async (req, res) => {
+  app.post("/api/protected/notifications", async (req, res) => {
     try {
-      const notificationData = insertNotificationSchema.parse(req.body);
-      const notification = await storage.createNotification(notificationData);
+      const validatedData = insertNotificationSchema.parse(req.body);
+      const notification = await storage.createNotification(validatedData);
       res.status(201).json(notification);
     } catch (error) {
       if (error instanceof z.ZodError) {
-        return res.status(400).json({ message: "Invalid input", errors: error.errors });
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
-      res.status(500).json({ message: "Error creating notification" });
+      res.status(500).json({ message: "Failed to create notification" });
     }
   });
 
-  app.post("/api/notifications/mark-read", ensureAuthenticated, async (req, res) => {
+  app.put("/api/protected/notifications/:id/read", async (req, res) => {
     try {
-      await storage.markNotificationsAsRead(req.user!.id);
-      res.status(200).json({ success: true });
+      const notificationId = parseInt(req.params.id);
+      const notification = await storage.updateNotificationStatus(notificationId, "read");
+      
+      if (!notification) {
+        return res.status(404).json({ message: "Notification not found" });
+      }
+      
+      res.json(notification);
     } catch (error) {
-      res.status(500).json({ message: "Error marking notifications as read" });
+      res.status(500).json({ message: "Failed to update notification" });
     }
   });
 

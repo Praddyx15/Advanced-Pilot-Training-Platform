@@ -3,14 +3,18 @@ import { useLocation } from "wouter";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useAuth } from "@/hooks/use-auth";
+import { useAuth, registerSchema, RegisterFormData } from "@/hooks/use-auth";
+import { Airplay } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Form,
   FormControl,
@@ -19,43 +23,23 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { Loader2, User, KeyRound, Mail, UserCheck } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { insertUserSchema } from "@shared/schema";
 
 const loginSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
-const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Invalid email address"),
-  role: z.enum(["instructor", "trainee"]),
-});
+type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function AuthPage() {
-  const [activeTab, setActiveTab] = useState<string>("login");
   const [, navigate] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
-
-  // Redirect if already logged in
-  if (user) {
-    navigate("/");
-    return null;
-  }
+  const [authTab, setAuthTab] = useState<"login" | "register">("login");
 
   // Login form
-  const loginForm = useForm<z.infer<typeof loginSchema>>({
+  const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       username: "",
@@ -64,11 +48,12 @@ export default function AuthPage() {
   });
 
   // Register form
-  const registerForm = useForm<z.infer<typeof registerSchema>>({
+  const registerForm = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
     defaultValues: {
       username: "",
       password: "",
+      confirmPassword: "",
       firstName: "",
       lastName: "",
       email: "",
@@ -76,120 +61,152 @@ export default function AuthPage() {
     },
   });
 
-  const onLoginSubmit = (values: z.infer<typeof loginSchema>) => {
-    loginMutation.mutate(values);
+  const onLoginSubmit = (data: LoginFormData) => {
+    loginMutation.mutate(data);
   };
 
-  const onRegisterSubmit = (values: z.infer<typeof registerSchema>) => {
-    registerMutation.mutate(values);
+  const onRegisterSubmit = (data: RegisterFormData) => {
+    // Remove confirmPassword before submitting to the API
+    const { confirmPassword, ...userData } = data;
+    registerMutation.mutate(userData);
   };
+
+  // Redirect if user is already logged in
+  if (user) {
+    navigate("/");
+    return null;
+  }
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Auth Form */}
-      <div className="flex-1 flex items-center justify-center p-6 md:w-1/2">
-        <Card className="w-full max-w-md">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
-              AviationTrain
-            </CardTitle>
-            <CardDescription className="text-center">
-              Aviation Training Management System
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs
-              defaultValue="login"
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2 mb-4">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="register">Register</TabsTrigger>
-              </TabsList>
-
-              {/* Login Form */}
-              <TabsContent value="login">
-                <Form {...loginForm}>
-                  <form
-                    onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                    className="space-y-4"
-                  >
-                    <FormField
-                      control={loginForm.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Enter your username"
-                                className="pl-10"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={loginForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                type="password"
-                                placeholder="Enter your password"
-                                className="pl-10"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={loginMutation.isPending}
+    <div className="flex min-h-screen bg-slate-50">
+      <div className="flex flex-1 flex-col justify-center py-12 px-4 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+        <div className="mx-auto w-full max-w-sm lg:w-96">
+          <div className="flex items-center mb-8">
+            <Airplay className="h-10 w-10 text-secondary" />
+            <h1 className="ml-2 text-2xl font-bold text-primary">AviationTMS</h1>
+          </div>
+          
+          <Tabs
+            value={authTab}
+            onValueChange={(value) => setAuthTab(value as "login" | "register")}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="login">Login</TabsTrigger>
+              <TabsTrigger value="register">Register</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="login">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Login</CardTitle>
+                  <CardDescription>
+                    Sign in to your account to access the training platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...loginForm}>
+                    <form
+                      onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                      className="space-y-4"
                     >
-                      {loginMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Login
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-
-              {/* Register Form */}
-              <TabsContent value="register">
-                <Form {...registerForm}>
-                  <form
-                    onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
-                    className="space-y-4"
-                  >
-                    <div className="grid grid-cols-2 gap-4">
                       <FormField
-                        control={registerForm.control}
-                        name="firstName"
+                        control={loginForm.control}
+                        name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>First Name</FormLabel>
+                            <FormLabel>Username</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="First name"
-                                {...field}
-                              />
+                              <Input {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={loginForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={loginMutation.isPending}
+                      >
+                        {loginMutation.isPending ? "Logging in..." : "Login"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button
+                    variant="link"
+                    onClick={() => setAuthTab("register")}
+                  >
+                    Don't have an account? Register
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="register">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Register</CardTitle>
+                  <CardDescription>
+                    Create a new account to access the training platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...registerForm}>
+                    <form
+                      onSubmit={registerForm.handleSubmit(onRegisterSubmit)}
+                      className="space-y-4"
+                    >
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={registerForm.control}
+                          name="firstName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>First Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={registerForm.control}
+                          name="lastName"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Last Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                      <FormField
+                        control={registerForm.control}
+                        name="email"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Email</FormLabel>
+                            <FormControl>
+                              <Input type="email" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -197,174 +214,132 @@ export default function AuthPage() {
                       />
                       <FormField
                         control={registerForm.control}
-                        name="lastName"
+                        name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Last Name</FormLabel>
+                            <FormLabel>Username</FormLabel>
                             <FormControl>
-                              <Input
-                                placeholder="Last name"
-                                {...field}
-                              />
+                              <Input {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
-                    </div>
-                    <FormField
-                      control={registerForm.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Enter your email"
-                                className="pl-10"
-                                {...field}
-                              />
+                      <FormField
+                        control={registerForm.control}
+                        name="password"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="confirmPassword"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Confirm Password</FormLabel>
+                            <FormControl>
+                              <Input type="password" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={registerForm.control}
+                        name="role"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Role</FormLabel>
+                            <div className="flex space-x-4">
+                              <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  className="h-4 w-4 text-primary border-slate-300 focus:ring-primary"
+                                  value="trainee"
+                                  checked={field.value === "trainee"}
+                                  onChange={() => field.onChange("trainee")}
+                                />
+                                <span>Trainee</span>
+                              </label>
+                              <label className="flex items-center space-x-2 cursor-pointer">
+                                <input
+                                  type="radio"
+                                  className="h-4 w-4 text-primary border-slate-300 focus:ring-primary"
+                                  value="instructor"
+                                  checked={field.value === "instructor"}
+                                  onChange={() => field.onChange("instructor")}
+                                />
+                                <span>Instructor</span>
+                              </label>
                             </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="username"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Username</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                placeholder="Choose a username"
-                                className="pl-10"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="password"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Password</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                              <Input
-                                type="password"
-                                placeholder="Create a password"
-                                className="pl-10"
-                                {...field}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={registerForm.control}
-                      name="role"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Role</FormLabel>
-                          <div className="flex space-x-4">
-                            <Button
-                              type="button"
-                              variant={field.value === "trainee" ? "default" : "outline"}
-                              className="flex-1"
-                              onClick={() => field.onChange("trainee")}
-                            >
-                              <User className="mr-2 h-4 w-4" />
-                              Trainee
-                            </Button>
-                            <Button
-                              type="button"
-                              variant={field.value === "instructor" ? "default" : "outline"}
-                              className="flex-1"
-                              onClick={() => field.onChange("instructor")}
-                            >
-                              <UserCheck className="mr-2 h-4 w-4" />
-                              Instructor
-                            </Button>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="submit"
-                      className="w-full"
-                      disabled={registerMutation.isPending}
-                    >
-                      {registerMutation.isPending ? (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      ) : null}
-                      Register
-                    </Button>
-                  </form>
-                </Form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <Button
+                        type="submit"
+                        className="w-full"
+                        disabled={registerMutation.isPending}
+                      >
+                        {registerMutation.isPending ? "Registering..." : "Register"}
+                      </Button>
+                    </form>
+                  </Form>
+                </CardContent>
+                <CardFooter className="flex justify-center">
+                  <Button
+                    variant="link"
+                    onClick={() => setAuthTab("login")}
+                  >
+                    Already have an account? Login
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
-
-      {/* Hero Section */}
-      <div className="hidden md:flex flex-1 md:w-1/2 bg-slate-900 text-white flex-col justify-center items-center p-10">
-        <div className="max-w-md">
-          <h1 className="text-4xl font-bold mb-4 font-heading">
-            Aviation Training Management
-          </h1>
-          <p className="text-slate-300 mb-6">
-            Comprehensive training management for aviation professionals. Streamline program
-            management, scheduling, assessments, and more with our powerful platform.
-          </p>
-          <div className="space-y-4">
-            <div className="flex items-start">
-              <div className="bg-primary-500 p-2 rounded-full mr-4">
-                <Book className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-medium text-lg">Training Programs</h3>
-                <p className="text-slate-400 text-sm">
-                  Create and manage comprehensive training programs with modules and lessons.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <div className="bg-primary-500 p-2 rounded-full mr-4">
-                <FileText className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-medium text-lg">Assessments</h3>
-                <p className="text-slate-400 text-sm">
-                  Evaluate trainee performance with detailed assessment tools.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start">
-              <div className="bg-primary-500 p-2 rounded-full mr-4">
-                <TrendingUp className="h-5 w-5" />
-              </div>
-              <div>
-                <h3 className="font-medium text-lg">Progress Tracking</h3>
-                <p className="text-slate-400 text-sm">
-                  Monitor trainee progress and performance with detailed analytics.
-                </p>
-              </div>
-            </div>
+      <div className="hidden md:block md:w-1/2 bg-primary">
+        <div className="flex flex-col justify-center items-center h-full p-8 text-white">
+          <h1 className="text-3xl font-bold mb-6">Aviation Training Management System</h1>
+          <div className="max-w-lg">
+            <p className="mb-6 text-lg">
+              A comprehensive platform for managing flight training programs, scheduling sessions, 
+              and assessing trainee performance.
+            </p>
+            <ul className="space-y-3">
+              <li className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Program and module management
+              </li>
+              <li className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Session scheduling and management
+              </li>
+              <li className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Assessment creation and grading
+              </li>
+              <li className="flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                Document repository with search functionality
+              </li>
+            </ul>
           </div>
         </div>
       </div>

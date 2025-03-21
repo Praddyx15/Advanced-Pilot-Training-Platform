@@ -1,20 +1,26 @@
-import {
-  users, trainingPrograms, modules, lessons, 
-  sessions, sessionTrainees, assessments, grades, 
-  documents, resources, notifications,
-  type User, type InsertUser,
-  type TrainingProgram, type InsertTrainingProgram,
-  type Module, type InsertModule,
-  type Lesson, type InsertLesson,
-  type Session, type InsertSession,
-  type SessionTrainee, type InsertSessionTrainee,
-  type Assessment, type InsertAssessment,
-  type Grade, type InsertGrade,
-  type Document, type InsertDocument,
-  type Resource, type InsertResource,
-  type Notification, type InsertNotification,
-  type TrainingProgramWithModules, type ModuleWithLessons,
-  type SessionWithDetails, type AssessmentWithDetails
+import { 
+  User, 
+  InsertUser, 
+  TrainingProgram, 
+  InsertTrainingProgram,
+  Module,
+  InsertModule,
+  Lesson,
+  InsertLesson,
+  Session,
+  InsertSession,
+  SessionTrainee,
+  InsertSessionTrainee,
+  Assessment,
+  InsertAssessment,
+  Grade,
+  InsertGrade,
+  Document,
+  InsertDocument,
+  Resource,
+  InsertResource,
+  Notification,
+  InsertNotification
 } from "@shared/schema";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -22,571 +28,451 @@ import createMemoryStore from "memorystore";
 const MemoryStore = createMemoryStore(session);
 
 export interface IStorage {
-  // User operations
+  // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
-  updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined>;
-  
-  // TrainingProgram operations
-  getTrainingPrograms(): Promise<TrainingProgram[]>;
-  getTrainingProgram(id: number): Promise<TrainingProgram | undefined>;
-  getTrainingProgramWithModules(id: number): Promise<TrainingProgramWithModules | undefined>;
-  createTrainingProgram(program: InsertTrainingProgram): Promise<TrainingProgram>;
-  updateTrainingProgram(id: number, program: Partial<InsertTrainingProgram>): Promise<TrainingProgram | undefined>;
-  deleteTrainingProgram(id: number): Promise<boolean>;
-  
-  // Module operations
-  getModules(programId?: number): Promise<Module[]>;
+  getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
+
+  // Training Program methods
+  getProgram(id: number): Promise<TrainingProgram | undefined>;
+  getAllPrograms(): Promise<TrainingProgram[]>;
+  createProgram(program: InsertTrainingProgram): Promise<TrainingProgram>;
+  updateProgram(id: number, program: Partial<TrainingProgram>): Promise<TrainingProgram | undefined>;
+  deleteProgram(id: number): Promise<boolean>;
+
+  // Module methods
   getModule(id: number): Promise<Module | undefined>;
-  getModuleWithLessons(id: number): Promise<ModuleWithLessons | undefined>;
+  getModulesByProgram(programId: number): Promise<Module[]>;
   createModule(module: InsertModule): Promise<Module>;
-  updateModule(id: number, module: Partial<InsertModule>): Promise<Module | undefined>;
+  updateModule(id: number, module: Partial<Module>): Promise<Module | undefined>;
   deleteModule(id: number): Promise<boolean>;
-  
-  // Lesson operations
-  getLessons(moduleId?: number): Promise<Lesson[]>;
+
+  // Lesson methods
   getLesson(id: number): Promise<Lesson | undefined>;
+  getLessonsByModule(moduleId: number): Promise<Lesson[]>;
   createLesson(lesson: InsertLesson): Promise<Lesson>;
-  updateLesson(id: number, lesson: Partial<InsertLesson>): Promise<Lesson | undefined>;
+  updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson | undefined>;
   deleteLesson(id: number): Promise<boolean>;
-  
-  // Session operations
-  getSessions(): Promise<Session[]>;
+
+  // Session methods
   getSession(id: number): Promise<Session | undefined>;
-  getSessionWithDetails(id: number): Promise<SessionWithDetails | undefined>;
+  getAllSessions(): Promise<Session[]>;
+  getSessionsByInstructor(instructorId: number): Promise<Session[]>;
+  getSessionsByTrainee(traineeId: number): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
-  updateSession(id: number, session: Partial<InsertSession>): Promise<Session | undefined>;
+  updateSession(id: number, session: Partial<Session>): Promise<Session | undefined>;
   deleteSession(id: number): Promise<boolean>;
-  
-  // SessionTrainee operations
-  getSessionTrainees(sessionId?: number): Promise<SessionTrainee[]>;
-  addTraineeToSession(traineeData: InsertSessionTrainee): Promise<SessionTrainee>;
+
+  // Session Trainee methods
+  getSessionTrainees(sessionId: number): Promise<number[]>;
+  addTraineeToSession(sessionTrainee: InsertSessionTrainee): Promise<SessionTrainee>;
   removeTraineeFromSession(sessionId: number, traineeId: number): Promise<boolean>;
-  
-  // Assessment operations
-  getAssessments(traineeId?: number, sessionId?: number): Promise<Assessment[]>;
+
+  // Assessment methods
   getAssessment(id: number): Promise<Assessment | undefined>;
-  getAssessmentWithDetails(id: number): Promise<AssessmentWithDetails | undefined>;
+  getAssessmentsByTrainee(traineeId: number): Promise<Assessment[]>;
+  getAssessmentsByInstructor(instructorId: number): Promise<Assessment[]>;
   createAssessment(assessment: InsertAssessment): Promise<Assessment>;
-  updateAssessment(id: number, assessment: Partial<InsertAssessment>): Promise<Assessment | undefined>;
-  deleteAssessment(id: number): Promise<boolean>;
-  
-  // Grade operations
-  getGrades(assessmentId: number): Promise<Grade[]>;
+  updateAssessment(id: number, assessment: Partial<Assessment>): Promise<Assessment | undefined>;
+
+  // Grade methods
+  getGradesByAssessment(assessmentId: number): Promise<Grade[]>;
   createGrade(grade: InsertGrade): Promise<Grade>;
-  updateGrade(id: number, grade: Partial<InsertGrade>): Promise<Grade | undefined>;
-  deleteGrade(id: number): Promise<boolean>;
+  updateGrade(id: number, grade: Partial<Grade>): Promise<Grade | undefined>;
   
-  // Document operations
-  getDocuments(): Promise<Document[]>;
+  // Document methods
   getDocument(id: number): Promise<Document | undefined>;
+  getAllDocuments(): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
-  updateDocument(id: number, document: Partial<InsertDocument>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
-  
-  // Resource operations
-  getResources(): Promise<Resource[]>;
+
+  // Resource methods
   getResource(id: number): Promise<Resource | undefined>;
+  getAllResources(): Promise<Resource[]>;
   createResource(resource: InsertResource): Promise<Resource>;
-  updateResource(id: number, resource: Partial<InsertResource>): Promise<Resource | undefined>;
+  updateResource(id: number, resource: Partial<Resource>): Promise<Resource | undefined>;
   deleteResource(id: number): Promise<boolean>;
-  
-  // Notification operations
-  getNotifications(recipientId?: number): Promise<Notification[]>;
-  getNotification(id: number): Promise<Notification | undefined>;
+
+  // Notification methods
+  getNotificationsByUser(userId: number): Promise<Notification[]>;
   createNotification(notification: InsertNotification): Promise<Notification>;
-  updateNotification(id: number, notification: Partial<InsertNotification>): Promise<Notification | undefined>;
-  deleteNotification(id: number): Promise<boolean>;
-  markNotificationsAsRead(recipientId: number): Promise<boolean>;
-  
-  // Session store for auth
+  updateNotificationStatus(id: number, status: string): Promise<Notification | undefined>;
+
+  // Session store for authentication
   sessionStore: session.SessionStore;
 }
 
 export class MemStorage implements IStorage {
-  private usersMap: Map<number, User>;
-  private trainingProgramsMap: Map<number, TrainingProgram>;
-  private modulesMap: Map<number, Module>;
-  private lessonsMap: Map<number, Lesson>;
-  private sessionsMap: Map<number, Session>;
-  private sessionTraineesMap: Map<number, SessionTrainee>;
-  private assessmentsMap: Map<number, Assessment>;
-  private gradesMap: Map<number, Grade>;
-  private documentsMap: Map<number, Document>;
-  private resourcesMap: Map<number, Resource>;
-  private notificationsMap: Map<number, Notification>;
-  
-  sessionStore: session.SessionStore;
-  
-  private userCounter: number = 1;
-  private programCounter: number = 1;
-  private moduleCounter: number = 1;
-  private lessonCounter: number = 1;
-  private sessionCounter: number = 1;
-  private sessionTraineeCounter: number = 1;
-  private assessmentCounter: number = 1;
-  private gradeCounter: number = 1;
-  private documentCounter: number = 1;
-  private resourceCounter: number = 1;
-  private notificationCounter: number = 1;
+  private users: Map<number, User>;
+  private programs: Map<number, TrainingProgram>;
+  private modules: Map<number, Module>;
+  private lessons: Map<number, Lesson>;
+  private sessions: Map<number, Session>;
+  private sessionTrainees: Map<number, SessionTrainee>;
+  private assessments: Map<number, Assessment>;
+  private grades: Map<number, Grade>;
+  private documents: Map<number, Document>;
+  private resources: Map<number, Resource>;
+  private notifications: Map<number, Notification>;
+  public sessionStore: session.SessionStore;
+
+  private userIdCounter: number;
+  private programIdCounter: number;
+  private moduleIdCounter: number;
+  private lessonIdCounter: number;
+  private sessionIdCounter: number;
+  private sessionTraineeIdCounter: number;
+  private assessmentIdCounter: number;
+  private gradeIdCounter: number;
+  private documentIdCounter: number;
+  private resourceIdCounter: number;
+  private notificationIdCounter: number;
 
   constructor() {
-    this.usersMap = new Map();
-    this.trainingProgramsMap = new Map();
-    this.modulesMap = new Map();
-    this.lessonsMap = new Map();
-    this.sessionsMap = new Map();
-    this.sessionTraineesMap = new Map();
-    this.assessmentsMap = new Map();
-    this.gradesMap = new Map();
-    this.documentsMap = new Map();
-    this.resourcesMap = new Map();
-    this.notificationsMap = new Map();
-    
+    this.users = new Map();
+    this.programs = new Map();
+    this.modules = new Map();
+    this.lessons = new Map();
+    this.sessions = new Map();
+    this.sessionTrainees = new Map();
+    this.assessments = new Map();
+    this.grades = new Map();
+    this.documents = new Map();
+    this.resources = new Map();
+    this.notifications = new Map();
+
+    this.userIdCounter = 1;
+    this.programIdCounter = 1;
+    this.moduleIdCounter = 1;
+    this.lessonIdCounter = 1;
+    this.sessionIdCounter = 1;
+    this.sessionTraineeIdCounter = 1;
+    this.assessmentIdCounter = 1;
+    this.gradeIdCounter = 1;
+    this.documentIdCounter = 1;
+    this.resourceIdCounter = 1;
+    this.notificationIdCounter = 1;
+
     this.sessionStore = new MemoryStore({
-      checkPeriod: 86400000, // 24 hours
+      checkPeriod: 86400000, // prune expired entries every 24h
     });
-    
-    // Initialize with demo data
-    this.initDemoData();
   }
 
-  private initDemoData() {
-    // Add some initial demo data here if needed
-  }
-
-  // User operations
+  // User methods
   async getUser(id: number): Promise<User | undefined> {
-    return this.usersMap.get(id);
+    return this.users.get(id);
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.usersMap.values()).find(
-      (user) => user.username === username,
+    return Array.from(this.users.values()).find(
+      (user) => user.username === username
     );
   }
 
-  async createUser(userData: InsertUser): Promise<User> {
-    const id = this.userCounter++;
-    const user: User = { ...userData, id };
-    this.usersMap.set(id, user);
-    return user;
+  async createUser(user: InsertUser): Promise<User> {
+    const id = this.userIdCounter++;
+    const newUser: User = { ...user, id };
+    this.users.set(id, newUser);
+    return newUser;
   }
 
-  async updateUser(id: number, userData: Partial<InsertUser>): Promise<User | undefined> {
-    const existingUser = this.usersMap.get(id);
-    if (!existingUser) return undefined;
-    
-    const updatedUser = { ...existingUser, ...userData };
-    this.usersMap.set(id, updatedUser);
-    return updatedUser;
+  async getAllUsers(): Promise<User[]> {
+    return Array.from(this.users.values());
   }
 
-  // TrainingProgram operations
-  async getTrainingPrograms(): Promise<TrainingProgram[]> {
-    return Array.from(this.trainingProgramsMap.values());
+  async getUsersByRole(role: string): Promise<User[]> {
+    return Array.from(this.users.values()).filter(user => user.role === role);
   }
 
-  async getTrainingProgram(id: number): Promise<TrainingProgram | undefined> {
-    return this.trainingProgramsMap.get(id);
+  // Training Program methods
+  async getProgram(id: number): Promise<TrainingProgram | undefined> {
+    return this.programs.get(id);
   }
 
-  async getTrainingProgramWithModules(id: number): Promise<TrainingProgramWithModules | undefined> {
-    const program = this.trainingProgramsMap.get(id);
-    if (!program) return undefined;
-    
-    const programModules = Array.from(this.modulesMap.values())
-      .filter(module => module.programId === id)
-      .map(module => {
-        const moduleLessons = Array.from(this.lessonsMap.values())
-          .filter(lesson => lesson.moduleId === module.id);
-        
-        return {
-          ...module,
-          lessons: moduleLessons
-        } as ModuleWithLessons;
-      });
-    
-    return {
-      ...program,
-      modules: programModules
-    };
+  async getAllPrograms(): Promise<TrainingProgram[]> {
+    return Array.from(this.programs.values());
   }
 
-  async createTrainingProgram(program: InsertTrainingProgram): Promise<TrainingProgram> {
-    const id = this.programCounter++;
+  async createProgram(program: InsertTrainingProgram): Promise<TrainingProgram> {
+    const id = this.programIdCounter++;
     const newProgram: TrainingProgram = { ...program, id };
-    this.trainingProgramsMap.set(id, newProgram);
+    this.programs.set(id, newProgram);
     return newProgram;
   }
 
-  async updateTrainingProgram(id: number, program: Partial<InsertTrainingProgram>): Promise<TrainingProgram | undefined> {
-    const existingProgram = this.trainingProgramsMap.get(id);
+  async updateProgram(id: number, program: Partial<TrainingProgram>): Promise<TrainingProgram | undefined> {
+    const existingProgram = this.programs.get(id);
     if (!existingProgram) return undefined;
-    
+
     const updatedProgram = { ...existingProgram, ...program };
-    this.trainingProgramsMap.set(id, updatedProgram);
+    this.programs.set(id, updatedProgram);
     return updatedProgram;
   }
 
-  async deleteTrainingProgram(id: number): Promise<boolean> {
-    return this.trainingProgramsMap.delete(id);
+  async deleteProgram(id: number): Promise<boolean> {
+    return this.programs.delete(id);
   }
 
-  // Module operations
-  async getModules(programId?: number): Promise<Module[]> {
-    const modules = Array.from(this.modulesMap.values());
-    if (programId !== undefined) {
-      return modules.filter(module => module.programId === programId);
-    }
-    return modules;
-  }
-
+  // Module methods
   async getModule(id: number): Promise<Module | undefined> {
-    return this.modulesMap.get(id);
+    return this.modules.get(id);
   }
 
-  async getModuleWithLessons(id: number): Promise<ModuleWithLessons | undefined> {
-    const module = this.modulesMap.get(id);
-    if (!module) return undefined;
-    
-    const moduleLessons = Array.from(this.lessonsMap.values())
-      .filter(lesson => lesson.moduleId === id);
-    
-    return {
-      ...module,
-      lessons: moduleLessons
-    };
+  async getModulesByProgram(programId: number): Promise<Module[]> {
+    return Array.from(this.modules.values()).filter(
+      module => module.programId === programId
+    );
   }
 
-  async createModule(moduleData: InsertModule): Promise<Module> {
-    const id = this.moduleCounter++;
-    const newModule: Module = { ...moduleData, id };
-    this.modulesMap.set(id, newModule);
+  async createModule(module: InsertModule): Promise<Module> {
+    const id = this.moduleIdCounter++;
+    const newModule: Module = { ...module, id };
+    this.modules.set(id, newModule);
     return newModule;
   }
 
-  async updateModule(id: number, moduleData: Partial<InsertModule>): Promise<Module | undefined> {
-    const existingModule = this.modulesMap.get(id);
+  async updateModule(id: number, module: Partial<Module>): Promise<Module | undefined> {
+    const existingModule = this.modules.get(id);
     if (!existingModule) return undefined;
-    
-    const updatedModule = { ...existingModule, ...moduleData };
-    this.modulesMap.set(id, updatedModule);
+
+    const updatedModule = { ...existingModule, ...module };
+    this.modules.set(id, updatedModule);
     return updatedModule;
   }
 
   async deleteModule(id: number): Promise<boolean> {
-    return this.modulesMap.delete(id);
+    return this.modules.delete(id);
   }
 
-  // Lesson operations
-  async getLessons(moduleId?: number): Promise<Lesson[]> {
-    const lessons = Array.from(this.lessonsMap.values());
-    if (moduleId !== undefined) {
-      return lessons.filter(lesson => lesson.moduleId === moduleId);
-    }
-    return lessons;
-  }
-
+  // Lesson methods
   async getLesson(id: number): Promise<Lesson | undefined> {
-    return this.lessonsMap.get(id);
+    return this.lessons.get(id);
   }
 
-  async createLesson(lessonData: InsertLesson): Promise<Lesson> {
-    const id = this.lessonCounter++;
-    const newLesson: Lesson = { ...lessonData, id };
-    this.lessonsMap.set(id, newLesson);
+  async getLessonsByModule(moduleId: number): Promise<Lesson[]> {
+    return Array.from(this.lessons.values()).filter(
+      lesson => lesson.moduleId === moduleId
+    );
+  }
+
+  async createLesson(lesson: InsertLesson): Promise<Lesson> {
+    const id = this.lessonIdCounter++;
+    const newLesson: Lesson = { ...lesson, id };
+    this.lessons.set(id, newLesson);
     return newLesson;
   }
 
-  async updateLesson(id: number, lessonData: Partial<InsertLesson>): Promise<Lesson | undefined> {
-    const existingLesson = this.lessonsMap.get(id);
+  async updateLesson(id: number, lesson: Partial<Lesson>): Promise<Lesson | undefined> {
+    const existingLesson = this.lessons.get(id);
     if (!existingLesson) return undefined;
-    
-    const updatedLesson = { ...existingLesson, ...lessonData };
-    this.lessonsMap.set(id, updatedLesson);
+
+    const updatedLesson = { ...existingLesson, ...lesson };
+    this.lessons.set(id, updatedLesson);
     return updatedLesson;
   }
 
   async deleteLesson(id: number): Promise<boolean> {
-    return this.lessonsMap.delete(id);
+    return this.lessons.delete(id);
   }
 
-  // Session operations
-  async getSessions(): Promise<Session[]> {
-    return Array.from(this.sessionsMap.values());
-  }
-
+  // Session methods
   async getSession(id: number): Promise<Session | undefined> {
-    return this.sessionsMap.get(id);
+    return this.sessions.get(id);
   }
 
-  async getSessionWithDetails(id: number): Promise<SessionWithDetails | undefined> {
-    const session = this.sessionsMap.get(id);
-    if (!session) return undefined;
-    
-    const program = this.trainingProgramsMap.get(session.programId);
-    const module = this.modulesMap.get(session.moduleId);
-    const resource = session.resourceId ? this.resourcesMap.get(session.resourceId) : undefined;
-    
-    if (!program || !module) return undefined;
-    
-    const sessionTrainees = Array.from(this.sessionTraineesMap.values())
-      .filter(st => st.sessionId === id);
-      
-    const trainees = sessionTrainees.map(st => {
-      const trainee = this.usersMap.get(st.traineeId);
-      return trainee!;
-    }).filter(Boolean);
-    
-    return {
-      ...session,
-      program,
-      module,
-      resource,
-      trainees,
-    };
+  async getAllSessions(): Promise<Session[]> {
+    return Array.from(this.sessions.values());
   }
 
-  async createSession(sessionData: InsertSession): Promise<Session> {
-    const id = this.sessionCounter++;
-    const newSession: Session = { ...sessionData, id };
-    this.sessionsMap.set(id, newSession);
+  async getSessionsByInstructor(instructorId: number): Promise<Session[]> {
+    return Array.from(this.sessions.values()).filter(
+      session => session.instructorId === instructorId
+    );
+  }
+
+  async getSessionsByTrainee(traineeId: number): Promise<Session[]> {
+    const traineeSessionIds = new Set(
+      Array.from(this.sessionTrainees.values())
+        .filter(st => st.traineeId === traineeId)
+        .map(st => st.sessionId)
+    );
+    
+    return Array.from(this.sessions.values()).filter(
+      session => traineeSessionIds.has(session.id)
+    );
+  }
+
+  async createSession(session: InsertSession): Promise<Session> {
+    const id = this.sessionIdCounter++;
+    const newSession: Session = { ...session, id };
+    this.sessions.set(id, newSession);
     return newSession;
   }
 
-  async updateSession(id: number, sessionData: Partial<InsertSession>): Promise<Session | undefined> {
-    const existingSession = this.sessionsMap.get(id);
+  async updateSession(id: number, session: Partial<Session>): Promise<Session | undefined> {
+    const existingSession = this.sessions.get(id);
     if (!existingSession) return undefined;
-    
-    const updatedSession = { ...existingSession, ...sessionData };
-    this.sessionsMap.set(id, updatedSession);
+
+    const updatedSession = { ...existingSession, ...session };
+    this.sessions.set(id, updatedSession);
     return updatedSession;
   }
 
   async deleteSession(id: number): Promise<boolean> {
-    return this.sessionsMap.delete(id);
+    return this.sessions.delete(id);
   }
 
-  // SessionTrainee operations
-  async getSessionTrainees(sessionId?: number): Promise<SessionTrainee[]> {
-    const sessionTrainees = Array.from(this.sessionTraineesMap.values());
-    if (sessionId !== undefined) {
-      return sessionTrainees.filter(st => st.sessionId === sessionId);
-    }
-    return sessionTrainees;
+  // Session Trainee methods
+  async getSessionTrainees(sessionId: number): Promise<number[]> {
+    return Array.from(this.sessionTrainees.values())
+      .filter(st => st.sessionId === sessionId)
+      .map(st => st.traineeId);
   }
 
-  async addTraineeToSession(traineeData: InsertSessionTrainee): Promise<SessionTrainee> {
-    const id = this.sessionTraineeCounter++;
-    const newSessionTrainee: SessionTrainee = { ...traineeData, id };
-    this.sessionTraineesMap.set(id, newSessionTrainee);
+  async addTraineeToSession(sessionTrainee: InsertSessionTrainee): Promise<SessionTrainee> {
+    const id = this.sessionTraineeIdCounter++;
+    const newSessionTrainee: SessionTrainee = { ...sessionTrainee, id };
+    this.sessionTrainees.set(id, newSessionTrainee);
     return newSessionTrainee;
   }
 
   async removeTraineeFromSession(sessionId: number, traineeId: number): Promise<boolean> {
-    const sessionTrainee = Array.from(this.sessionTraineesMap.values())
-      .find(st => st.sessionId === sessionId && st.traineeId === traineeId);
+    const sessionTraineeToRemove = Array.from(this.sessionTrainees.values()).find(
+      st => st.sessionId === sessionId && st.traineeId === traineeId
+    );
     
-    if (sessionTrainee) {
-      return this.sessionTraineesMap.delete(sessionTrainee.id);
-    }
-    return false;
+    if (!sessionTraineeToRemove) return false;
+    return this.sessionTrainees.delete(sessionTraineeToRemove.id);
   }
 
-  // Assessment operations
-  async getAssessments(traineeId?: number, sessionId?: number): Promise<Assessment[]> {
-    let assessments = Array.from(this.assessmentsMap.values());
-    
-    if (traineeId !== undefined) {
-      assessments = assessments.filter(a => a.traineeId === traineeId);
-    }
-    
-    if (sessionId !== undefined) {
-      assessments = assessments.filter(a => a.sessionId === sessionId);
-    }
-    
-    return assessments;
-  }
-
+  // Assessment methods
   async getAssessment(id: number): Promise<Assessment | undefined> {
-    return this.assessmentsMap.get(id);
+    return this.assessments.get(id);
   }
 
-  async getAssessmentWithDetails(id: number): Promise<AssessmentWithDetails | undefined> {
-    const assessment = this.assessmentsMap.get(id);
-    if (!assessment) return undefined;
-    
-    const trainee = this.usersMap.get(assessment.traineeId);
-    const session = this.sessionsMap.get(assessment.sessionId);
-    const module = this.modulesMap.get(assessment.moduleId);
-    const instructor = this.usersMap.get(assessment.instructorId);
-    
-    if (!trainee || !session || !module || !instructor) return undefined;
-    
-    const grades = Array.from(this.gradesMap.values())
-      .filter(g => g.assessmentId === id);
-    
-    return {
-      ...assessment,
-      trainee,
-      session,
-      module,
-      instructor,
-      grades,
-    };
+  async getAssessmentsByTrainee(traineeId: number): Promise<Assessment[]> {
+    return Array.from(this.assessments.values()).filter(
+      assessment => assessment.traineeId === traineeId
+    );
   }
 
-  async createAssessment(assessmentData: InsertAssessment): Promise<Assessment> {
-    const id = this.assessmentCounter++;
-    const newAssessment: Assessment = { ...assessmentData, id };
-    this.assessmentsMap.set(id, newAssessment);
+  async getAssessmentsByInstructor(instructorId: number): Promise<Assessment[]> {
+    return Array.from(this.assessments.values()).filter(
+      assessment => assessment.instructorId === instructorId
+    );
+  }
+
+  async createAssessment(assessment: InsertAssessment): Promise<Assessment> {
+    const id = this.assessmentIdCounter++;
+    const newAssessment: Assessment = { ...assessment, id };
+    this.assessments.set(id, newAssessment);
     return newAssessment;
   }
 
-  async updateAssessment(id: number, assessmentData: Partial<InsertAssessment>): Promise<Assessment | undefined> {
-    const existingAssessment = this.assessmentsMap.get(id);
+  async updateAssessment(id: number, assessment: Partial<Assessment>): Promise<Assessment | undefined> {
+    const existingAssessment = this.assessments.get(id);
     if (!existingAssessment) return undefined;
-    
-    const updatedAssessment = { ...existingAssessment, ...assessmentData };
-    this.assessmentsMap.set(id, updatedAssessment);
+
+    const updatedAssessment = { ...existingAssessment, ...assessment };
+    this.assessments.set(id, updatedAssessment);
     return updatedAssessment;
   }
 
-  async deleteAssessment(id: number): Promise<boolean> {
-    return this.assessmentsMap.delete(id);
+  // Grade methods
+  async getGradesByAssessment(assessmentId: number): Promise<Grade[]> {
+    return Array.from(this.grades.values()).filter(
+      grade => grade.assessmentId === assessmentId
+    );
   }
 
-  // Grade operations
-  async getGrades(assessmentId: number): Promise<Grade[]> {
-    return Array.from(this.gradesMap.values())
-      .filter(g => g.assessmentId === assessmentId);
-  }
-
-  async createGrade(gradeData: InsertGrade): Promise<Grade> {
-    const id = this.gradeCounter++;
-    const newGrade: Grade = { ...gradeData, id };
-    this.gradesMap.set(id, newGrade);
+  async createGrade(grade: InsertGrade): Promise<Grade> {
+    const id = this.gradeIdCounter++;
+    const newGrade: Grade = { ...grade, id };
+    this.grades.set(id, newGrade);
     return newGrade;
   }
 
-  async updateGrade(id: number, gradeData: Partial<InsertGrade>): Promise<Grade | undefined> {
-    const existingGrade = this.gradesMap.get(id);
+  async updateGrade(id: number, grade: Partial<Grade>): Promise<Grade | undefined> {
+    const existingGrade = this.grades.get(id);
     if (!existingGrade) return undefined;
-    
-    const updatedGrade = { ...existingGrade, ...gradeData };
-    this.gradesMap.set(id, updatedGrade);
+
+    const updatedGrade = { ...existingGrade, ...grade };
+    this.grades.set(id, updatedGrade);
     return updatedGrade;
   }
 
-  async deleteGrade(id: number): Promise<boolean> {
-    return this.gradesMap.delete(id);
-  }
-
-  // Document operations
-  async getDocuments(): Promise<Document[]> {
-    return Array.from(this.documentsMap.values());
-  }
-
+  // Document methods
   async getDocument(id: number): Promise<Document | undefined> {
-    return this.documentsMap.get(id);
+    return this.documents.get(id);
   }
 
-  async createDocument(documentData: InsertDocument): Promise<Document> {
-    const id = this.documentCounter++;
-    const newDocument: Document = { ...documentData, id };
-    this.documentsMap.set(id, newDocument);
+  async getAllDocuments(): Promise<Document[]> {
+    return Array.from(this.documents.values());
+  }
+
+  async createDocument(document: InsertDocument): Promise<Document> {
+    const id = this.documentIdCounter++;
+    const newDocument: Document = { ...document, id };
+    this.documents.set(id, newDocument);
     return newDocument;
   }
 
-  async updateDocument(id: number, documentData: Partial<InsertDocument>): Promise<Document | undefined> {
-    const existingDocument = this.documentsMap.get(id);
-    if (!existingDocument) return undefined;
-    
-    const updatedDocument = { ...existingDocument, ...documentData };
-    this.documentsMap.set(id, updatedDocument);
-    return updatedDocument;
-  }
-
   async deleteDocument(id: number): Promise<boolean> {
-    return this.documentsMap.delete(id);
+    return this.documents.delete(id);
   }
 
-  // Resource operations
-  async getResources(): Promise<Resource[]> {
-    return Array.from(this.resourcesMap.values());
-  }
-
+  // Resource methods
   async getResource(id: number): Promise<Resource | undefined> {
-    return this.resourcesMap.get(id);
+    return this.resources.get(id);
   }
 
-  async createResource(resourceData: InsertResource): Promise<Resource> {
-    const id = this.resourceCounter++;
-    const newResource: Resource = { ...resourceData, id };
-    this.resourcesMap.set(id, newResource);
+  async getAllResources(): Promise<Resource[]> {
+    return Array.from(this.resources.values());
+  }
+
+  async createResource(resource: InsertResource): Promise<Resource> {
+    const id = this.resourceIdCounter++;
+    const newResource: Resource = { ...resource, id };
+    this.resources.set(id, newResource);
     return newResource;
   }
 
-  async updateResource(id: number, resourceData: Partial<InsertResource>): Promise<Resource | undefined> {
-    const existingResource = this.resourcesMap.get(id);
+  async updateResource(id: number, resource: Partial<Resource>): Promise<Resource | undefined> {
+    const existingResource = this.resources.get(id);
     if (!existingResource) return undefined;
-    
-    const updatedResource = { ...existingResource, ...resourceData };
-    this.resourcesMap.set(id, updatedResource);
+
+    const updatedResource = { ...existingResource, ...resource };
+    this.resources.set(id, updatedResource);
     return updatedResource;
   }
 
   async deleteResource(id: number): Promise<boolean> {
-    return this.resourcesMap.delete(id);
+    return this.resources.delete(id);
   }
 
-  // Notification operations
-  async getNotifications(recipientId?: number): Promise<Notification[]> {
-    const notifications = Array.from(this.notificationsMap.values());
-    if (recipientId !== undefined) {
-      return notifications.filter(n => n.recipientId === recipientId);
-    }
-    return notifications;
+  // Notification methods
+  async getNotificationsByUser(userId: number): Promise<Notification[]> {
+    return Array.from(this.notifications.values()).filter(
+      notification => notification.recipientId === userId
+    );
   }
 
-  async getNotification(id: number): Promise<Notification | undefined> {
-    return this.notificationsMap.get(id);
-  }
-
-  async createNotification(notificationData: InsertNotification): Promise<Notification> {
-    const id = this.notificationCounter++;
-    const newNotification: Notification = { ...notificationData, id };
-    this.notificationsMap.set(id, newNotification);
+  async createNotification(notification: InsertNotification): Promise<Notification> {
+    const id = this.notificationIdCounter++;
+    const newNotification: Notification = { ...notification, id };
+    this.notifications.set(id, newNotification);
     return newNotification;
   }
 
-  async updateNotification(id: number, notificationData: Partial<InsertNotification>): Promise<Notification | undefined> {
-    const existingNotification = this.notificationsMap.get(id);
+  async updateNotificationStatus(id: number, status: string): Promise<Notification | undefined> {
+    const existingNotification = this.notifications.get(id);
     if (!existingNotification) return undefined;
-    
-    const updatedNotification = { ...existingNotification, ...notificationData };
-    this.notificationsMap.set(id, updatedNotification);
+
+    const updatedNotification = { ...existingNotification, status };
+    this.notifications.set(id, updatedNotification);
     return updatedNotification;
-  }
-
-  async deleteNotification(id: number): Promise<boolean> {
-    return this.notificationsMap.delete(id);
-  }
-
-  async markNotificationsAsRead(recipientId: number): Promise<boolean> {
-    const notifications = Array.from(this.notificationsMap.values())
-      .filter(n => n.recipientId === recipientId && n.status === 'sent');
-    
-    for (const notification of notifications) {
-      this.notificationsMap.set(notification.id, {
-        ...notification,
-        status: 'read'
-      });
-    }
-    
-    return true;
   }
 }
 
