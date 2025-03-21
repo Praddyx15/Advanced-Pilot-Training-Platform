@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { extendedSessionSchema, insertProgramSchema, insertModuleSchema, insertLessonSchema, insertAssessmentSchema, insertGradeSchema, insertDocumentSchema, insertResourceSchema, insertNotificationSchema } from "@shared/schema";
+import { syllabusGenerationOptionsSchema, syllabusImportSchema } from "@shared/syllabus-types";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -18,6 +19,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   seedDatabase();
+
+  // === Syllabus Generator API ===
+  app.post("/api/protected/syllabus/generate", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+
+      const { documentId, options } = syllabusImportSchema.parse(req.body);
+      
+      // Check if the document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Generate syllabus from document
+      const syllabus = await storage.generateSyllabusFromDocument(documentId, options);
+      res.json(syllabus);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to generate syllabus" });
+    }
+  });
+  
+  app.post("/api/protected/syllabus/import", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const { syllabus } = req.body;
+      if (!syllabus) {
+        return res.status(400).json({ message: "Syllabus data is required" });
+      }
+      
+      // Save the syllabus as a training program
+      const program = await storage.saveSyllabusAsProgram(syllabus, req.user.id);
+      res.status(201).json(program);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to import syllabus" });
+    }
+  });
 
   // === Training Programs API ===
   app.get("/api/programs", async (req, res) => {

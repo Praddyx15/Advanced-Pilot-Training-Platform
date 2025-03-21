@@ -125,6 +125,7 @@ export function setupAuth(app: Express) {
   });
 
   app.post("/api/login", (req, res, next) => {
+    // @ts-ignore: TypeScript doesn't properly infer types for passport.authenticate()
     passport.authenticate("local", (err, user, info) => {
       if (err) {
         return next(err);
