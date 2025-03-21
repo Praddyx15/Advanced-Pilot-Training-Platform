@@ -79,6 +79,15 @@ export function setupAuth(app: Express) {
     role: z.enum(["instructor", "trainee"], {
       errorMap: () => ({ message: "Role must be either 'instructor' or 'trainee'" }),
     }),
+    organizationType: z.enum(["ATO", "Airline", "Personal", "Admin"], {
+      errorMap: () => ({ message: "Organization type must be one of 'ATO', 'Airline', 'Personal', or 'Admin'" }),
+    }).optional(),
+    organizationName: z.string().optional(),
+    authProvider: z.enum(["local", "google", "microsoft"], {
+      errorMap: () => ({ message: "Auth provider must be one of 'local', 'google', or 'microsoft'" }),
+    }).default("local"),
+    authProviderId: z.string().optional(),
+    profilePicture: z.string().url().optional(),
   });
 
   app.post("/api/register", async (req, res, next) => {
@@ -136,6 +145,60 @@ export function setupAuth(app: Express) {
         return res.status(200).json(userWithoutPassword);
       });
     })(req, res, next);
+  });
+  
+  // Mock implementation for social login
+  // In a real implementation, we would use passport strategies for Google and Microsoft
+  app.post("/api/social-login", async (req, res, next) => {
+    try {
+      const { provider, token, profile } = req.body;
+      
+      if (!provider || !token || !profile) {
+        return res.status(400).json({ message: "Missing required fields" });
+      }
+      
+      if (provider !== "google" && provider !== "microsoft") {
+        return res.status(400).json({ message: "Invalid provider" });
+      }
+      
+      // In a real implementation, we would verify the token with the provider
+      // and get the user profile from the provider
+      // Here we'll just use the provided profile and check if user exists
+      
+      let user = await storage.getUserByUsername(`${provider}_${profile.email}`);
+      
+      if (!user) {
+        // Create new user if not exists
+        user = await storage.createUser({
+          username: `${provider}_${profile.email}`,
+          password: await hashPassword(randomBytes(16).toString("hex")), // Random password
+          email: profile.email,
+          firstName: profile.firstName || profile.given_name || profile.name.split(" ")[0],
+          lastName: profile.lastName || profile.family_name || profile.name.split(" ").slice(1).join(" "),
+          role: "trainee", // Default role
+          organizationType: req.body.organizationType,
+          organizationName: req.body.organizationName,
+          authProvider: provider,
+          authProviderId: profile.id || profile.sub,
+          profilePicture: profile.picture || profile.avatar,
+        });
+      }
+      
+      req.login(user, (loginErr) => {
+        if (loginErr) {
+          return next(loginErr);
+        }
+        
+        const userWithoutPassword = {
+          ...user,
+          password: undefined,
+        };
+        
+        return res.status(200).json(userWithoutPassword);
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.post("/api/logout", (req, res, next) => {

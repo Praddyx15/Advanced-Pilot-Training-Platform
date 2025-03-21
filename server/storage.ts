@@ -173,7 +173,15 @@ export class MemStorage implements IStorage {
 
   async createUser(user: InsertUser): Promise<User> {
     const id = this.userIdCounter++;
-    const newUser: User = { ...user, id };
+    const newUser: User = {
+      ...user,
+      id,
+      organizationType: user.organizationType || null,
+      organizationName: user.organizationName || null,
+      authProvider: user.authProvider || "local",
+      authProviderId: user.authProviderId || null,
+      profilePicture: user.profilePicture || null
+    };
     this.users.set(id, newUser);
     return newUser;
   }
@@ -197,7 +205,11 @@ export class MemStorage implements IStorage {
 
   async createProgram(program: InsertTrainingProgram): Promise<TrainingProgram> {
     const id = this.programIdCounter++;
-    const newProgram: TrainingProgram = { ...program, id };
+    const newProgram: TrainingProgram = { 
+      ...program, 
+      id,
+      description: program.description || null 
+    };
     this.programs.set(id, newProgram);
     return newProgram;
   }
@@ -306,7 +318,11 @@ export class MemStorage implements IStorage {
 
   async createSession(session: InsertSession): Promise<Session> {
     const id = this.sessionIdCounter++;
-    const newSession: Session = { ...session, id };
+    const newSession: Session = { 
+      ...session, 
+      id,
+      resourceId: session.resourceId || null
+    };
     this.sessions.set(id, newSession);
     return newSession;
   }
@@ -389,7 +405,11 @@ export class MemStorage implements IStorage {
 
   async createGrade(grade: InsertGrade): Promise<Grade> {
     const id = this.gradeIdCounter++;
-    const newGrade: Grade = { ...grade, id };
+    const newGrade: Grade = { 
+      ...grade, 
+      id,
+      comments: grade.comments || null 
+    };
     this.grades.set(id, newGrade);
     return newGrade;
   }
@@ -414,7 +434,11 @@ export class MemStorage implements IStorage {
 
   async createDocument(document: InsertDocument): Promise<Document> {
     const id = this.documentIdCounter++;
-    const newDocument: Document = { ...document, id };
+    const newDocument: Document = { 
+      ...document, 
+      id,
+      description: document.description || null 
+    };
     this.documents.set(id, newDocument);
     return newDocument;
   }
