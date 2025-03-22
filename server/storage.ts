@@ -17,6 +17,8 @@ import {
   InsertGrade,
   Document,
   InsertDocument,
+  DocumentVersion,
+  InsertDocumentVersion,
   Resource,
   InsertResource,
   Notification,
