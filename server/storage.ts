@@ -282,6 +282,9 @@ export interface IStorage {
 
   // Session store for authentication
   sessionStore: session.Store;
+  
+  // Initialize sample user data for testing (only for development)
+  initializeSampleUser(): void;
 }
 
 export class MemStorage implements IStorage {
@@ -413,6 +416,9 @@ export class MemStorage implements IStorage {
 
     // Initialize with some common regulatory references
     this.initializeRegulatoryReferences();
+    
+    // Initialize sample user
+    this.initializeSampleUser();
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -439,6 +445,91 @@ export class MemStorage implements IStorage {
         effectiveDate: new Date()
       };
     });
+  }
+
+  // Initialize a sample user for testing
+  private initializeSampleUser() {
+    // Add admin user
+    const adminUser: User = {
+      id: this.userIdCounter++,
+      username: 'admin',
+      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
+      email: 'admin@example.com',
+      firstName: 'Admin',
+      lastName: 'User',
+      role: 'admin',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'Admin',
+      organizationName: 'Aviation Training Platform',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
+    // Add instructor user
+    const instructorUser: User = {
+      id: this.userIdCounter++,
+      username: 'instructor',
+      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
+      email: 'instructor@example.com',
+      firstName: 'Test',
+      lastName: 'Instructor',
+      role: 'instructor',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'ATO',
+      organizationName: 'Flight Academy',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
+    // Add trainee user
+    const traineeUser: User = {
+      id: this.userIdCounter++,
+      username: 'trainee',
+      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
+      email: 'trainee@example.com',
+      firstName: 'Test',
+      lastName: 'Trainee',
+      role: 'trainee',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'Airline',
+      organizationName: 'Skyways Airlines',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
+    this.users.set(adminUser.id, adminUser);
+    this.users.set(instructorUser.id, instructorUser);
+    this.users.set(traineeUser.id, traineeUser);
+    
+    console.log('Initialized sample users:', 
+      this.users.size, 
+      'users created with IDs:', 
+      Array.from(this.users.keys()).join(', ')
+    );
   }
 
   // Initialize regulatory references for different authorities
