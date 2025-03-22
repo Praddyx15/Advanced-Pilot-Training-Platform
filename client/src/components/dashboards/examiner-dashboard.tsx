@@ -500,38 +500,59 @@ export function ExaminerDashboard() {
           {/* Standardization Statistics */}
           <Card>
             <CardHeader>
-              <CardTitle>Standardization Statistics</CardTitle>
-              <CardDescription>Pass Rate by Assessment Area</CardDescription>
+              <CardTitle className="flex items-center">
+                <PieChart className="h-5 w-5 mr-2 text-purple-600" />
+                Standardization Statistics
+              </CardTitle>
+              <CardDescription>Pass Rate Distribution by Area</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="h-48 flex items-end space-x-2">
-                {standardization?.areas.map((area, i) => (
-                  <div key={i} className="flex flex-col items-center flex-1">
-                    <div className="w-full flex items-end justify-center space-x-1 h-36 mb-2">
-                      <div 
-                        className="w-3 bg-purple-200 rounded-sm"
-                        style={{ height: `${standardization.atoStandard[i]}%` }}
-                      ></div>
-                      <div 
-                        className="w-3 bg-purple-500 rounded-sm"
-                        style={{ height: `${standardization.examinerRates[i]}%` }}
-                      ></div>
-                    </div>
-                    <span className="text-xs font-medium">{area}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-center gap-4 mt-3">
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-purple-200 mr-1"></div>
-                  <span className="text-xs text-muted-foreground">ATO standard</span>
-                </div>
-                <div className="flex items-center">
-                  <div className="w-3 h-3 bg-purple-500 mr-1"></div>
-                  <span className="text-xs text-muted-foreground">Your rates</span>
-                </div>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={standardization?.areas.map((area, i) => ({
+                        name: area,
+                        value: standardization.examinerRates[i],
+                        standard: standardization.atoStandard[i]
+                      }))}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      innerRadius={40}
+                      dataKey="value"
+                      nameKey="name"
+                      label={({ name, value }) => `${name}: ${value}%`}
+                    >
+                      {standardization?.areas.map((_, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={[
+                            '#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', 
+                            '#ede9fe', '#7c3aed', '#6d28d9', '#5b21b6'
+                          ][index % 8]} 
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      formatter={(value, name, props) => {
+                        return [`${value}% (Your Rate) / ${props.payload.standard}% (ATO)`, name];
+                      }}
+                    />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
               </div>
             </CardContent>
+            <CardFooter className="border-t pt-4 px-6">
+              <Button variant="outline" size="sm" className="w-full" asChild>
+                <Link to="/standardization-details">
+                  View Detailed Statistics
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>
