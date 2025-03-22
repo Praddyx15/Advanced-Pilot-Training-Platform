@@ -938,7 +938,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Document not found" });
       }
       
-      const { analysisType } = req.body;
+      const { analysisType, options = {} } = req.body;
       if (!analysisType) {
         return res.status(400).json({ message: "Analysis type is required" });
       }
@@ -953,42 +953,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const analysis = await storage.createDocumentAnalysis(analysisData);
       
-      // In a real-world scenario, we would trigger an async analysis job here
-      // For demo purposes, we'll update the status immediately
+      // Import our document processing services
+      const { extractTextFromDocument } = await import('./services/document-extraction');
+      const { analyzeDocumentStructure } = await import('./services/document-structure');
+
+      // Start the analysis process in the background
       setTimeout(async () => {
         try {
-          const sampleResults = {
-            metadata: {
-              processingTime: Math.floor(Math.random() * 5000) + 1000
-            },
-            content: {}
-          };
+          let results = {};
+          const startTime = Date.now();
           
-          // Different mock results based on analysis type
-          if (analysisType === 'text_extraction') {
-            sampleResults.content = {
-              text: `Extracted text content from ${document.title}`,
-              pageCount: Math.floor(Math.random() * 20) + 1
-            };
-          } else if (analysisType === 'structure_recognition') {
-            sampleResults.content = {
-              sections: ['Introduction', 'Methods', 'Results', 'Discussion'],
-              figures: Math.floor(Math.random() * 10),
-              tables: Math.floor(Math.random() * 8)
-            };
-          } else if (analysisType === 'entity_extraction') {
-            sampleResults.content = {
-              people: ['John Smith', 'Mary Johnson'],
-              organizations: ['FAA', 'EASA', 'ICAO'],
-              locations: ['New York', 'London', 'Tokyo']
-            };
+          // Get the document file path (in a real app, this would be in storage)
+          // For demo purposes, we assume the document path is stored in document.filePath
+          const filePath = document.filePath || `./uploads/${document.id}_${document.title.replace(/\s+/g, '_')}`;
+          
+          try {
+            if (analysisType === 'text_extraction') {
+              // Perform text extraction
+              results = await extractTextFromDocument(filePath, {
+                language: options.language || 'eng',
+                ocrEnabled: options.ocrEnabled !== false, // Enable OCR by default
+              });
+              
+            } else if (analysisType === 'structure_recognition') {
+              // First extract text, then analyze structure
+              const extractionResult = await extractTextFromDocument(filePath, {
+                language: options.language || 'eng',
+                ocrEnabled: options.ocrEnabled !== false,
+              });
+              
+              results = await analyzeDocumentStructure(extractionResult, {
+                recognizeHeadings: options.recognizeHeadings !== false,
+                recognizeSections: options.recognizeSections !== false,
+                recognizeTables: options.recognizeTables !== false,
+                recognizeLists: options.recognizeLists !== false,
+                recognizeKeyValue: options.recognizeKeyValue !== false,
+                recognizeReferences: options.recognizeReferences !== false,
+                language: options.language || 'eng',
+              });
+              
+            } else if (analysisType === 'entity_extraction') {
+              // Placeholder for future entity extraction implementation
+              // This would use an NLP service like spaCy, Stanford NER, etc.
+              results = {
+                metadata: {
+                  processingTime: Date.now() - startTime,
+                  status: 'not_implemented',
+                },
+                content: {
+                  message: 'Entity extraction service is not fully implemented yet',
+                }
+              };
+            }
+            
+            // Update the analysis with the results
+            await storage.updateDocumentAnalysisStatus(
+              analysis.id, 
+              'completed', 
+              results
+            );
+          } catch (processingError) {
+            console.error('Document processing error:', processingError);
+            
+            // Update with error status and error details
+            await storage.updateDocumentAnalysisStatus(
+              analysis.id, 
+              'failed', 
+              {
+                error: processingError.message,
+                stack: process.env.NODE_ENV === 'development' ? processingError.stack : undefined,
+              }
+            );
           }
-          
-          await storage.updateDocumentAnalysisStatus(
-            analysis.id, 
-            'completed', 
-            sampleResults
-          );
         } catch (error) {
           console.error('Error in analysis job:', error);
           await storage.updateDocumentAnalysisStatus(
@@ -997,7 +1033,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { error: 'Analysis processing failed' }
           );
         }
-      }, 2000);
+      }, 100); // Start processing almost immediately
       
       res.status(202).json({
         ...analysis,

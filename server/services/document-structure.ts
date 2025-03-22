@@ -173,7 +173,7 @@ function processHeadings(
   const sortedHeadings = [...headings];
   
   // Track current section for each level
-  const currentSections: DocumentElement[] = [structure.hierarchy];
+  const currentSections: (DocumentElement | undefined)[] = [structure.hierarchy];
   
   for (const heading of sortedHeadings) {
     const headingElement: DocumentElement = {
@@ -197,7 +197,7 @@ function processHeadings(
         pageNumber: heading.pageIndex ? heading.pageIndex + 1 : undefined,
       },
       children: [],
-      parent: null, // Will be set below
+      parent: undefined, // Will be set below
     };
     
     // Add heading to its section
@@ -221,7 +221,7 @@ function processHeadings(
     
     // Clear any deeper levels since they would now belong to this new section
     for (let i = heading.level + 1; i < currentSections.length; i++) {
-      currentSections[i] = null;
+      currentSections[i] = undefined;
     }
     
     // Add to flat list of elements
