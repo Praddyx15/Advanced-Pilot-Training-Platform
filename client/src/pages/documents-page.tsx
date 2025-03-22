@@ -201,11 +201,7 @@ export default function DocumentsPage() {
   };
 
   const handleDocumentView = (document: Document) => {
-    // In a real app, this would open the document viewer
-    toast({
-      title: 'Viewing Document',
-      description: `Opening ${document.fileName}...`,
-    });
+    setSelectedDocument(document);
   };
 
   return (
@@ -406,6 +402,13 @@ export default function DocumentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      {/* Document Detail Dialog */}
+      <DocumentDetailDialog 
+        document={selectedDocument} 
+        open={!!selectedDocument} 
+        onOpenChange={(open) => !open && setSelectedDocument(null)}
+      />
     </div>
   );
 

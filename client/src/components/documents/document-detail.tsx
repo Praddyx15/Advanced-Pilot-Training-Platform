@@ -13,7 +13,7 @@ import {
   FileText, 
   Download, 
   ExternalLink, 
-  FileVersion, 
+  FilesIcon, 
   Calendar,
   User,
   Tag,
@@ -30,16 +30,16 @@ import { useToast } from "@/hooks/use-toast";
 
 interface DocumentDetailDialogProps {
   document: Document | null;
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onDownload?: (document: Document) => void;
   onAnalyze?: (document: Document) => void;
 }
 
 export function DocumentDetailDialog({ 
   document, 
-  isOpen, 
-  onClose, 
+  open, 
+  onOpenChange, 
   onDownload, 
   onAnalyze 
 }: DocumentDetailDialogProps) {
@@ -48,7 +48,7 @@ export function DocumentDetailDialog({
 
   const { data: documentVersions = [] } = useQuery<DocumentVersion[]>({
     queryKey: [`/api/documents/${document?.id}/versions`],
-    enabled: !!document && isOpen,
+    enabled: !!document && open,
   });
 
   if (!document) return null;
@@ -91,7 +91,7 @@ export function DocumentDetailDialog({
   };
 
   const getFileIcon = () => {
-    const fileType = document.fileType || document.fileName.split('.').pop()?.toLowerCase();
+    const fileType = document.fileType || document.fileName?.split('.').pop()?.toLowerCase();
     
     switch (fileType) {
       case 'pdf':
@@ -123,7 +123,7 @@ export function DocumentDetailDialog({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -154,7 +154,7 @@ export function DocumentDetailDialog({
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">File Type:</span>
                       <span className="text-sm font-medium">
-                        {document.fileType?.toUpperCase() || document.fileName.split('.').pop()?.toUpperCase() || 'Unknown'}
+                        {document.fileType?.toUpperCase() || document.fileName?.split('.').pop()?.toUpperCase() || 'Unknown'}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -163,15 +163,15 @@ export function DocumentDetailDialog({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-sm text-muted-foreground">Uploaded:</span>
-                      <span className="text-sm font-medium" title={formatDate(document.uploadedAt)}>
-                        {getTimeAgo(document.uploadedAt)}
+                      <span className="text-sm font-medium" title={formatDate(document.createdAt)}>
+                        {getTimeAgo(document.createdAt)}
                       </span>
                     </div>
-                    {document.lastModified && (
+                    {document.updatedAt && document.updatedAt.getTime() !== document.createdAt.getTime() && (
                       <div className="flex justify-between">
                         <span className="text-sm text-muted-foreground">Last Modified:</span>
-                        <span className="text-sm font-medium" title={formatDate(document.lastModified)}>
-                          {getTimeAgo(document.lastModified)}
+                        <span className="text-sm font-medium" title={formatDate(document.updatedAt)}>
+                          {getTimeAgo(document.updatedAt)}
                         </span>
                       </div>
                     )}
@@ -187,12 +187,6 @@ export function DocumentDetailDialog({
                       <span className="text-sm text-muted-foreground">Uploaded By:</span>
                       <span className="text-sm font-medium">User ID: {document.uploadedById}</span>
                     </div>
-                    {document.ownerId && (
-                      <div className="flex justify-between">
-                        <span className="text-sm text-muted-foreground">Owner:</span>
-                        <span className="text-sm font-medium">User ID: {document.ownerId}</span>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
@@ -250,12 +244,12 @@ export function DocumentDetailDialog({
             <Separator />
 
             <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
               <div className="space-x-2">
-                {document.externalUrl && (
-                  <Button variant="outline" onClick={() => window.open(document.externalUrl, '_blank')}>
+                {document.url && (
+                  <Button variant="outline" onClick={() => window.open(document.url, '_blank')}>
                     <ExternalLink className="mr-2 h-4 w-4" />
                     Open Original
                   </Button>
@@ -271,10 +265,10 @@ export function DocumentDetailDialog({
           <TabsContent value="versions" className="space-y-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium flex items-center gap-2">
-                <FileVersion className="h-5 w-5" />
+                <FilesIcon className="h-5 w-5" />
                 Document Versions
               </h3>
-              <DocumentVersionUpload documentId={document.id} documentTitle={document.fileName} />
+              <DocumentVersionUpload documentId={document.id} documentTitle={document.fileName || 'document'} />
             </div>
 
             <DocumentVersions 
@@ -285,7 +279,7 @@ export function DocumentDetailDialog({
             <Separator />
 
             <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={onClose}>
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Close
               </Button>
               <Button variant="outline" onClick={() => setActiveTab("overview")}>
