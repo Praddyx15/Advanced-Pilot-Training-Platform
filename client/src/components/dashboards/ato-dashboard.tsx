@@ -45,6 +45,14 @@ export function ATODashboard() {
   const [selectedProgram, setSelectedProgram] = useState("All Programs");
   const [selectedCycle, setSelectedCycle] = useState("Jan - Mar 2025");
 
+  // Certification status data for pie chart
+  const certificationStatusData = [
+    { name: "Active", count: 56, color: "#2dd4bf" },  // Teal
+    { name: "Pending Renewal", count: 12, color: "#f59e0b" },  // Amber
+    { name: "Expiring Soon", count: 8, color: "#f43f5e" },  // Rose
+    { name: "Recently Issued", count: 24, color: "#3b82f6" }  // Blue
+  ];
+
   // Fetch ATO dashboard data
   const { data: dashboardData, isLoading: isDashboardLoading } = useQuery({
     queryKey: ['/api/ato/dashboard', selectedProgram, selectedCycle],
@@ -103,7 +111,8 @@ export function ATODashboard() {
             { type: "CPL Certification Tests", students: 8 },
             { type: "IR Certification Tests", students: 6 },
             { type: "ATPL Certification Tests", students: 3 },
-          ]
+          ],
+          certificationStatusData: certificationStatusData
         };
       }
     },
@@ -281,6 +290,53 @@ export function ATODashboard() {
                 ))}
               </div>
             </CardContent>
+          </Card>
+
+          {/* Certification Status Distribution */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Certification Status Distribution</CardTitle>
+              <CardDescription>Current certification status across all programs</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center">
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={dashboardData?.certificationStatusData || certificationStatusData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {(dashboardData?.certificationStatusData || certificationStatusData).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name) => [`${value} certifications`, name]}
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button variant="outline" className="w-full md:w-auto">
+                <PieChart className="mr-2 h-4 w-4" />
+                View Detailed Certification Report
+              </Button>
+            </CardFooter>
           </Card>
 
           {/* Instructor Allocation */}
