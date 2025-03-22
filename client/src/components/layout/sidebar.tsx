@@ -53,7 +53,13 @@ export default function Sidebar() {
         <MenuItem id="assessments" icon={<FileText className="h-5 w-5" />} label="Assessments" />
         <MenuItem id="trainees" icon={<Users className="h-5 w-5" />} label="Trainees" />
         <MenuItem id="resources" icon={<Airplay className="h-5 w-5" />} label="Resources" />
-        <MenuItem id="documents" icon={<FileText className="h-5 w-5" />} label="Documents" />
+        
+        <Link href="/documents">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors">
+            <StickyNote className="h-5 w-5" />
+            <span>Documents</span>
+          </a>
+        </Link>
       </div>
       
       <div className="border-t border-slate-200 my-4"></div>
@@ -78,6 +84,27 @@ export default function Sidebar() {
           <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-green-600 hover:bg-green-50 transition-colors">
             <ActivitySquare className="h-5 w-5" />
             <span>Analytics Dashboard</span>
+          </a>
+        </Link>
+        
+        <Link href="/session-replay">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-orange-600 hover:bg-orange-50 transition-colors">
+            <PlayCircle className="h-5 w-5" />
+            <span>Session Replay</span>
+          </a>
+        </Link>
+        
+        <Link href="/compliance">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors">
+            <ShieldCheck className="h-5 w-5" />
+            <span>Regulatory Compliance</span>
+          </a>
+        </Link>
+        
+        <Link href="/achievements">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-amber-600 hover:bg-amber-50 transition-colors">
+            <Medal className="h-5 w-5" />
+            <span>Achievements</span>
           </a>
         </Link>
         
