@@ -12,7 +12,11 @@ import {
   Wand2,
   Network,
   LineChart,
-  ActivitySquare
+  ActivitySquare,
+  PlayCircle,
+  ShieldCheck,
+  Medal,
+  StickyNote
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";

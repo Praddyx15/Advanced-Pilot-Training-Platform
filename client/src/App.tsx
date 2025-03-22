@@ -8,6 +8,10 @@ import AuthPage from "@/pages/auth-page";
 import SyllabusGeneratorPage from "@/pages/syllabus-generator-page";
 import KnowledgeGraphPage from "@/pages/knowledge-graph-page";
 import AnalyticsDashboardPage from "@/pages/analytics-dashboard";
+import SessionReplayPage from "@/pages/session-replay-page";
+import AchievementsPage from "@/pages/achievements-page";
+import DocumentsPage from "@/pages/documents-page";
+import CompliancePage from "@/pages/compliance-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -20,6 +24,10 @@ function Router() {
       <ProtectedRoute path="/syllabus-generator" component={SyllabusGeneratorPage} />
       <ProtectedRoute path="/knowledge-graph" component={KnowledgeGraphPage} />
       <ProtectedRoute path="/analytics" component={AnalyticsDashboardPage} />
+      <ProtectedRoute path="/session-replay" component={SessionReplayPage} />
+      <ProtectedRoute path="/achievements" component={AchievementsPage} />
+      <ProtectedRoute path="/documents" component={DocumentsPage} />
+      <ProtectedRoute path="/compliance" component={CompliancePage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
