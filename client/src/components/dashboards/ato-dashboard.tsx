@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,8 @@ import {
   Loader2,
   ArrowUpRight,
   Info,
+  PieChart,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Select,
@@ -29,6 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 export function ATODashboard() {
   const [selectedProgram, setSelectedProgram] = useState("All Programs");

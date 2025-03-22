@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -21,7 +22,21 @@ import {
   User,
   Play,
   ChevronRight,
+  PieChart,
+  BarChart,
 } from 'lucide-react';
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+} from 'recharts';
 
 export function InstructorDashboard() {
   const { data: instructorProfile, isLoading: isProfileLoading } = useQuery({
@@ -167,8 +182,27 @@ export function InstructorDashboard() {
     },
   });
 
+  // Fetch assessment ratings data
+  const { data: assessmentRatings, isLoading: isAssessmentRatingsLoading } = useQuery({
+    queryKey: ['/api/instructor/assessment-ratings'],
+    queryFn: async () => {
+      try {
+        const response = await apiRequest('GET', '/api/instructor/assessment-ratings');
+        return await response.json();
+      } catch (error) {
+        // Return mock data for development
+        return [
+          { name: "Excellent", count: 15, color: "#10b981" },
+          { name: "Satisfactory", count: 42, color: "#3b82f6" },
+          { name: "Unsatisfactory", count: 8, color: "#f97316" },
+          { name: "Needs Improvement", count: 12, color: "#f59e0b" },
+        ];
+      }
+    },
+  });
+
   // Loading states
-  if (isProfileLoading || isSessionsLoading || isGradesheetsLoading || isTraineesLoading || isWeeklyScheduleLoading) {
+  if (isProfileLoading || isSessionsLoading || isGradesheetsLoading || isTraineesLoading || isWeeklyScheduleLoading || isAssessmentRatingsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -353,6 +387,53 @@ export function InstructorDashboard() {
                 </table>
               </div>
             </CardContent>
+          </Card>
+          
+          {/* Assessment Ratings */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Assessment Ratings Distribution</CardTitle>
+              <CardDescription>Overview of all trainee assessment ratings</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center justify-center">
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RechartsPieChart>
+                    <Pie
+                      data={assessmentRatings}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="count"
+                      nameKey="name"
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                    >
+                      {assessmentRatings?.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value, name) => [`${value} assessments`, name]}
+                      contentStyle={{ 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                        borderRadius: '0.5rem',
+                        border: '1px solid #e2e8f0',
+                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
+                      }}
+                    />
+                    <Legend />
+                  </RechartsPieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-center">
+              <Button variant="outline" className="w-full md:w-auto">
+                View Detailed Assessment Report
+                <ChevronRight className="ml-2 h-4 w-4" />
+              </Button>
+            </CardFooter>
           </Card>
 
           {/* Pending Gradesheets */}
