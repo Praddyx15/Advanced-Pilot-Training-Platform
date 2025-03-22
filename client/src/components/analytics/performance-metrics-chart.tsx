@@ -1,171 +1,152 @@
-import { useState } from "react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  LineChart, 
+  Line, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  Legend, 
+  ResponsiveContainer 
+} from 'recharts';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
+import { PerformanceMetric } from '@shared/schema';
+import { Loader2 } from 'lucide-react';
 
-// Mock data - in a real application, this would come from API calls
-const generatePerformanceData = (numPoints = 10, detailed = false) => {
-  const categories = detailed
-    ? ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM', 'Decision Making', 'Situational Awareness', 'Workload Management']
-    : ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM'];
-  
-  return Array.from({ length: numPoints }).map((_, i) => {
-    const month = new Date();
-    month.setMonth(month.getMonth() - (numPoints - i - 1));
-    
-    const entry: Record<string, any> = {
-      name: month.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-    };
-    
-    // Generate realistic data for each category with upward trend and minor variations
-    categories.forEach(category => {
-      // Base value between 2.0 and 3.0 with upward progression
-      const baseValue = 2.0 + (i * 0.1);
-      // Random variation +/- 0.3
-      const variation = (Math.random() * 0.6) - 0.3;
-      // Ensure final value is between 1 and 4
-      let value = Math.min(Math.max(baseValue + variation, 1), 4);
-      // Round to one decimal place
-      value = Math.round(value * 10) / 10;
-      
-      entry[category] = value;
-    });
-    
-    return entry;
-  });
-};
-
-// Define colors for different metrics
-const categoryColors = {
-  'Technical Knowledge': '#8884d8',
-  'Aircraft Handling': '#82ca9d',
-  'Procedures': '#ffc658',
-  'CRM': '#ff8042',
-  'Decision Making': '#a4de6c',
-  'Situational Awareness': '#d0ed57',
-  'Workload Management': '#83a6ed'
-};
-
-interface PerformanceMetricsChartProps {
-  showDetailed?: boolean;
+interface PerformanceData {
+  date: string;
+  reactionTime?: number;
+  cognitiveWorkload?: number;
+  proceduralCompliance?: number;
+  [key: string]: string | number | undefined;
 }
 
-export default function PerformanceMetricsChart({ showDetailed = false }: PerformanceMetricsChartProps) {
-  const [timeframe, setTimeframe] = useState('6m');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>(
-    showDetailed
-      ? ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM']
-      : ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM']
-  );
+function processMetricsData(metrics: PerformanceMetric[]): PerformanceData[] {
+  // Group data by day
+  const dataByDay = metrics.reduce((acc, metric) => {
+    const date = new Date(metric.timestamp).toLocaleDateString();
+    if (!acc[date]) {
+      acc[date] = {
+        date,
+        metrics: {}
+      };
+    }
+    
+    if (!acc[date].metrics[metric.metricType]) {
+      acc[date].metrics[metric.metricType] = [];
+    }
+    
+    acc[date].metrics[metric.metricType].push(metric.value);
+    return acc;
+  }, {} as Record<string, { date: string; metrics: Record<string, number[]> }>);
+  
+  // Calculate average for each metric type by day
+  return Object.values(dataByDay).map(day => {
+    const result: PerformanceData = { date: day.date };
+    
+    Object.entries(day.metrics).forEach(([metricType, values]) => {
+      const average = values.reduce((sum, val) => sum + val, 0) / values.length;
+      result[metricType] = parseFloat(average.toFixed(2));
+    });
+    
+    return result;
+  }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+}
 
-  // Generate data based on the selected timeframe
-  let dataPoints;
-  switch (timeframe) {
-    case '1m':
-      dataPoints = 4; // Weekly data points for 1 month
-      break;
-    case '3m':
-      dataPoints = 6; // Bi-weekly data points for 3 months
-      break;
-    case '6m':
-      dataPoints = 6; // Monthly data points for 6 months
-      break;
-    case '1y':
-      dataPoints = 12; // Monthly data points for 1 year
-      break;
-    default:
-      dataPoints = 6;
-  }
-
-  const data = generatePerformanceData(dataPoints, showDetailed);
-
-  // All possible categories
-  const allCategories = showDetailed
-    ? ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM', 'Decision Making', 'Situational Awareness', 'Workload Management']
-    : ['Technical Knowledge', 'Aircraft Handling', 'Procedures', 'CRM'];
-
-  const toggleCategory = (category: string) => {
-    setSelectedCategories(prev => 
-      prev.includes(category)
-        ? prev.filter(c => c !== category)
-        : [...prev, category]
-    );
+export default function PerformanceMetricsChart() {
+  const { user } = useAuth();
+  const [selectedTrainee, setSelectedTrainee] = useState<number | null>(null);
+  const [chartData, setChartData] = useState<PerformanceData[]>([]);
+  
+  const { data: trainees, isLoading: isLoadingTrainees } = useQuery({
+    queryKey: ['/api/users/trainees'],
+    enabled: user?.role === 'instructor' || user?.role === 'admin',
+  });
+  
+  const { data: metrics, isLoading: isLoadingMetrics } = useQuery({
+    queryKey: ['/api/analytics/performance/trainee', selectedTrainee],
+    enabled: !!selectedTrainee,
+  });
+  
+  useEffect(() => {
+    if (!selectedTrainee && user && user.role === 'trainee') {
+      setSelectedTrainee(user.id);
+    } else if (!selectedTrainee && trainees && trainees.length > 0) {
+      setSelectedTrainee(trainees[0].id);
+    }
+  }, [user, trainees, selectedTrainee]);
+  
+  useEffect(() => {
+    if (metrics) {
+      setChartData(processMetricsData(metrics));
+    }
+  }, [metrics]);
+  
+  const isLoading = isLoadingTrainees || isLoadingMetrics || !chartData.length;
+  
+  const getMetricColor = (metric: string) => {
+    switch (metric) {
+      case 'reactionTime': return '#8884d8';
+      case 'cognitiveWorkload': return '#82ca9d';
+      case 'proceduralCompliance': return '#ffc658';
+      default: return '#ff8042';
+    }
   };
-
+  
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap justify-between items-center gap-2">
-        <div className="flex flex-wrap gap-2">
-          {allCategories.map(category => (
-            <Button
-              key={category}
-              variant={selectedCategories.includes(category) ? "default" : "outline"}
-              size="sm"
-              onClick={() => toggleCategory(category)}
-              className="text-xs"
-              style={{ 
-                backgroundColor: selectedCategories.includes(category) 
-                  ? categoryColors[category as keyof typeof categoryColors] 
-                  : 'transparent',
-                color: selectedCategories.includes(category) ? 'white' : 'inherit',
-                borderColor: categoryColors[category as keyof typeof categoryColors]
-              }}
-            >
-              {category}
-            </Button>
-          ))}
-        </div>
-        <Select value={timeframe} onValueChange={setTimeframe}>
-          <SelectTrigger className="w-[100px]">
-            <SelectValue placeholder="Timeframe" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1m">1 Month</SelectItem>
-            <SelectItem value="3m">3 Months</SelectItem>
-            <SelectItem value="6m">6 Months</SelectItem>
-            <SelectItem value="1y">1 Year</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart
-            data={data}
-            margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
+    <Card className="col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Performance Metrics</CardTitle>
+        {user && (user.role === 'instructor' || user.role === 'admin') && (
+          <Select
+            value={selectedTrainee?.toString()}
+            onValueChange={(value) => setSelectedTrainee(parseInt(value))}
           >
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-            <XAxis dataKey="name" />
-            <YAxis domain={[0, 4]} ticks={[0, 1, 2, 3, 4]} />
-            <Tooltip 
-              formatter={(value: any) => [`${value} (1-4)`, '']}
-              labelFormatter={(label) => `Date: ${label}`}
-            />
-            <Legend />
-            {selectedCategories.map(category => (
-              <Line
-                key={category}
-                type="monotone"
-                dataKey={category}
-                stroke={categoryColors[category as keyof typeof categoryColors]}
-                strokeWidth={2}
-                dot={{ r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            ))}
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-    </div>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select trainee" />
+            </SelectTrigger>
+            <SelectContent>
+              {trainees?.map((trainee) => (
+                <SelectItem key={trainee.id} value={trainee.id.toString()}>
+                  {trainee.username}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </CardHeader>
+      <CardContent className="h-[300px]">
+        {isLoading ? (
+          <div className="flex h-full items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Legend />
+              {Object.keys(chartData[0])
+                .filter(key => key !== 'date')
+                .map(metric => (
+                  <Line 
+                    key={metric}
+                    type="monotone"
+                    dataKey={metric}
+                    name={metric.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    stroke={getMetricColor(metric)}
+                    activeDot={{ r: 8 }}
+                  />
+                ))}
+            </LineChart>
+          </ResponsiveContainer>
+        )}
+      </CardContent>
+    </Card>
   );
 }

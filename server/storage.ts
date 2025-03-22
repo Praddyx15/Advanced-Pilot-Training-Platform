@@ -1323,6 +1323,381 @@ export class MemStorage implements IStorage {
   async deleteKnowledgeGraphEdge(id: number): Promise<boolean> {
     return this.knowledgeGraphEdges.delete(id);
   }
+
+  // Performance Metrics methods
+  async getPerformanceMetric(id: number): Promise<PerformanceMetric | undefined> {
+    return this.performanceMetrics.get(id);
+  }
+
+  async getPerformanceMetricsByTrainee(traineeId: number): Promise<PerformanceMetric[]> {
+    return Array.from(this.performanceMetrics.values())
+      .filter(metric => metric.traineeId === traineeId);
+  }
+
+  async getPerformanceMetricsBySession(sessionId: number): Promise<PerformanceMetric[]> {
+    return Array.from(this.performanceMetrics.values())
+      .filter(metric => metric.sessionId === sessionId);
+  }
+
+  async createPerformanceMetric(metric: InsertPerformanceMetric): Promise<PerformanceMetric> {
+    const id = this.performanceMetricIdCounter++;
+    const newMetric: PerformanceMetric = { 
+      ...metric, 
+      id,
+      context: metric.context || null,
+      confidence: metric.confidence || 1.0
+    };
+    this.performanceMetrics.set(id, newMetric);
+    return newMetric;
+  }
+
+  // Predictive Models methods
+  async getPredictiveModel(id: number): Promise<PredictiveModel | undefined> {
+    return this.predictiveModels.get(id);
+  }
+
+  async getAllPredictiveModels(active?: boolean): Promise<PredictiveModel[]> {
+    const models = Array.from(this.predictiveModels.values());
+    if (active !== undefined) {
+      return models.filter(model => model.active === active);
+    }
+    return models;
+  }
+
+  async createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel> {
+    const id = this.predictiveModelIdCounter++;
+    const now = new Date();
+    const newModel: PredictiveModel = {
+      ...model,
+      id,
+      trainingData: model.trainingData || null,
+      accuracy: model.accuracy || null,
+      createdAt: model.createdAt || now,
+      updatedAt: model.updatedAt || now,
+      active: model.active !== undefined ? model.active : true
+    };
+    this.predictiveModels.set(id, newModel);
+    return newModel;
+  }
+
+  async updatePredictiveModel(id: number, model: Partial<PredictiveModel>): Promise<PredictiveModel | undefined> {
+    const existingModel = this.predictiveModels.get(id);
+    if (!existingModel) return undefined;
+
+    const updatedModel = { ...existingModel, ...model, updatedAt: new Date() };
+    this.predictiveModels.set(id, updatedModel);
+    return updatedModel;
+  }
+
+  async deletePredictiveModel(id: number): Promise<boolean> {
+    return this.predictiveModels.delete(id);
+  }
+
+  // Skill Decay Predictions methods
+  async getSkillDecayPrediction(id: number): Promise<SkillDecayPrediction | undefined> {
+    return this.skillDecayPredictions.get(id);
+  }
+
+  async getSkillDecayPredictionsByTrainee(traineeId: number): Promise<SkillDecayPrediction[]> {
+    return Array.from(this.skillDecayPredictions.values())
+      .filter(prediction => prediction.traineeId === traineeId);
+  }
+
+  async createSkillDecayPrediction(prediction: InsertSkillDecayPrediction): Promise<SkillDecayPrediction> {
+    const id = this.skillDecayPredictionIdCounter++;
+    const now = new Date();
+    const newPrediction: SkillDecayPrediction = {
+      ...prediction,
+      id,
+      createdAt: prediction.createdAt || now
+    };
+    this.skillDecayPredictions.set(id, newPrediction);
+    return newPrediction;
+  }
+
+  async updateSkillDecayPrediction(id: number, prediction: Partial<SkillDecayPrediction>): Promise<SkillDecayPrediction | undefined> {
+    const existingPrediction = this.skillDecayPredictions.get(id);
+    if (!existingPrediction) return undefined;
+
+    const updatedPrediction = { ...existingPrediction, ...prediction };
+    this.skillDecayPredictions.set(id, updatedPrediction);
+    return updatedPrediction;
+  }
+
+  // Session Replay methods
+  async getSessionReplay(id: number): Promise<SessionReplay | undefined> {
+    return this.sessionReplays.get(id);
+  }
+
+  async getSessionReplaysBySession(sessionId: number): Promise<SessionReplay[]> {
+    return Array.from(this.sessionReplays.values())
+      .filter(replay => replay.sessionId === sessionId);
+  }
+
+  async createSessionReplay(replay: InsertSessionReplay): Promise<SessionReplay> {
+    const id = this.sessionReplayIdCounter++;
+    const now = new Date();
+    const newReplay: SessionReplay = {
+      ...replay,
+      id,
+      metadata: replay.metadata || null,
+      createdAt: replay.createdAt || now
+    };
+    this.sessionReplays.set(id, newReplay);
+    return newReplay;
+  }
+
+  // Session Events methods
+  async getSessionEvent(id: number): Promise<SessionEvent | undefined> {
+    return this.sessionEvents.get(id);
+  }
+
+  async getSessionEventsByReplay(replayId: number): Promise<SessionEvent[]> {
+    return Array.from(this.sessionEvents.values())
+      .filter(event => event.replayId === replayId);
+  }
+
+  async createSessionEvent(event: InsertSessionEvent): Promise<SessionEvent> {
+    const id = this.sessionEventIdCounter++;
+    const newEvent: SessionEvent = {
+      ...event,
+      id,
+      severity: event.severity || null,
+      parameters: event.parameters || null
+    };
+    this.sessionEvents.set(id, newEvent);
+    return newEvent;
+  }
+
+  // Achievements methods
+  async getAchievement(id: number): Promise<Achievement | undefined> {
+    return this.achievements.get(id);
+  }
+
+  async getAllAchievements(active?: boolean): Promise<Achievement[]> {
+    const achievements = Array.from(this.achievements.values());
+    if (active !== undefined) {
+      return achievements.filter(achievement => achievement.active === active);
+    }
+    return achievements;
+  }
+
+  async createAchievement(achievement: InsertAchievement): Promise<Achievement> {
+    const id = this.achievementIdCounter++;
+    const newAchievement: Achievement = {
+      ...achievement,
+      id,
+      criteria: achievement.criteria || null,
+      imageUrl: achievement.imageUrl || null,
+      active: achievement.active !== undefined ? achievement.active : true
+    };
+    this.achievements.set(id, newAchievement);
+    return newAchievement;
+  }
+
+  async updateAchievement(id: number, achievement: Partial<Achievement>): Promise<Achievement | undefined> {
+    const existingAchievement = this.achievements.get(id);
+    if (!existingAchievement) return undefined;
+
+    const updatedAchievement = { ...existingAchievement, ...achievement };
+    this.achievements.set(id, updatedAchievement);
+    return updatedAchievement;
+  }
+
+  async deleteAchievement(id: number): Promise<boolean> {
+    return this.achievements.delete(id);
+  }
+
+  // User Achievements methods
+  async getUserAchievement(id: number): Promise<UserAchievement | undefined> {
+    return this.userAchievements.get(id);
+  }
+
+  async getUserAchievementsByUser(userId: number): Promise<UserAchievement[]> {
+    return Array.from(this.userAchievements.values())
+      .filter(userAchievement => userAchievement.userId === userId);
+  }
+
+  async createUserAchievement(userAchievement: InsertUserAchievement): Promise<UserAchievement> {
+    const id = this.userAchievementIdCounter++;
+    const now = new Date();
+    const newUserAchievement: UserAchievement = {
+      ...userAchievement,
+      id,
+      notes: userAchievement.notes || null,
+      awardedAt: userAchievement.awardedAt || now
+    };
+    this.userAchievements.set(id, newUserAchievement);
+    return newUserAchievement;
+  }
+
+  async updateUserAchievement(id: number, userAchievement: Partial<UserAchievement>): Promise<UserAchievement | undefined> {
+    const existingUserAchievement = this.userAchievements.get(id);
+    if (!existingUserAchievement) return undefined;
+
+    const updatedUserAchievement = { ...existingUserAchievement, ...userAchievement };
+    this.userAchievements.set(id, updatedUserAchievement);
+    return updatedUserAchievement;
+  }
+
+  // Leaderboards methods
+  async getLeaderboard(id: number): Promise<Leaderboard | undefined> {
+    return this.leaderboards.get(id);
+  }
+
+  async getAllLeaderboards(active?: boolean): Promise<Leaderboard[]> {
+    const leaderboards = Array.from(this.leaderboards.values());
+    if (active !== undefined) {
+      return leaderboards.filter(leaderboard => leaderboard.active === active);
+    }
+    return leaderboards;
+  }
+
+  async createLeaderboard(leaderboard: InsertLeaderboard): Promise<Leaderboard> {
+    const id = this.leaderboardIdCounter++;
+    const now = new Date();
+    const newLeaderboard: Leaderboard = {
+      ...leaderboard,
+      id,
+      criteria: leaderboard.criteria || null,
+      startDate: leaderboard.startDate || now,
+      endDate: leaderboard.endDate || null,
+      active: leaderboard.active !== undefined ? leaderboard.active : true
+    };
+    this.leaderboards.set(id, newLeaderboard);
+    return newLeaderboard;
+  }
+
+  async updateLeaderboard(id: number, leaderboard: Partial<Leaderboard>): Promise<Leaderboard | undefined> {
+    const existingLeaderboard = this.leaderboards.get(id);
+    if (!existingLeaderboard) return undefined;
+
+    const updatedLeaderboard = { ...existingLeaderboard, ...leaderboard };
+    this.leaderboards.set(id, updatedLeaderboard);
+    return updatedLeaderboard;
+  }
+
+  async deleteLeaderboard(id: number): Promise<boolean> {
+    return this.leaderboards.delete(id);
+  }
+
+  // Leaderboard Entries methods
+  async getLeaderboardEntry(id: number): Promise<LeaderboardEntry | undefined> {
+    return this.leaderboardEntries.get(id);
+  }
+
+  async getLeaderboardEntriesByLeaderboard(leaderboardId: number): Promise<LeaderboardEntry[]> {
+    return Array.from(this.leaderboardEntries.values())
+      .filter(entry => entry.leaderboardId === leaderboardId)
+      .sort((a, b) => b.score - a.score); // Sort by score descending
+  }
+
+  async createLeaderboardEntry(entry: InsertLeaderboardEntry): Promise<LeaderboardEntry> {
+    const id = this.leaderboardEntryIdCounter++;
+    const now = new Date();
+    const newEntry: LeaderboardEntry = {
+      ...entry,
+      id,
+      updatedAt: now
+    };
+    this.leaderboardEntries.set(id, newEntry);
+    return newEntry;
+  }
+
+  async updateLeaderboardEntry(id: number, entry: Partial<LeaderboardEntry>): Promise<LeaderboardEntry | undefined> {
+    const existingEntry = this.leaderboardEntries.get(id);
+    if (!existingEntry) return undefined;
+
+    const updatedEntry = { 
+      ...existingEntry, 
+      ...entry,
+      updatedAt: new Date()
+    };
+    this.leaderboardEntries.set(id, updatedEntry);
+    return updatedEntry;
+  }
+
+  // Shared Scenarios methods
+  async getSharedScenario(id: number): Promise<SharedScenario | undefined> {
+    return this.sharedScenarios.get(id);
+  }
+
+  async getAllSharedScenarios(status?: string): Promise<SharedScenario[]> {
+    const scenarios = Array.from(this.sharedScenarios.values());
+    if (status) {
+      return scenarios.filter(scenario => scenario.status === status);
+    }
+    return scenarios;
+  }
+
+  async getSharedScenariosByUser(userId: number): Promise<SharedScenario[]> {
+    return Array.from(this.sharedScenarios.values())
+      .filter(scenario => scenario.createdById === userId);
+  }
+
+  async createSharedScenario(scenario: InsertSharedScenario): Promise<SharedScenario> {
+    const id = this.sharedScenarioIdCounter++;
+    const now = new Date();
+    const newScenario: SharedScenario = {
+      ...scenario,
+      id,
+      verifiedById: scenario.verifiedById || null,
+      verifiedAt: scenario.verifiedAt || null,
+      downloadCount: 0,
+      rating: null,
+      createdAt: now,
+      updatedAt: now,
+      status: scenario.status || 'pending',
+      aircraft: scenario.aircraft || null
+    };
+    this.sharedScenarios.set(id, newScenario);
+    return newScenario;
+  }
+
+  async updateSharedScenario(id: number, scenario: Partial<SharedScenario>): Promise<SharedScenario | undefined> {
+    const existingScenario = this.sharedScenarios.get(id);
+    if (!existingScenario) return undefined;
+
+    const updatedScenario = { 
+      ...existingScenario, 
+      ...scenario,
+      updatedAt: new Date() 
+    };
+    this.sharedScenarios.set(id, updatedScenario);
+    return updatedScenario;
+  }
+
+  async deleteSharedScenario(id: number): Promise<boolean> {
+    return this.sharedScenarios.delete(id);
+  }
+
+  async verifySharedScenario(id: number, verifiedById: number): Promise<SharedScenario | undefined> {
+    const scenario = this.sharedScenarios.get(id);
+    if (!scenario) return undefined;
+
+    const verifiedScenario = {
+      ...scenario,
+      verifiedById,
+      verifiedAt: new Date(),
+      status: 'verified',
+      updatedAt: new Date()
+    };
+    this.sharedScenarios.set(id, verifiedScenario);
+    return verifiedScenario;
+  }
+
+  async incrementScenarioDownloadCount(id: number): Promise<SharedScenario | undefined> {
+    const scenario = this.sharedScenarios.get(id);
+    if (!scenario) return undefined;
+
+    const updatedScenario = {
+      ...scenario,
+      downloadCount: scenario.downloadCount + 1,
+      updatedAt: new Date()
+    };
+    this.sharedScenarios.set(id, updatedScenario);
+    return updatedScenario;
+  }
 }
 
 export const storage = new MemStorage();
