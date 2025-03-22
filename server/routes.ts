@@ -808,6 +808,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === Knowledge Graph API ===
+  app.get("/api/knowledge-graph/nodes", async (req, res) => {
+    try {
+      const { nodeType, documentId } = req.query;
+      
+      const options: { nodeType?: string, documentId?: number } = {};
+      if (nodeType) options.nodeType = nodeType as string;
+      if (documentId) options.documentId = parseInt(documentId as string);
+      
+      const nodes = await storage.getKnowledgeGraphNodes(options);
+      res.json(nodes);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch knowledge graph nodes" });
+    }
+  });
+  
+  app.get("/api/knowledge-graph/nodes/:id", async (req, res) => {
+    try {
+      const nodeId = parseInt(req.params.id);
+      const node = await storage.getKnowledgeGraphNode(nodeId);
+      
+      if (!node) {
+        return res.status(404).json({ message: "Knowledge graph node not found" });
+      }
+      
+      res.json(node);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch knowledge graph node" });
+    }
+  });
+  
+  app.get("/api/knowledge-graph/edges", async (req, res) => {
+    try {
+      const { sourceNodeId, targetNodeId, relationship } = req.query;
+      
+      const options: { sourceNodeId?: number, targetNodeId?: number, relationship?: string } = {};
+      if (sourceNodeId) options.sourceNodeId = parseInt(sourceNodeId as string);
+      if (targetNodeId) options.targetNodeId = parseInt(targetNodeId as string);
+      if (relationship) options.relationship = relationship as string;
+      
+      const edges = await storage.getKnowledgeGraphEdges(options);
+      res.json(edges);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch knowledge graph edges" });
+    }
+  });
+  
+  app.post("/api/protected/knowledge-graph/nodes", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const node = req.body;
+      if (!node) {
+        return res.status(400).json({ message: "Node data is required" });
+      }
+      
+      const createdNode = await storage.createKnowledgeGraphNode(node);
+      res.status(201).json(createdNode);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create knowledge graph node" });
+    }
+  });
+  
+  app.post("/api/protected/knowledge-graph/edges", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const edge = req.body;
+      if (!edge) {
+        return res.status(400).json({ message: "Edge data is required" });
+      }
+      
+      const createdEdge = await storage.createKnowledgeGraphEdge(edge);
+      res.status(201).json(createdEdge);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create knowledge graph edge" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

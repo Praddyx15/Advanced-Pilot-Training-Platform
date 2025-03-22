@@ -6,6 +6,7 @@ import NotFound from "@/pages/not-found";
 import HomePage from "@/pages/home-page";
 import AuthPage from "@/pages/auth-page";
 import SyllabusGeneratorPage from "@/pages/syllabus-generator-page";
+import KnowledgeGraphPage from "@/pages/knowledge-graph-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -16,6 +17,7 @@ function Router() {
     <Switch>
       <ProtectedRoute path="/" component={HomePage} />
       <ProtectedRoute path="/syllabus-generator" component={SyllabusGeneratorPage} />
+      <ProtectedRoute path="/knowledge-graph" component={KnowledgeGraphPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
