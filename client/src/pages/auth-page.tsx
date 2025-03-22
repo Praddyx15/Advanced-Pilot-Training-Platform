@@ -309,7 +309,24 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Password</FormLabel>
                               <FormControl>
-                                <Input type="password" placeholder="******" {...field} />
+                                <div className="relative">
+                                  <Input 
+                                    type={showRegisterPassword ? "text" : "password"} 
+                                    placeholder="******" 
+                                    {...field} 
+                                  />
+                                  <button 
+                                    type="button"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                    onClick={() => setShowRegisterPassword(!showRegisterPassword)}
+                                  >
+                                    {showRegisterPassword ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -322,7 +339,24 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Confirm Password</FormLabel>
                               <FormControl>
-                                <Input type="password" placeholder="******" {...field} />
+                                <div className="relative">
+                                  <Input 
+                                    type={showConfirmPassword ? "text" : "password"} 
+                                    placeholder="******" 
+                                    {...field} 
+                                  />
+                                  <button 
+                                    type="button"
+                                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                  >
+                                    {showConfirmPassword ? (
+                                      <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                      <Eye className="h-4 w-4" />
+                                    )}
+                                  </button>
+                                </div>
                               </FormControl>
                               <FormMessage />
                             </FormItem>
