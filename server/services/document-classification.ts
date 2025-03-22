@@ -8,11 +8,11 @@
  * - Content tagging
  * - Document relation clustering
  */
+
 import { ExtractionResult } from './document-extraction';
-import { DocumentElement, DocumentStructure } from './document-structure';
+import { DocumentStructure } from './document-structure';
 import { logger } from '../core/logger';
 
-// Classification categories
 export enum DocumentCategory {
   TECHNICAL = 'technical',
   REGULATORY = 'regulatory',
@@ -23,7 +23,6 @@ export enum DocumentCategory {
   UNCLASSIFIED = 'unclassified'
 }
 
-// Subject areas
 export enum SubjectArea {
   AIRCRAFT_SYSTEMS = 'aircraft_systems',
   FLIGHT_PROCEDURES = 'flight_procedures',
@@ -36,7 +35,6 @@ export enum SubjectArea {
   GENERAL = 'general'
 }
 
-// Priority levels
 export enum PriorityLevel {
   CRITICAL = 'critical',
   HIGH = 'high',
@@ -44,7 +42,6 @@ export enum PriorityLevel {
   LOW = 'low'
 }
 
-// Classification result
 export interface DocumentClassification {
   category: DocumentCategory;
   subjects: SubjectArea[];
@@ -60,7 +57,6 @@ export interface DocumentClassification {
   };
 }
 
-// Classification options
 export interface ClassificationOptions {
   includeRelatedDocuments?: boolean;
   maxRelatedDocuments?: number;
@@ -69,109 +65,161 @@ export interface ClassificationOptions {
   includeKeyTerms?: boolean;
 }
 
-// Default classification options
 const DEFAULT_OPTIONS: ClassificationOptions = {
-  includeRelatedDocuments: true,
+  includeRelatedDocuments: false,
   maxRelatedDocuments: 5,
   minConfidenceThreshold: 0.6,
   includeKeyTerms: true
 };
 
-// Term weighting by category
-const CATEGORY_TERM_WEIGHTS: Record<DocumentCategory, string[]> = {
+// Stop words that should be ignored during classification
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'if', 'because', 'as', 'what', 'which',
+  'this', 'that', 'these', 'those', 'then', 'just', 'so', 'than', 'such', 'when',
+  'while', 'who', 'whom', 'where', 'why', 'how', 'all', 'any', 'both', 'each',
+  'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only',
+  'own', 'same', 'too', 'very', 's', 't', 'can', 'will', 'don', 'should', 'now'
+]);
+
+// Terms associated with each document category
+const CATEGORY_TERMS: Record<DocumentCategory, string[]> = {
   [DocumentCategory.TECHNICAL]: [
-    'system', 'component', 'aircraft', 'equipment', 'technical', 'installation',
-    'maintenance', 'specifications', 'design', 'performance', 'limitations'
+    'system', 'component', 'engine', 'hydraulic', 'electrical', 'avionics', 'autopilot',
+    'fuel', 'landing gear', 'flaps', 'spoilers', 'thrust', 'power', 'oil', 'maintenance',
+    'pressure', 'temperature', 'valve', 'pump', 'circuit', 'wiring', 'brake', 'indicator',
+    'display', 'computer', 'technical', 'engineering', 'specification', 'tolerance'
   ],
   [DocumentCategory.REGULATORY]: [
-    'regulation', 'compliance', 'requirement', 'approved', 'authority', 'legal',
-    'certification', 'standard', 'rule', 'law', 'mandatory', 'must', 'shall'
+    'regulation', 'compliance', 'law', 'requirement', 'standard', 'authority', 'approved',
+    'certification', 'certificate', 'license', 'inspection', 'faa', 'easa', 'icao', 'caa',
+    'part', 'section', 'paragraph', 'subpart', 'appendix', 'advisory', 'circular', 'directive',
+    'legal', 'authorize', 'enforce', 'mandatory', 'prohibited', 'restriction', 'violation'
   ],
   [DocumentCategory.OPERATIONAL]: [
-    'procedure', 'operation', 'checklist', 'normal', 'abnormal', 'emergency',
-    'flight', 'crew', 'pilot', 'operator', 'controller', 'maneuver'
+    'operation', 'procedure', 'checklist', 'sop', 'standard', 'flight', 'preflight', 'takeoff',
+    'landing', 'cruise', 'descent', 'climb', 'approach', 'taxi', 'maneuver', 'technique',
+    'performance', 'weight', 'balance', 'fuel', 'calculation', 'speed', 'altitude', 'heading',
+    'navigation', 'clearance', 'instruction', 'vector', 'route', 'waypoint', 'flight plan'
   ],
   [DocumentCategory.TRAINING]: [
-    'training', 'learning', 'syllabus', 'course', 'lesson', 'module', 'instructor',
-    'student', 'trainee', 'exercise', 'simulation', 'practice', 'skill'
+    'training', 'lesson', 'course', 'syllabus', 'instructor', 'student', 'trainee', 'pilot',
+    'learning', 'objective', 'skill', 'knowledge', 'competency', 'proficiency', 'exercise',
+    'practice', 'simulator', 'scenario', 'briefing', 'debriefing', 'evaluation', 'assessment',
+    'grade', 'feedback', 'progress', 'curriculum', 'module', 'demonstration', 'instruction'
   ],
   [DocumentCategory.ASSESSMENT]: [
-    'assessment', 'test', 'exam', 'evaluation', 'grade', 'score', 'performance',
-    'measure', 'criteria', 'standard', 'pass', 'fail', 'proficiency'
+    'assessment', 'test', 'exam', 'evaluation', 'check', 'checkride', 'proficiency', 'skill',
+    'performance', 'measure', 'criteria', 'standard', 'satisfactory', 'unsatisfactory', 'pass',
+    'fail', 'grading', 'score', 'result', 'outcome', 'competent', 'deficiency', 'remedial',
+    'oral', 'practical', 'written', 'question', 'answer', 'rating', 'examiner', 'instructor'
   ],
   [DocumentCategory.REFERENCE]: [
-    'reference', 'manual', 'handbook', 'guide', 'information', 'data', 'table',
-    'chart', 'appendix', 'glossary', 'definition', 'term'
+    'manual', 'handbook', 'guide', 'reference', 'publication', 'document', 'information',
+    'data', 'chart', 'diagram', 'illustration', 'figure', 'table', 'appendix', 'index',
+    'glossary', 'definition', 'terminology', 'abbreviation', 'acronym', 'section', 'chapter',
+    'page', 'revision', 'edition', 'volume', 'supplement', 'library', 'collection'
   ],
-  [DocumentCategory.UNCLASSIFIED]: []
+  [DocumentCategory.UNCLASSIFIED]: [
+    'general', 'miscellaneous', 'other', 'additional', 'various', 'supplementary', 'extra'
+  ]
 };
 
-// Subject area term weighting
-const SUBJECT_TERM_WEIGHTS: Record<SubjectArea, string[]> = {
+// Terms associated with each subject area
+const SUBJECT_TERMS: Record<SubjectArea, string[]> = {
   [SubjectArea.AIRCRAFT_SYSTEMS]: [
-    'engine', 'hydraulic', 'electrical', 'avionics', 'fuel', 'landing gear',
-    'flight control', 'pressurization', 'air conditioning', 'system', 'components'
+    'system', 'engine', 'hydraulic', 'electrical', 'avionics', 'fuel', 'oil', 'landing gear',
+    'flaps', 'spoilers', 'thrust reverser', 'brake', 'pressurization', 'air conditioning',
+    'oxygen', 'fire suppression', 'anti-ice', 'autopilot', 'flight control', 'instruments',
+    'navigation', 'communication', 'radar', 'warning', 'indicating', 'lighting', 'power'
   ],
   [SubjectArea.FLIGHT_PROCEDURES]: [
-    'procedure', 'takeoff', 'landing', 'cruise', 'climb', 'descent', 'approach',
-    'maneuver', 'configuration', 'speed', 'altitude', 'flight plan'
+    'procedure', 'checklist', 'normal', 'standard', 'operation', 'takeoff', 'landing',
+    'cruise', 'climb', 'descent', 'approach', 'taxi', 'startup', 'shutdown', 'preflight',
+    'postflight', 'departure', 'arrival', 'holding', 'missed approach', 'go-around',
+    'performance', 'technique', 'maneuver', 'configuration', 'speed', 'altitude'
   ],
   [SubjectArea.EMERGENCY_PROCEDURES]: [
-    'emergency', 'failure', 'malfunction', 'abort', 'evacuation', 'fire', 'smoke',
-    'decompression', 'ditching', 'abnormal', 'warning', 'caution', 'alert'
+    'emergency', 'abnormal', 'failure', 'malfunction', 'warning', 'caution', 'alert',
+    'fire', 'engine failure', 'hydraulic failure', 'electrical failure', 'decompression',
+    'evacuation', 'ditching', 'forced landing', 'engine out', 'rejected takeoff', 'aborted',
+    'smoke', 'fumes', 'loss of control', 'uncommanded', 'system failure', 'emergency descent'
   ],
   [SubjectArea.REGULATIONS]: [
-    'regulation', 'requirement', 'law', 'compliance', 'authority', 'certificate',
-    'license', 'approval', 'standard', 'rule', 'part', 'paragraph'
+    'regulation', 'law', 'rule', 'requirement', 'compliance', 'standard', 'certification',
+    'airworthiness', 'authorization', 'approval', 'limitation', 'restriction', 'prohibition',
+    'faa', 'easa', 'icao', 'caa', 'authority', 'directive', 'order', 'advisory', 'circular',
+    'part', 'subpart', 'section', 'paragraph', 'legal', 'enforcement', 'violation'
   ],
   [SubjectArea.METEOROLOGY]: [
-    'weather', 'wind', 'cloud', 'visibility', 'temperature', 'pressure', 'forecast',
-    'turbulence', 'thunderstorm', 'icing', 'fog', 'precipitation'
+    'weather', 'meteorology', 'cloud', 'precipitation', 'wind', 'turbulence', 'visibility',
+    'ceiling', 'temperature', 'pressure', 'front', 'storm', 'thunderstorm', 'icing', 'fog',
+    'haze', 'snow', 'rain', 'forecast', 'metar', 'taf', 'sigmet', 'airmet', 'chart', 'radar',
+    'satellite', 'jet stream', 'shear', 'gust', 'microburst', 'downdraft', 'updraft'
   ],
   [SubjectArea.NAVIGATION]: [
-    'navigation', 'waypoint', 'route', 'course', 'heading', 'track', 'bearing',
-    'distance', 'gps', 'vor', 'ils', 'approach', 'departure', 'arrival'
+    'navigation', 'route', 'waypoint', 'fix', 'radial', 'bearing', 'heading', 'course',
+    'track', 'distance', 'position', 'latitude', 'longitude', 'vor', 'ndb', 'ils', 'dme',
+    'gps', 'rnav', 'lnav', 'vnav', 'approach', 'sid', 'star', 'departure', 'arrival',
+    'airway', 'intersection', 'chart', 'map', 'procedure', 'planning', 'flight plan'
   ],
   [SubjectArea.HUMAN_FACTORS]: [
-    'human factors', 'crew resource management', 'crm', 'workload', 'fatigue',
-    'stress', 'decision making', 'situational awareness', 'communication', 'teamwork'
+    'human factors', 'crew', 'resource management', 'crm', 'decision making', 'judgment',
+    'situational awareness', 'workload', 'fatigue', 'stress', 'communication', 'teamwork',
+    'leadership', 'followership', 'error', 'mistake', 'violation', 'attitude', 'behavior',
+    'performance', 'incapacitation', 'psychological', 'physiological', 'attention', 'memory'
   ],
   [SubjectArea.COMMUNICATIONS]: [
-    'communication', 'radio', 'phraseology', 'clearance', 'readback', 'frequency',
-    'call sign', 'transmission', 'atc', 'controller', 'message'
+    'communication', 'radio', 'phraseology', 'clearance', 'readback', 'transmission',
+    'frequency', 'callsign', 'broadcast', 'instruction', 'atc', 'tower', 'approach',
+    'departure', 'center', 'ground', 'atis', 'transponder', 'squawk', 'aviation english',
+    'standard phraseology', 'emergency communication', 'lost communication', 'reporting'
   ],
   [SubjectArea.GENERAL]: [
-    'general', 'introduction', 'overview', 'purpose', 'scope', 'description',
-    'summary', 'background', 'information', 'note'
+    'general', 'introduction', 'overview', 'background', 'fundamental', 'basic', 'principle',
+    'concept', 'theory', 'philosophy', 'approach', 'method', 'practice', 'information',
+    'knowledge', 'aviation', 'aeronautical', 'aerospace', 'pilot', 'crew', 'airman'
   ]
 };
 
-// Priority term weighting
-const PRIORITY_TERM_WEIGHTS: Record<PriorityLevel, string[]> = {
+// Terms associated with each priority level
+const PRIORITY_TERMS: Record<PriorityLevel, string[]> = {
   [PriorityLevel.CRITICAL]: [
-    'warning', 'caution', 'danger', 'emergency', 'critical', 'immediate', 'severe',
-    'must', 'required', 'mandatory', 'essential', 'life', 'safety'
+    'emergency', 'critical', 'urgent', 'warning', 'caution', 'danger', 'hazard', 'safety',
+    'required', 'mandatory', 'vital', 'essential', 'immediately', 'prohibit', 'never',
+    'always', 'must', 'failure', 'malfunction', 'serious', 'severe', 'extreme', 'life',
+    'death', 'fatal', 'accident', 'incident', 'crash', 'fire', 'explosion', 'loss of control'
   ],
   [PriorityLevel.HIGH]: [
-    'important', 'significant', 'major', 'key', 'primary', 'main', 'serious',
-    'necessary', 'should', 'recommended', 'advised'
+    'important', 'significant', 'priority', 'key', 'main', 'major', 'primary', 'fundamental',
+    'substantial', 'necessary', 'crucial', 'valuable', 'serious', 'attention', 'ensure',
+    'verify', 'check', 'monitor', 'maintain', 'regulation', 'compliance', 'requirement',
+    'limitation', 'restriction', 'should', 'recommended', 'strongly', 'advised'
   ],
   [PriorityLevel.MEDIUM]: [
-    'normal', 'standard', 'regular', 'routine', 'common', 'typical', 'general',
-    'suggested', 'considered'
+    'procedure', 'standard', 'normal', 'regular', 'routine', 'common', 'typical', 'usual',
+    'general', 'conventional', 'moderate', 'average', 'intermediate', 'acceptable', 'suitable',
+    'appropriate', 'reasonable', 'adequate', 'sufficient', 'satisfactory', 'may', 'can',
+    'might', 'could', 'would', 'guidance', 'recommendation', 'suggestion'
   ],
   [PriorityLevel.LOW]: [
-    'minor', 'supplementary', 'additional', 'optional', 'reference', 'may',
-    'can', 'could', 'might', 'note', 'information'
+    'supplementary', 'additional', 'extra', 'optional', 'alternative', 'discretionary',
+    'elective', 'voluntary', 'non-essential', 'minor', 'minimal', 'marginal', 'slight',
+    'trivial', 'incidental', 'background', 'information', 'note', 'reference', 'detail',
+    'example', 'illustration', 'clarification', 'explanation', 'description', 'for information'
   ]
 };
 
-// Regex patterns for identifying specific content
-const REGEX_PATTERNS = {
-  regulatoryReference: /([A-Z]{2,4}[-|\s]?[0-9]{1,4}[A-Z]?|Part\s[0-9]{1,4})/gi,
-  aircraftType: /([A-Z]{1,2}[-|\s]?[0-9]{1,4}[A-Z]?|\b[A-Z][a-z]+\s[0-9]{2,3}[-|\/]?[0-9]{0,3})/g,
-  version: /(?:Rev(?:ision)?|Ver(?:sion)?)[.\s]([0-9]+(?:[.][0-9]+)*)/i,
-  date: /(?:\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\s+[0-9]{1,2},?\s+[0-9]{4}\b|\b[0-9]{1,2}[\/\-.][0-9]{1,2}[\/\-.][0-9]{2,4}\b)/i
+// Regex patterns for common aviation-related information
+const REGEX_PATTERNS: Record<string, RegExp> = {
+  aircraftType: /\b([A-Z]{1,4}-[A-Z0-9]{1,5}|B7[0-9]{2}|A[0-9]{3}|CRJ[0-9]{3}|E[0-9]{3}|MD-[0-9]{2})\b/g,
+  regulatoryReference: /\b(14\s?CFR\s+Part\s+\d+(\.\d+)?|FAR\s+\d+(\.\d+)?|EASA\s+Part\s+[A-Z]+-[A-Z0-9]+)\b/gi,
+  airportCode: /\b[A-Z]{3,4}\b/g,
+  altitude: /\b\d{1,3}(?:,\d{3})*\s*(?:ft|feet)\b/gi,
+  speed: /\b\d{1,3}\s*(?:kts?|knots?|KIAS)\b/gi,
+  heading: /\b(?:heading|HDG)\s+\d{1,3}\b/gi,
+  frequency: /\b1[0-9]{2}\.[0-9]{1,3}\b/g,
+  flightLevel: /\b(?:FL|Flight Level)\s*\d{1,3}\b/gi,
+  date: /\b(?:0?[1-9]|[12][0-9]|3[01])[\/-](?:0?[1-9]|1[012])[\/-](?:19|20)\d\d\b/g
 };
 
 /**
@@ -184,72 +232,84 @@ export async function classifyDocument(
   const startTime = Date.now();
   
   try {
-    // Extract text based on input type
+    // Extract text from the document
     const text = extractText(document);
     
-    // Tokenize and preprocess text
+    // Tokenize the text
     const tokens = tokenizeText(text);
     
     // Calculate term frequencies
     const termFrequencies = calculateTermFrequencies(tokens);
     
-    // Determine document category
+    // Calculate scores for each category
     const categoryScores = calculateCategoryScores(termFrequencies);
-    const category = determineTopCategory(categoryScores);
+    const topCategory = determineTopCategory(categoryScores);
     
-    // Determine subject areas
+    // Calculate scores for each subject
     const subjectScores = calculateSubjectScores(termFrequencies);
-    const subjects = determineTopSubjects(subjectScores, 3);
+    const topSubjects = determineTopSubjects(subjectScores, 3);
     
-    // Determine priority
+    // Calculate scores for priority
     const priorityScores = calculatePriorityScores(termFrequencies);
-    const priority = determineTopPriority(priorityScores);
+    const topPriority = determineTopPriority(priorityScores);
+    
+    // Extract key terms if requested
+    const keyTerms = options.includeKeyTerms === true 
+      ? extractKeyTerms(termFrequencies) 
+      : {};
     
     // Extract tags
-    const tags = extractTags(termFrequencies, text, category, subjects);
+    const tags = extractTags(text, termFrequencies, topCategory);
     
-    // Extract regulatory references if applicable
-    const regulatoryReferences = options.includeRegExPatterns !== false ? 
-      extractRegexMatches(text, REGEX_PATTERNS.regulatoryReference) : [];
+    // Extract regulatory references and aircraft types using regex
+    const regulatoryReferences = extractRegexMatches(text, REGEX_PATTERNS.regulatoryReference);
+    const aircraftTypes = extractRegexMatches(text, REGEX_PATTERNS.aircraftType);
     
-    // Extract aircraft types if applicable
-    const aircraftTypes = options.includeRegExPatterns !== false ?
-      extractRegexMatches(text, REGEX_PATTERNS.aircraftType) : [];
+    // Extract additional regex patterns if provided
+    let additionalTags: string[] = [];
+    if (options.includeRegExPatterns === true) {
+      // Extract using standard patterns
+      Object.keys(REGEX_PATTERNS).forEach(key => {
+        if (key !== 'regulatoryReference' && key !== 'aircraftType') {
+          additionalTags = additionalTags.concat(extractRegexMatches(text, REGEX_PATTERNS[key]));
+        }
+      });
+    } else if (typeof options.includeRegExPatterns === 'object') {
+      // Extract using custom patterns
+      Object.values(options.includeRegExPatterns).forEach(pattern => {
+        additionalTags = additionalTags.concat(extractRegexMatches(text, pattern));
+      });
+    }
     
     // Calculate confidence score
-    const confidence = calculateConfidenceScore(categoryScores, subjectScores, priorityScores);
+    const confidence = calculateConfidenceScore(categoryScores, topCategory, subjectScores, topSubjects);
     
     // Create classification result
     const classification: DocumentClassification = {
-      category,
-      subjects,
-      priority,
-      tags,
+      category: topCategory,
+      subjects: topSubjects,
+      priority: topPriority,
+      tags: [...new Set([...tags, ...additionalTags])], // Remove duplicates
       confidence,
       metadata: {
-        keyTerms: options.includeKeyTerms ? extractKeyTerms(termFrequencies) : {},
+        keyTerms,
         regulatoryReferences: regulatoryReferences.length > 0 ? regulatoryReferences : undefined,
         aircraftTypes: aircraftTypes.length > 0 ? aircraftTypes : undefined,
-        processingTime: Date.now() - startTime
+        processingTime: Date.now() - startTime,
       }
     };
+    
+    // Include related documents if requested
+    if (options.includeRelatedDocuments) {
+      // This would require document storage access to find similar documents
+      // For now, we'll leave this as a placeholder
+      classification.relatedDocumentIds = [];
+    }
     
     return classification;
   } catch (error) {
-    logger.error('Error during document classification', { error });
-    
-    // Return a default classification with low confidence
-    return {
-      category: DocumentCategory.UNCLASSIFIED,
-      subjects: [SubjectArea.GENERAL],
-      priority: PriorityLevel.MEDIUM,
-      tags: [],
-      confidence: 0.1,
-      metadata: {
-        keyTerms: {},
-        processingTime: Date.now() - startTime
-      }
-    };
+    logger.error('Document classification error', { context: { error } });
+    throw new Error(`Document classification failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -260,9 +320,11 @@ function extractText(document: { text: string } | ExtractionResult | DocumentStr
   if ('text' in document) {
     return document.text;
   } else if ('elements' in document) {
-    // If it's a DocumentStructure, concatenate all element texts
+    // It's a DocumentStructure - concatenate all text from elements
     return document.elements.map(element => element.text).join(' ');
   }
+  
+  // Fallback for unexpected format
   return '';
 }
 
@@ -270,32 +332,24 @@ function extractText(document: { text: string } | ExtractionResult | DocumentStr
  * Tokenize text into words
  */
 function tokenizeText(text: string): string[] {
-  // Convert to lowercase and split by non-alphanumeric characters
-  return text.toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
-    .filter(token => token.length > 2) // Filter out short tokens
-    .filter(token => !isStopWord(token)); // Filter out stop words
+  // Normalize text: lowercase and remove punctuation
+  const normalizedText = text.toLowerCase()
+    .replace(/[^\w\s]|_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Split into tokens and filter out stop words and numbers
+  return normalizedText.split(' ')
+    .filter(word => word.length > 1)
+    .filter(word => !STOP_WORDS.has(word))
+    .filter(word => isNaN(Number(word)));
 }
 
 /**
  * Check if a word is a stop word
  */
 function isStopWord(word: string): boolean {
-  const stopWords = [
-    'a', 'an', 'the', 'and', 'or', 'but', 'if', 'then', 'else', 'when',
-    'at', 'from', 'by', 'on', 'off', 'for', 'in', 'out', 'over', 'to', 
-    'into', 'with', 'about', 'against', 'between', 'during', 'without',
-    'before', 'after', 'above', 'below', 'up', 'down', 'this', 'that',
-    'these', 'those', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'shall',
-    'should', 'can', 'could', 'may', 'might', 'must', 'of', 'also', 'as',
-    'it', 'its', 'they', 'them', 'their', 'what', 'which', 'who', 'whom',
-    'whose', 'where', 'when', 'why', 'how', 'all', 'any', 'both', 'each',
-    'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not',
-    'only', 'own', 'same', 'so', 'than', 'too', 'very'
-  ];
-  return stopWords.includes(word);
+  return STOP_WORDS.has(word.toLowerCase());
 }
 
 /**
@@ -303,9 +357,11 @@ function isStopWord(word: string): boolean {
  */
 function calculateTermFrequencies(tokens: string[]): Record<string, number> {
   const frequencies: Record<string, number> = {};
-  tokens.forEach(token => {
+  
+  for (const token of tokens) {
     frequencies[token] = (frequencies[token] || 0) + 1;
-  });
+  }
+  
   return frequencies;
 }
 
@@ -320,25 +376,56 @@ function calculateCategoryScores(termFrequencies: Record<string, number>): Recor
     [DocumentCategory.TRAINING]: 0,
     [DocumentCategory.ASSESSMENT]: 0,
     [DocumentCategory.REFERENCE]: 0,
-    [DocumentCategory.UNCLASSIFIED]: 0
+    [DocumentCategory.UNCLASSIFIED]: 0,
   };
   
-  // Score each category based on term weights
-  Object.entries(CATEGORY_TERM_WEIGHTS).forEach(([category, terms]) => {
-    terms.forEach(term => {
-      // Check for exact match first
-      if (termFrequencies[term]) {
-        scores[category as DocumentCategory] += termFrequencies[term] * 2;
-      }
-      
-      // Check for partial matches (terms containing this term)
-      Object.entries(termFrequencies).forEach(([token, frequency]) => {
-        if (token.includes(term) && token !== term) {
-          scores[category as DocumentCategory] += frequency;
+  // Calculate scores for each category
+  for (const category of Object.keys(CATEGORY_TERMS) as DocumentCategory[]) {
+    const categoryTerms = CATEGORY_TERMS[category];
+    let score = 0;
+    
+    // Check for exact terms
+    for (const term of categoryTerms) {
+      // For multi-word terms, check if the phrase appears in the original text
+      if (term.includes(' ')) {
+        const termWords = term.split(' ');
+        let termScore = 0;
+        
+        // Check if all words in the term are in the frequencies
+        for (const word of termWords) {
+          if (termFrequencies[word]) {
+            termScore += termFrequencies[word];
+          }
         }
-      });
-    });
-  });
+        
+        if (termScore > 0) {
+          // Adjust score based on number of words matched
+          score += termScore / termWords.length;
+        }
+      } else if (termFrequencies[term]) {
+        // Single word term
+        score += termFrequencies[term] * 2; // Higher weight for exact matches
+      }
+    }
+    
+    // Check for partial matches (terms that contain the category words)
+    for (const term in termFrequencies) {
+      const categoryWord = category.toLowerCase();
+      if (term.includes(categoryWord)) {
+        score += termFrequencies[term] * 3; // Even higher weight for terms containing the category name
+      }
+    }
+    
+    scores[category] = score;
+  }
+  
+  // Normalize scores
+  const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
+  if (total > 0) {
+    for (const category of Object.keys(scores) as DocumentCategory[]) {
+      scores[category] = scores[category] / total;
+    }
+  }
   
   return scores;
 }
@@ -347,9 +434,17 @@ function calculateCategoryScores(termFrequencies: Record<string, number>): Recor
  * Determine the top category based on scores
  */
 function determineTopCategory(scores: Record<DocumentCategory, number>): DocumentCategory {
-  return Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .map(([category]) => category as DocumentCategory)[0] || DocumentCategory.UNCLASSIFIED;
+  let topCategory = DocumentCategory.UNCLASSIFIED;
+  let topScore = 0;
+  
+  for (const category of Object.keys(scores) as DocumentCategory[]) {
+    if (scores[category] > topScore) {
+      topScore = scores[category];
+      topCategory = category;
+    }
+  }
+  
+  return topCategory;
 }
 
 /**
@@ -365,46 +460,48 @@ function calculateSubjectScores(termFrequencies: Record<string, number>): Record
     [SubjectArea.NAVIGATION]: 0,
     [SubjectArea.HUMAN_FACTORS]: 0,
     [SubjectArea.COMMUNICATIONS]: 0,
-    [SubjectArea.GENERAL]: 0
+    [SubjectArea.GENERAL]: 0,
   };
   
-  // Score each subject area based on term weights
-  Object.entries(SUBJECT_TERM_WEIGHTS).forEach(([subject, terms]) => {
-    terms.forEach(term => {
-      // Some terms may be multi-word phrases
-      const phraseWords = term.toLowerCase().split(/\s+/);
-      
-      if (phraseWords.length > 1) {
-        // For multi-word phrases, check if all words are present
-        let allWordsPresent = true;
-        let totalFrequency = 0;
+  // Calculate scores for each subject
+  for (const subject of Object.keys(SUBJECT_TERMS) as SubjectArea[]) {
+    const subjectTerms = SUBJECT_TERMS[subject];
+    let score = 0;
+    
+    // Check for exact terms
+    for (const term of subjectTerms) {
+      // For multi-word terms, check if the phrase appears in the original text
+      if (term.includes(' ')) {
+        const termWords = term.split(' ');
+        let termScore = 0;
         
-        phraseWords.forEach(word => {
-          if (!termFrequencies[word]) {
-            allWordsPresent = false;
-          } else {
-            totalFrequency += termFrequencies[word];
+        // Check if all words in the term are in the frequencies
+        for (const word of termWords) {
+          if (termFrequencies[word]) {
+            termScore += termFrequencies[word];
           }
-        });
-        
-        if (allWordsPresent) {
-          scores[subject as SubjectArea] += totalFrequency / phraseWords.length * 2;
         }
-      } else {
+        
+        if (termScore > 0) {
+          // Adjust score based on number of words matched
+          score += termScore / termWords.length;
+        }
+      } else if (termFrequencies[term]) {
         // Single word term
-        if (termFrequencies[term]) {
-          scores[subject as SubjectArea] += termFrequencies[term] * 2;
-        }
-        
-        // Check for partial matches (terms containing this term)
-        Object.entries(termFrequencies).forEach(([token, frequency]) => {
-          if (token.includes(term) && token !== term) {
-            scores[subject as SubjectArea] += frequency;
-          }
-        });
+        score += termFrequencies[term] * 2; // Higher weight for exact matches
       }
-    });
-  });
+    }
+    
+    scores[subject] = score;
+  }
+  
+  // Normalize scores
+  const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
+  if (total > 0) {
+    for (const subject of Object.keys(scores) as SubjectArea[]) {
+      scores[subject] = scores[subject] / total;
+    }
+  }
   
   return scores;
 }
@@ -413,11 +510,13 @@ function calculateSubjectScores(termFrequencies: Record<string, number>): Record
  * Determine the top subject areas based on scores
  */
 function determineTopSubjects(scores: Record<SubjectArea, number>, limit: number = 3): SubjectArea[] {
-  return Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, limit)
-    .filter(([_, score]) => score > 0)
+  // Sort subjects by score
+  const sortedSubjects = Object.entries(scores)
+    .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
     .map(([subject]) => subject as SubjectArea);
+  
+  // Return top N subjects
+  return sortedSubjects.slice(0, limit);
 }
 
 /**
@@ -428,24 +527,48 @@ function calculatePriorityScores(termFrequencies: Record<string, number>): Recor
     [PriorityLevel.CRITICAL]: 0,
     [PriorityLevel.HIGH]: 0,
     [PriorityLevel.MEDIUM]: 0,
-    [PriorityLevel.LOW]: 0
+    [PriorityLevel.LOW]: 0,
   };
   
-  // Score each priority level based on term weights
-  Object.entries(PRIORITY_TERM_WEIGHTS).forEach(([priority, terms]) => {
-    terms.forEach(term => {
-      if (termFrequencies[term]) {
-        scores[priority as PriorityLevel] += termFrequencies[term] * 2;
-      }
-      
-      // Check for partial matches (terms containing this term)
-      Object.entries(termFrequencies).forEach(([token, frequency]) => {
-        if (token.includes(term) && token !== term) {
-          scores[priority as PriorityLevel] += frequency;
+  // Calculate scores for each priority level
+  for (const priority of Object.keys(PRIORITY_TERMS) as PriorityLevel[]) {
+    const priorityTerms = PRIORITY_TERMS[priority];
+    let score = 0;
+    
+    // Check for exact terms
+    for (const term of priorityTerms) {
+      // For multi-word terms, check if the phrase appears in the original text
+      if (term.includes(' ')) {
+        const termWords = term.split(' ');
+        let termScore = 0;
+        
+        // Check if all words in the term are in the frequencies
+        for (const word of termWords) {
+          if (termFrequencies[word]) {
+            termScore += termFrequencies[word];
+          }
         }
-      });
-    });
-  });
+        
+        if (termScore > 0) {
+          // Adjust score based on number of words matched
+          score += termScore / termWords.length;
+        }
+      } else if (termFrequencies[term]) {
+        // Single word term
+        score += termFrequencies[term] * 2; // Higher weight for exact matches
+      }
+    }
+    
+    scores[priority] = score;
+  }
+  
+  // Normalize scores
+  const total = Object.values(scores).reduce((sum, score) => sum + score, 0);
+  if (total > 0) {
+    for (const priority of Object.keys(scores) as PriorityLevel[]) {
+      scores[priority] = scores[priority] / total;
+    }
+  }
   
   return scores;
 }
@@ -454,63 +577,117 @@ function calculatePriorityScores(termFrequencies: Record<string, number>): Recor
  * Determine the top priority based on scores
  */
 function determineTopPriority(scores: Record<PriorityLevel, number>): PriorityLevel {
-  return Object.entries(scores)
-    .sort((a, b) => b[1] - a[1])
-    .map(([priority]) => priority as PriorityLevel)[0] || PriorityLevel.MEDIUM;
+  let topPriority = PriorityLevel.MEDIUM; // Default to medium
+  let topScore = 0;
+  
+  for (const priority of Object.keys(scores) as PriorityLevel[]) {
+    if (scores[priority] > topScore) {
+      topScore = scores[priority];
+      topPriority = priority;
+    }
+  }
+  
+  return topPriority;
 }
 
 /**
  * Extract tags from term frequencies and other metadata
  */
 function extractTags(
-  termFrequencies: Record<string, number>,
   text: string,
+  termFrequencies: Record<string, number>,
   category: DocumentCategory,
-  subjects: SubjectArea[]
 ): string[] {
-  // Get top terms by frequency
+  const tags: Set<string> = new Set();
+  
+  // Add top terms as tags
   const topTerms = Object.entries(termFrequencies)
-    .sort((a, b) => b[1] - a[1])
+    .sort(([, freqA], [, freqB]) => freqB - freqA)
     .slice(0, 15)
     .map(([term]) => term);
   
-  // Add category and subjects as tags
-  const tags = [
-    category.toLowerCase(),
-    ...subjects.map(subject => subject.toLowerCase().replace(/_/g, '-'))
-  ];
+  for (const term of topTerms) {
+    if (term.length > 3) { // Only include meaningful terms
+      tags.add(term);
+    }
+  }
   
-  // Extract aircraft types
-  const aircraftTypes = extractRegexMatches(text, REGEX_PATTERNS.aircraftType);
+  // Add category-specific tags
+  const categoryTerms = CATEGORY_TERMS[category];
+  for (const term of categoryTerms) {
+    if (text.toLowerCase().includes(term.toLowerCase())) {
+      // Convert multi-word terms to camelCase for tags
+      if (term.includes(' ')) {
+        const camelCase = term
+          .split(' ')
+          .map((word, index) => 
+            index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1)
+          )
+          .join('');
+        tags.add(camelCase);
+      } else {
+        tags.add(term);
+      }
+    }
+  }
   
-  // Extract regulatory references
-  const regulations = extractRegexMatches(text, REGEX_PATTERNS.regulatoryReference);
+  // Add regex matches
+  for (const pattern of [
+    REGEX_PATTERNS.airportCode,
+    REGEX_PATTERNS.altitude,
+    REGEX_PATTERNS.speed,
+    REGEX_PATTERNS.heading,
+    REGEX_PATTERNS.flightLevel
+  ]) {
+    const matches = extractRegexMatches(text, pattern);
+    for (const match of matches) {
+      tags.add(match);
+    }
+  }
   
-  // Combine all tags
-  return [...new Set([
-    ...tags,
-    ...topTerms.slice(0, 5),
-    ...aircraftTypes.slice(0, 3),
-    ...regulations.slice(0, 3)
-  ])];
+  return Array.from(tags);
 }
 
 /**
  * Extract matches from text using a regex pattern
  */
 function extractRegexMatches(text: string, pattern: RegExp): string[] {
-  const matches = text.match(pattern) || [];
-  return [...new Set(matches)]; // Remove duplicates
+  const matches: string[] = [];
+  let match;
+  
+  // Reset regex to avoid issues with global flag
+  const regex = new RegExp(pattern.source, pattern.flags);
+  
+  while ((match = regex.exec(text)) !== null) {
+    matches.push(match[0]);
+    
+    // Prevent infinite loops for zero-width matches
+    if (match.index === regex.lastIndex) {
+      regex.lastIndex++;
+    }
+  }
+  
+  return matches;
 }
 
 /**
  * Extract key terms from term frequencies
  */
 function extractKeyTerms(termFrequencies: Record<string, number>): Record<string, number> {
-  return Object.entries(termFrequencies)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 50)
-    .reduce((obj, [term, freq]) => ({...obj, [term]: freq}), {});
+  // Sort terms by frequency
+  const sortedTerms = Object.entries(termFrequencies)
+    .sort(([, freqA], [, freqB]) => freqB - freqA);
+  
+  // Take top 30 terms
+  const topTerms = sortedTerms.slice(0, 30);
+  
+  // Convert back to record
+  const keyTerms: Record<string, number> = {};
+  for (const [term, freq] of topTerms) {
+    keyTerms[term] = freq;
+  }
+  
+  return keyTerms;
 }
 
 /**
@@ -518,32 +695,21 @@ function extractKeyTerms(termFrequencies: Record<string, number>): Record<string
  */
 function calculateConfidenceScore(
   categoryScores: Record<DocumentCategory, number>,
+  topCategory: DocumentCategory,
   subjectScores: Record<SubjectArea, number>,
-  priorityScores: Record<PriorityLevel, number>
+  topSubjects: SubjectArea[],
 ): number {
-  // Get the top two category scores
-  const sortedCategoryScores = Object.values(categoryScores).sort((a, b) => b - a);
-  const topCategoryScore = sortedCategoryScores[0] || 0;
-  const secondCategoryScore = sortedCategoryScores[1] || 0;
+  // Confidence based on how dominant the top category is
+  const categoryConfidence = categoryScores[topCategory];
   
-  // Get the top subject score
-  const topSubjectScore = Math.max(...Object.values(subjectScores));
+  // Confidence based on how dominant the top subjects are
+  const subjectConfidence = topSubjects.reduce(
+    (sum, subject) => sum + subjectScores[subject], 
+    0
+  ) / topSubjects.length;
   
-  // Calculate the difference between top and second categories (dominance)
-  const categoryDominance = secondCategoryScore > 0 ? 
-    topCategoryScore / secondCategoryScore : 
-    topCategoryScore > 0 ? 2 : 0;
-  
-  // Calculate confidence score components
-  const categoryConfidence = Math.min(topCategoryScore / 10, 1) * 0.5;
-  const subjectConfidence = Math.min(topSubjectScore / 10, 1) * 0.3;
-  const dominanceConfidence = Math.min(categoryDominance / 3, 1) * 0.2;
-  
-  // Combine all components
-  const confidence = categoryConfidence + subjectConfidence + dominanceConfidence;
-  
-  // Ensure confidence is between 0 and 1
-  return Math.max(0, Math.min(1, confidence));
+  // Combined confidence - weighted average
+  return 0.6 * categoryConfidence + 0.4 * subjectConfidence;
 }
 
 /**
@@ -551,14 +717,29 @@ function calculateConfidenceScore(
  */
 export function compareDocuments(doc1: string, doc2: string): number {
   // Tokenize both documents
-  const tokens1 = new Set(tokenizeText(doc1));
-  const tokens2 = new Set(tokenizeText(doc2));
+  const tokens1 = tokenizeText(doc1);
+  const tokens2 = tokenizeText(doc2);
   
-  // Find intersection
-  const intersection = new Set([...tokens1].filter(token => tokens2.has(token)));
+  // Calculate term frequencies
+  const termFreq1 = calculateTermFrequencies(tokens1);
+  const termFreq2 = calculateTermFrequencies(tokens2);
   
-  // Calculate Jaccard similarity
-  const similarity = intersection.size / (tokens1.size + tokens2.size - intersection.size);
+  // Get all unique terms
+  const allTerms = new Set([...Object.keys(termFreq1), ...Object.keys(termFreq2)]);
   
-  return similarity;
+  // Calculate dot product
+  let dotProduct = 0;
+  for (const term of allTerms) {
+    const freq1 = termFreq1[term] || 0;
+    const freq2 = termFreq2[term] || 0;
+    dotProduct += freq1 * freq2;
+  }
+  
+  // Calculate magnitudes
+  const mag1 = Math.sqrt(Object.values(termFreq1).reduce((sum, freq) => sum + Math.pow(freq, 2), 0));
+  const mag2 = Math.sqrt(Object.values(termFreq2).reduce((sum, freq) => sum + Math.pow(freq, 2), 0));
+  
+  // Calculate cosine similarity
+  if (mag1 === 0 || mag2 === 0) return 0;
+  return dotProduct / (mag1 * mag2);
 }

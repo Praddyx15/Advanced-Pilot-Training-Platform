@@ -8,6 +8,7 @@
  * - Content hierarchy
  * - Key-value pairs and form fields
  */
+
 import { ExtractionResult } from './document-extraction';
 import { logger } from '../core/logger';
 
@@ -89,7 +90,7 @@ const DEFAULT_OPTIONS: StructureRecognitionOptions = {
   recognizeKeyValue: true,
   recognizeReferences: true,
   minHeadingConfidence: 0.7,
-  minTableConfidence: 0.6,
+  minTableConfidence: 0.7,
   language: 'eng',
 };
 
@@ -103,62 +104,49 @@ export async function analyzeDocumentStructure(
   const startTime = Date.now();
   
   try {
-    logger.info('Starting document structure recognition', {
-      documentTitle: extractionResult.metadata.title,
-      options,
-    });
+    // Create the root element for the hierarchy
+    const root: DocumentElement = {
+      type: StructureType.SECTION,
+      text: extractionResult.metadata.title || 'Document Root',
+      level: 0,
+      children: [],
+    };
     
-    // Initialize the result
+    // Initialize the structure result
     const structure: DocumentStructure = {
       title: extractionResult.metadata.title,
       elements: [],
-      hierarchy: {
-        type: StructureType.SECTION,
-        text: 'Document Root',
-        children: [],
-      },
+      hierarchy: root,
       metadata: {
         processingTime: 0,
         confidence: 0,
         pageCount: extractionResult.metadata.pageCount,
         format: extractionResult.metadata.format,
-        language: extractionResult.metadata.language,
+        language: extractionResult.metadata.language || options.language,
       },
     };
     
-    // Process headings and create document hierarchy
-    if (options.recognizeHeadings && extractionResult.structured?.headings) {
-      processHeadings(extractionResult.structured.headings, structure);
+    // Process headings first to establish document hierarchy
+    if (options.recognizeHeadings) {
+      processHeadings(extractionResult, structure, options);
     }
     
-    // Process tables
+    // Process tables if available in the extraction result
     if (options.recognizeTables && extractionResult.structured?.tables) {
-      processTables(extractionResult.structured.tables, structure);
+      processTables(extractionResult, structure, options);
     }
     
-    // Process full text for other elements
-    processFullText(extractionResult.text, structure, options);
+    // Process the full text for other structural elements
+    processFullText(extractionResult, structure, options);
     
-    // Calculate confidence score
-    structure.metadata.confidence = calculateConfidence(structure);
-    
-    // Calculate processing time
+    // Calculate processing time and confidence
     structure.metadata.processingTime = Date.now() - startTime;
-    
-    logger.info('Document structure recognition completed', {
-      documentTitle: extractionResult.metadata.title,
-      elementCount: structure.elements.length,
-      processingTime: structure.metadata.processingTime,
-      confidence: structure.metadata.confidence,
-    });
+    structure.metadata.confidence = calculateConfidence(structure);
     
     return structure;
   } catch (error) {
-    logger.error('Error in document structure recognition', {
-      error,
-      documentTitle: extractionResult.metadata.title,
-    });
-    throw error;
+    logger.error('Document structure analysis error', { context: { error } });
+    throw new Error(`Document structure analysis failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -166,67 +154,78 @@ export async function analyzeDocumentStructure(
  * Process headings to create document hierarchy
  */
 function processHeadings(
-  headings: { level: number; text: string; pageIndex?: number }[],
+  extractionResult: ExtractionResult,
   structure: DocumentStructure,
+  options: StructureRecognitionOptions,
 ): void {
-  // Sort headings by their position in the document (if available)
-  const sortedHeadings = [...headings];
+  const headings = extractionResult.structured?.headings || [];
+  let currentNode = structure.hierarchy;
+  let currentLevel = 0;
   
-  // Track current section for each level
-  const currentSections: (DocumentElement | undefined)[] = [structure.hierarchy];
-  
-  for (const heading of sortedHeadings) {
+  // Process each heading in order
+  for (const heading of headings) {
+    const level = heading.level;
+    const text = heading.text;
+    
+    // Create a heading element
     const headingElement: DocumentElement = {
       type: StructureType.HEADING,
-      text: heading.text,
-      level: heading.level,
+      text,
+      level,
       metadata: {
-        confidence: 0.9, // Headings directly from extraction are high confidence
-        pageNumber: heading.pageIndex ? heading.pageIndex + 1 : undefined,
+        confidence: 0.9, // Headings from extraction are typically reliable
+        pageNumber: heading.pageIndex,
       },
       children: [],
     };
     
-    // Create a section for this heading
+    // Add to the flat list of elements
+    structure.elements.push(headingElement);
+    
+    // Create a section element that will contain content after this heading
     const sectionElement: DocumentElement = {
       type: StructureType.SECTION,
-      text: heading.text,
-      level: heading.level,
+      text: `${text} Section`,
+      level,
       metadata: {
-        confidence: 0.9,
-        pageNumber: heading.pageIndex ? heading.pageIndex + 1 : undefined,
+        confidence: 0.85,
+        pageNumber: heading.pageIndex,
       },
       children: [],
-      parent: undefined, // Will be set below
+      parent: headingElement,
     };
     
-    // Add heading to its section
-    sectionElement.children?.push(headingElement);
+    // Set the section as a child of the heading
+    headingElement.children = [sectionElement];
     
-    // Find the parent section for this heading based on its level
-    let parentLevel = heading.level - 1;
-    while (parentLevel > 0 && !currentSections[parentLevel]) {
-      parentLevel--;
+    // Find the correct parent in the hierarchy
+    if (level > currentLevel) {
+      // This is a child of the previous heading
+      if (currentNode.children && currentNode.children.length > 0) {
+        // Set parent to the last section under the current node
+        const lastChild = currentNode.children[currentNode.children.length - 1];
+        currentNode = lastChild.type === StructureType.SECTION ? lastChild : currentNode;
+      }
+    } else if (level < currentLevel) {
+      // This is a higher-level heading, go up the hierarchy
+      while (currentNode.parent && currentNode.level && currentNode.level >= level) {
+        currentNode = currentNode.parent;
+      }
+    } else {
+      // Same level, navigate to parent
+      if (currentNode.parent) {
+        currentNode = currentNode.parent;
+      }
     }
     
-    const parentSection = currentSections[parentLevel] || structure.hierarchy;
-    
-    // Set parent-child relationships
-    sectionElement.parent = parentSection;
-    parentSection.children = parentSection.children || [];
-    parentSection.children.push(sectionElement);
-    
-    // Update current section for this level
-    currentSections[heading.level] = sectionElement;
-    
-    // Clear any deeper levels since they would now belong to this new section
-    for (let i = heading.level + 1; i < currentSections.length; i++) {
-      currentSections[i] = undefined;
+    // Add the heading element to the current node in the hierarchy
+    if (currentNode.children) {
+      currentNode.children.push(headingElement);
     }
     
-    // Add to flat list of elements
-    structure.elements.push(headingElement);
-    structure.elements.push(sectionElement);
+    // Update the current node and level
+    currentNode = sectionElement;
+    currentLevel = level;
   }
 }
 
@@ -234,55 +233,61 @@ function processHeadings(
  * Process tables from the extraction result
  */
 function processTables(
-  tables: any[][],
+  extractionResult: ExtractionResult,
   structure: DocumentStructure,
+  options: StructureRecognitionOptions,
 ): void {
+  const tables = extractionResult.structured?.tables || [];
+  
   tables.forEach((tableData, tableIndex) => {
-    if (!tableData || tableData.length === 0) return;
-    
+    // Create a table element
     const tableElement: DocumentElement = {
       type: StructureType.TABLE,
       text: `Table ${tableIndex + 1}`,
       metadata: {
-        confidence: 0.85,
-        rowCount: tableData.length,
-        columnCount: Math.max(...tableData.map(row => Array.isArray(row) ? row.length : 0)),
+        confidence: 0.85, // Tables from extraction are typically reliable
       },
       children: [],
     };
     
-    // Process table cells
+    // Process each row and cell
     tableData.forEach((row, rowIndex) => {
+      const rowElement: DocumentElement = {
+        type: StructureType.PARAGRAPH, // Using paragraph for rows
+        text: `Row ${rowIndex + 1}`,
+        parent: tableElement,
+        children: [],
+      };
+      
+      // Process cells
       if (Array.isArray(row)) {
-        row.forEach((cell, colIndex) => {
+        row.forEach((cell, cellIndex) => {
           const cellElement: DocumentElement = {
             type: StructureType.TABLE_CELL,
             text: String(cell),
+            parent: rowElement,
             metadata: {
-              confidence: 0.85,
-              row: rowIndex,
-              column: colIndex,
+              columnIndex: cellIndex,
+              rowIndex: rowIndex,
             },
-            parent: tableElement,
           };
-          tableElement.children?.push(cellElement);
+          
+          rowElement.children?.push(cellElement);
         });
       }
+      
+      tableElement.children?.push(rowElement);
     });
     
-    // Find a good parent for this table in the hierarchy
+    // Add to the flat list of elements
+    structure.elements.push(tableElement);
+    
+    // Place table in the hierarchy - find the most recent section
     const bestParent = findBestParentForElement(tableElement, structure.hierarchy);
-    if (bestParent) {
-      bestParent.children = bestParent.children || [];
+    if (bestParent && bestParent.children) {
       bestParent.children.push(tableElement);
       tableElement.parent = bestParent;
-    } else {
-      structure.hierarchy.children = structure.hierarchy.children || [];
-      structure.hierarchy.children.push(tableElement);
-      tableElement.parent = structure.hierarchy;
     }
-    
-    structure.elements.push(tableElement);
   });
 }
 
@@ -290,25 +295,58 @@ function processTables(
  * Process the full text to identify other structural elements
  */
 function processFullText(
-  text: string,
+  extractionResult: ExtractionResult,
   structure: DocumentStructure,
   options: StructureRecognitionOptions,
 ): void {
-  const lines = text.split('\n');
+  const text = extractionResult.text;
   
-  // Process lists
-  if (options.recognizeLists) {
-    processLists(lines, structure);
-  }
+  // Split into paragraphs
+  const paragraphs = text.split(/\n\s*\n/).filter(p => p.trim().length > 0);
   
-  // Process key-value pairs
-  if (options.recognizeKeyValue) {
-    processKeyValuePairs(lines, structure);
-  }
-  
-  // Process references and citations
-  if (options.recognizeReferences) {
-    processReferences(text, structure);
+  // Iterate through paragraphs and identify structure
+  for (const paragraph of paragraphs) {
+    const trimmedText = paragraph.trim();
+    
+    // Skip if empty
+    if (trimmedText.length === 0) continue;
+    
+    // Check for lists
+    if (options.recognizeLists && isList(trimmedText)) {
+      processLists(trimmedText, structure);
+      continue;
+    }
+    
+    // Check for key-value pairs
+    if (options.recognizeKeyValue && isKeyValuePair(trimmedText)) {
+      processKeyValuePairs(trimmedText, structure);
+      continue;
+    }
+    
+    // Check for references
+    if (options.recognizeReferences && isReference(trimmedText)) {
+      processReferences(trimmedText, structure);
+      continue;
+    }
+    
+    // Default to paragraph
+    const paragraphElement: DocumentElement = {
+      type: StructureType.PARAGRAPH,
+      text: trimmedText,
+      metadata: {
+        confidence: 0.9, // High confidence for basic paragraphs
+      },
+    };
+    
+    // Add to flat list
+    structure.elements.push(paragraphElement);
+    
+    // Add to hierarchy in the appropriate section
+    const bestParent = findBestParentForElement(paragraphElement, structure.hierarchy);
+    if (bestParent && bestParent.children) {
+      bestParent.children.push(paragraphElement);
+      paragraphElement.parent = bestParent;
+    }
   }
 }
 
@@ -316,76 +354,65 @@ function processFullText(
  * Process lists from text lines
  */
 function processLists(
-  lines: string[],
+  text: string,
   structure: DocumentStructure,
 ): void {
-  let currentList: DocumentElement | undefined = undefined;
-  const listMarkerRegex = /^\s*[•\-\*\d+\.\+]\s+/;
+  // Split into lines
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    if (!line) continue;
-    
-    // Check if this is a list item
-    const isListItem = listMarkerRegex.test(line);
-    
-    if (isListItem) {
-      // Start a new list if we're not in one already
-      if (!currentList) {
-        currentList = {
-          type: StructureType.LIST,
-          text: 'List',
-          metadata: {
-            confidence: 0.75,
-            startLine: i,
-          },
-          children: [],
-        };
-        
-        // Find a parent for this list
-        const bestParent = findBestParentForElement(currentList, structure.hierarchy);
-        if (bestParent) {
-          bestParent.children = bestParent.children || [];
-          bestParent.children.push(currentList);
-          currentList.parent = bestParent;
-        } else {
-          structure.hierarchy.children = structure.hierarchy.children || [];
-          structure.hierarchy.children.push(currentList);
-          currentList.parent = structure.hierarchy;
-        }
-        
-        structure.elements.push(currentList);
-      }
+  // Create list element
+  const listElement: DocumentElement = {
+    type: StructureType.LIST,
+    text: 'List',
+    metadata: {
+      confidence: 0.85,
+    },
+    children: [],
+  };
+  
+  // Process each list item
+  for (const line of lines) {
+    // Extract the list marker and content
+    const match = line.match(/^(\s*[-•*]\s+|\s*\d+[.)]\s+)(.+)$/);
+    if (match) {
+      const [, marker, content] = match;
       
-      // Create list item
-      const itemText = line.replace(listMarkerRegex, '');
+      // Create list item element
       const listItem: DocumentElement = {
         type: StructureType.LIST_ITEM,
-        text: itemText,
+        text: content.trim(),
         metadata: {
-          confidence: 0.8,
-          lineIndex: i,
+          marker: marker.trim(),
+          isOrdered: /^\d+[.)]/.test(marker),
+          confidence: 0.9,
         },
-        parent: currentList,
+        parent: listElement,
       };
       
-      if (currentList.children) {
-        currentList.children.push(listItem);
-      }
-      structure.elements.push(listItem);
-    } else if (currentList && line.trim().length > 0 && !line.match(/^\s+/)) {
-      // A non-indented, non-empty line that doesn't match list pattern - end current list
-      if (currentList.metadata) {
-        currentList.metadata.endLine = i - 1;
-      }
-      currentList = undefined;
+      listElement.children?.push(listItem);
+    } else {
+      // If no marker found, add as plain text item
+      const listItem: DocumentElement = {
+        type: StructureType.LIST_ITEM,
+        text: line.trim(),
+        metadata: {
+          confidence: 0.7, // Lower confidence because no clear marker
+        },
+        parent: listElement,
+      };
+      
+      listElement.children?.push(listItem);
     }
   }
   
-  // Close any open list at the end
-  if (currentList && currentList.metadata) {
-    currentList.metadata.endLine = lines.length - 1;
+  // Add to flat list
+  structure.elements.push(listElement);
+  
+  // Add to hierarchy in the appropriate section
+  const bestParent = findBestParentForElement(listElement, structure.hierarchy);
+  if (bestParent && bestParent.children) {
+    bestParent.children.push(listElement);
+    listElement.parent = bestParent;
   }
 }
 
@@ -393,47 +420,37 @@ function processLists(
  * Process key-value pairs (like form fields or property lists)
  */
 function processKeyValuePairs(
-  lines: string[],
+  text: string,
   structure: DocumentStructure,
 ): void {
-  const keyValueRegex = /^([^:]+):(.+)$/;
+  // Split into lines
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
   
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    if (!line) continue;
-    
-    const match = line.match(keyValueRegex);
+  for (const line of lines) {
+    // Try to match key: value pattern
+    const match = line.match(/^([^:]+):\s*(.*)$/);
     if (match) {
-      const key = match[1].trim();
-      const value = match[2].trim();
+      const [, key, value] = match;
       
-      // Only consider it a key-value if key is reasonable and value exists
-      if (key.length > 0 && key.length < 50 && value.length > 0) {
-        const kvElement: DocumentElement = {
-          type: StructureType.KEY_VALUE,
-          text: line,
-          metadata: {
-            confidence: 0.75,
-            key,
-            value,
-            lineIndex: i,
-          },
-        };
-        
-        // Find a parent for this key-value
-        const bestParent = findBestParentForElement(kvElement, structure.hierarchy);
-        if (bestParent) {
-          bestParent.children = bestParent.children || [];
-          bestParent.children.push(kvElement);
-          kvElement.parent = bestParent;
-        } else {
-          structure.hierarchy.children = structure.hierarchy.children || [];
-          structure.hierarchy.children.push(kvElement);
-          kvElement.parent = structure.hierarchy;
-        }
-        
-        structure.elements.push(kvElement);
+      // Create key-value element
+      const kvElement: DocumentElement = {
+        type: StructureType.KEY_VALUE,
+        text: line.trim(),
+        metadata: {
+          key: key.trim(),
+          value: value.trim(),
+          confidence: 0.9,
+        },
+      };
+      
+      // Add to flat list
+      structure.elements.push(kvElement);
+      
+      // Add to hierarchy in the appropriate section
+      const bestParent = findBestParentForElement(kvElement, structure.hierarchy);
+      if (bestParent && bestParent.children) {
+        bestParent.children.push(kvElement);
+        kvElement.parent = bestParent;
       }
     }
   }
@@ -446,117 +463,105 @@ function processReferences(
   text: string,
   structure: DocumentStructure,
 ): void {
-  // Citation patterns
-  const citationPatterns = [
-    /\[(\d+)\]/g, // [1], [2], etc.
-    /\(([A-Za-z]+,?\s+\d{4}(?:[a-z])?)\)/g, // (Smith, 2020), (Jones, 2019a), etc.
-  ];
+  // Split into lines
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
   
-  // Reference list patterns
-  const referencePatterns = [
-    /References:|Bibliography:|Works Cited:/i, // Common section headings for references
-  ];
-  
-  // Find the references section
-  let refSection: DocumentElement | undefined = undefined;
-  for (const pattern of referencePatterns) {
-    if (pattern.test(text)) {
-      // Find the section by looking through existing headings/sections
-      for (const element of structure.elements) {
-        if (
-          (element.type === StructureType.HEADING || element.type === StructureType.SECTION) &&
-          pattern.test(element.text)
-        ) {
-          // Create a special reference section if we found a heading
-          refSection = {
-            type: StructureType.SECTION,
-            text: 'References',
-            metadata: {
-              confidence: 0.9,
-              isReferenceSection: true,
-            },
-            children: [],
-            parent: element.parent,
-          };
-          
-          // Add to hierarchy and elements
-          if (element.parent) {
-            element.parent.children = element.parent.children || [];
-            element.parent.children.push(refSection);
-          } else {
-            structure.hierarchy.children = structure.hierarchy.children || [];
-            structure.hierarchy.children.push(refSection);
-            refSection.parent = structure.hierarchy;
-          }
-          
-          structure.elements.push(refSection);
-          break;
-        }
-      }
-    }
-    
-    if (refSection) break;
-  }
-  
-  // Process citations
-  for (const pattern of citationPatterns) {
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
+  for (const line of lines) {
+    // Look for patterns like [1], [Smith, 2020], etc.
+    const matches = line.match(/\[([^\]]+)\]/g);
+    if (matches) {
+      // Create citation element
       const citation: DocumentElement = {
         type: StructureType.CITATION,
-        text: match[0],
+        text: line.trim(),
         metadata: {
-          confidence: 0.7,
-          citationText: match[1],
-          position: match.index,
+          references: matches.map(m => m.replace(/[\[\]]/g, '').trim()),
+          confidence: 0.85,
         },
       };
       
+      // Add to flat list
       structure.elements.push(citation);
+      
+      // Add to hierarchy in the appropriate section
+      const bestParent = findBestParentForElement(citation, structure.hierarchy);
+      if (bestParent && bestParent.children) {
+        bestParent.children.push(citation);
+        citation.parent = bestParent;
+      }
     }
   }
 }
 
-/**
- * Find the best parent for a new element in the document hierarchy
- */
-// Helper function defined outside of the block (prevents strict mode error)
+// Helper functions to detect structure types
+function isList(text: string): boolean {
+  const lines = text.split('\n');
+  if (lines.length < 2) return false;
+  
+  // Check if multiple lines start with list markers
+  const listMarkerCount = lines.filter(line => 
+    line.trim().match(/^(\s*[-•*]\s+|\s*\d+[.)]\s+)/)
+  ).length;
+  
+  return listMarkerCount >= Math.min(lines.length * 0.5, 3); // At least half or 3 items
+}
+
+function isKeyValuePair(text: string): boolean {
+  const lines = text.split('\n');
+  if (lines.length < 1) return false;
+  
+  // Check if lines have key: value format
+  const keyValueCount = lines.filter(line => 
+    line.trim().match(/^([^:]+):\s*(.+)$/)
+  ).length;
+  
+  return keyValueCount >= Math.min(lines.length * 0.5, 2); // At least half or 2 items
+}
+
+function isReference(text: string): boolean {
+  // Check for citation patterns
+  return /\[([^\]]+)\]/.test(text) || 
+         /\(\d{4}\)/.test(text) || // (2020)
+         /^References:?$/im.test(text);
+}
+
+// Utility function to find a section on a specific page
 function findSectionOnPageHelper(node: DocumentElement, pageNumber: number): DocumentElement | null {
-  if (node.type === StructureType.SECTION && node.metadata?.pageNumber === pageNumber) {
-    // Search children first to find the deepest matching section
-    for (const child of node.children || []) {
-      const result = findSectionOnPageHelper(child, pageNumber);
-      if (result) return result;
-    }
+  if (node.metadata?.pageNumber === pageNumber && node.type === StructureType.SECTION) {
     return node;
   }
   
-  // If this isn't a matching section, check all children
-  for (const child of node.children || []) {
-    const result = findSectionOnPageHelper(child, pageNumber);
-    if (result) return result;
+  if (node.children) {
+    for (const child of node.children) {
+      const found = findSectionOnPageHelper(child, pageNumber);
+      if (found) return found;
+    }
   }
   
   return null;
 }
 
-// Helper function for finding most recent section (prevents strict mode error)
+// Utility function to find the most recent section in the document
 function findMostRecentSectionHelper(node: DocumentElement): DocumentElement | null {
   if (node.type === StructureType.SECTION) {
-    // Check if any children are sections
-    let lastSection: DocumentElement | null = null;
-    for (const child of node.children || []) {
-      if (child.type === StructureType.SECTION) {
-        lastSection = child;
+    // Check children first for deeper sections
+    if (node.children) {
+      for (let i = node.children.length - 1; i >= 0; i--) {
+        const found = findMostRecentSectionHelper(node.children[i]);
+        if (found) return found;
       }
     }
     
-    if (lastSection) {
-      const deeperSection = findMostRecentSectionHelper(lastSection);
-      return deeperSection || lastSection;
-    }
-    
+    // If no deeper section found, return this one
     return node;
+  }
+  
+  // If not a section, check children
+  if (node.children) {
+    for (let i = node.children.length - 1; i >= 0; i--) {
+      const found = findMostRecentSectionHelper(node.children[i]);
+      if (found) return found;
+    }
   }
   
   return null;
@@ -566,20 +571,14 @@ function findBestParentForElement(
   element: DocumentElement,
   root: DocumentElement,
 ): DocumentElement | null {
-  // For now, use a simple strategy: find the deepest section that could contain this element
-  // based on page number or position in text
-  
-  // If this element has page metadata, try to find a section on that page
-  const pageNumber = element.metadata?.pageNumber;
-  
-  if (pageNumber) {
-    // Use the helper function defined outside the block
-    const sectionOnPage = findSectionOnPageHelper(root, pageNumber);
+  // If element has page info, try to find a section on the same page
+  if (element.metadata?.pageNumber !== undefined) {
+    const sectionOnPage = findSectionOnPageHelper(root, element.metadata.pageNumber);
     if (sectionOnPage) return sectionOnPage;
   }
   
-  // If no section found based on page, return the most recently added section
-  return findMostRecentSectionHelper(root) || root;
+  // Otherwise, find the most recent section
+  return findMostRecentSectionHelper(root);
 }
 
 /**
@@ -588,11 +587,18 @@ function findBestParentForElement(
 function calculateConfidence(structure: DocumentStructure): number {
   if (structure.elements.length === 0) return 0;
   
-  // Average confidence across all elements
-  const confidenceSum = structure.elements.reduce(
-    (sum, element) => sum + (element.metadata?.confidence || 0.5),
-    0
-  );
+  // Calculate average confidence of all elements
+  let totalConfidence = 0;
+  let elementsWithConfidence = 0;
   
-  return confidenceSum / structure.elements.length;
+  for (const element of structure.elements) {
+    if (element.metadata?.confidence !== undefined) {
+      totalConfidence += element.metadata.confidence;
+      elementsWithConfidence++;
+    }
+  }
+  
+  return elementsWithConfidence > 0 
+    ? totalConfidence / elementsWithConfidence 
+    : 0.5; // Default confidence if no elements have confidence scores
 }
