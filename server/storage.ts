@@ -473,7 +473,7 @@ export class MemStorage implements IStorage {
     const adminUser: User = {
       id: this.userIdCounter++,
       username: 'admin',
-      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
+      password: '$2b$10$7zUDXTKMXKfxMfOG7Dkbuu/gDy9h0Jk8KsEZnZm5hW.4URqgC5ZMq', // hashed 'Admin@123'
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -493,13 +493,13 @@ export class MemStorage implements IStorage {
       notificationSettings: null
     };
 
-    // Add instructor user
-    const instructorUser: User = {
+    // Add ATO/Airline user
+    const atoUser: User = {
       id: this.userIdCounter++,
-      username: 'instructor',
-      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
-      email: 'instructor@example.com',
-      firstName: 'Test',
+      username: 'ato_airline',
+      password: '$2b$10$KGuxHUdw7NcJwfU3E.g47eTpqh0X9lIx2EsqAGmMy70eS6NvXSTtu', // hashed 'ATO@airline123'
+      email: 'Airline@example.com',
+      firstName: 'Airline',
       lastName: 'Instructor',
       role: 'instructor',
       createdAt: new Date(),
@@ -517,13 +517,13 @@ export class MemStorage implements IStorage {
       notificationSettings: null
     };
 
-    // Add trainee user
-    const traineeUser: User = {
+    // Add student user
+    const studentUser: User = {
       id: this.userIdCounter++,
-      username: 'trainee',
-      password: '$2b$10$sKZR5DFXk1TxRhyM8e69WePxjJRV18ymYrVB0yAhZ2cwvC7o5VKJK', // hashed 'password123'
-      email: 'trainee@example.com',
-      firstName: 'Test',
+      username: 'student',
+      password: '$2b$10$.V5wNBkwLnY7mTN1vEGRbOqQJWMZ/E/T.1bfO.WLX3TxHNLLnZhbe', // hashed 'Student@123'
+      email: 'student@example.com',
+      firstName: 'Student',
       lastName: 'Trainee',
       role: 'trainee',
       createdAt: new Date(),
@@ -541,9 +541,58 @@ export class MemStorage implements IStorage {
       notificationSettings: null
     };
 
+    // Additional users for testing
+    const secondStudent: User = {
+      id: this.userIdCounter++,
+      username: 'student2',
+      password: '$2b$10$.V5wNBkwLnY7mTN1vEGRbOqQJWMZ/E/T.1bfO.WLX3TxHNLLnZhbe', // hashed 'Student@123'
+      email: 'student2@example.com',
+      firstName: 'Second',
+      lastName: 'Student',
+      role: 'trainee',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'Airline',
+      organizationName: 'Global Airlines',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
+    const secondAirline: User = {
+      id: this.userIdCounter++,
+      username: 'airline2',
+      password: '$2b$10$KGuxHUdw7NcJwfU3E.g47eTpqh0X9lIx2EsqAGmMy70eS6NvXSTtu', // hashed 'ATO@airline123'
+      email: 'ATO@example.com',
+      firstName: 'ATO',
+      lastName: 'Manager',
+      role: 'instructor',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'ATO',
+      organizationName: 'Advanced Training Organization',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
     this.users.set(adminUser.id, adminUser);
-    this.users.set(instructorUser.id, instructorUser);
-    this.users.set(traineeUser.id, traineeUser);
+    this.users.set(atoUser.id, atoUser);
+    this.users.set(studentUser.id, studentUser);
+    this.users.set(secondStudent.id, secondStudent);
+    this.users.set(secondAirline.id, secondAirline);
     
     console.log('Initialized sample users:', 
       this.users.size, 
