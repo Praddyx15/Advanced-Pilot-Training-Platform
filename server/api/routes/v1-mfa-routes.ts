@@ -207,7 +207,7 @@ router.post('/mfa/totp/verify', ensureAuthenticated, async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: 'Validation failed', errors: error.errors });
     }
-    logger.error('Error verifying TOTP', { userId: req.user?.id }, error);
+    logger.error('Error verifying TOTP', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to verify TOTP' });
   }
 });
@@ -316,7 +316,7 @@ router.post('/mfa/login/verify', ensureAuthenticated, async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: 'Validation failed', errors: error.errors });
     }
-    logger.error('Error verifying MFA during login', { userId: req.user?.id }, error);
+    logger.error('Error verifying MFA during login', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to verify MFA' });
   }
 });
@@ -418,7 +418,7 @@ router.post('/mfa/biometric/register', ensureAuthenticated, async (req, res) => 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ message: 'Validation failed', errors: error.errors });
     }
-    logger.error('Error registering biometric template', { userId: req.user?.id }, error);
+    logger.error('Error registering biometric template', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to register biometric template' });
   }
 });
