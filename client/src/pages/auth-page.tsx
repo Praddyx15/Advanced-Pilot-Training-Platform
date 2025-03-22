@@ -4,7 +4,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth, registerSchema, RegisterFormData } from "@/hooks/use-auth";
-import { Airplay, Building2, Globe, User, Shield, CheckCircle2 } from "lucide-react";
+import { Airplay, Building2, Globe, User, Shield, CheckCircle2, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
