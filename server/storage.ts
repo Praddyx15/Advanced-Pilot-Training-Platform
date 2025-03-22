@@ -1477,6 +1477,49 @@ export class MemStorage implements IStorage {
     return this.knowledgeGraphEdges.delete(id);
   }
 
+  // Document Analysis methods
+  async getDocumentAnalysis(id: number): Promise<DocumentAnalysis | undefined> {
+    return this.documentAnalyses.get(id);
+  }
+
+  async getDocumentAnalysisByDocument(documentId: number, analysisType?: string): Promise<DocumentAnalysis[]> {
+    return Array.from(this.documentAnalyses.values())
+      .filter(analysis => {
+        if (analysis.documentId !== documentId) return false;
+        if (analysisType && analysis.analysisType !== analysisType) return false;
+        return true;
+      });
+  }
+
+  async createDocumentAnalysis(analysis: InsertDocumentAnalysis): Promise<DocumentAnalysis> {
+    const id = this.documentAnalysisIdCounter++;
+    const newAnalysis: DocumentAnalysis = {
+      ...analysis,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      status: analysis.status || 'pending',
+      results: analysis.results || null
+    };
+    this.documentAnalyses.set(id, newAnalysis);
+    return newAnalysis;
+  }
+
+  async updateDocumentAnalysisStatus(id: number, status: string, results?: any): Promise<DocumentAnalysis | undefined> {
+    const analysis = this.documentAnalyses.get(id);
+    if (!analysis) return undefined;
+    
+    const updatedAnalysis: DocumentAnalysis = {
+      ...analysis,
+      status,
+      results: results !== undefined ? results : analysis.results,
+      updatedAt: new Date()
+    };
+    
+    this.documentAnalyses.set(id, updatedAnalysis);
+    return updatedAnalysis;
+  }
+
   // Performance Metrics methods
   async getPerformanceMetric(id: number): Promise<PerformanceMetric | undefined> {
     return this.performanceMetrics.get(id);
