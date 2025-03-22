@@ -293,6 +293,7 @@ export class MemStorage implements IStorage {
   private modules: Map<number, Module>;
   private lessons: Map<number, Lesson>;
   private sessions: Map<number, Session>;
+  private documentAnalyses: Map<number, DocumentAnalysis>;
   private sessionTrainees: Map<number, SessionTrainee>;
   private assessments: Map<number, Assessment>;
   private grades: Map<number, Grade>;
@@ -305,7 +306,6 @@ export class MemStorage implements IStorage {
   private regulatoryReferences: Map<string, RegulatoryReference[]>;
   private knowledgeGraphNodes: Map<number, KnowledgeGraphNode>;
   private knowledgeGraphEdges: Map<number, KnowledgeGraphEdge>;
-  private documentAnalyses: Map<number, DocumentAnalysis>;
   private regulatoryRequirements: Map<number, RegulatoryRequirement>;
   private programCompliances: Map<number, ProgramCompliance>;
   private auditLogs: Map<number, AuditLog>;
