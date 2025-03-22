@@ -1,8 +1,24 @@
 import { z } from "zod";
 
+// Template types for syllabus generation
+export const syllabusTemplateSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  description: z.string(),
+  programType: z.enum(['initial_type_rating', 'recurrent', 'joc_mcc', 'type_conversion', 'instructor', 'custom']),
+  version: z.string(),
+  regulatoryAuthority: z.enum(['faa', 'easa', 'icao', 'dgca', 'other']),
+  modules: z.array(z.any()).optional(), // Will be properly typed in the actual implementation
+  metadata: z.record(z.string(), z.any()).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
+});
+
+export type SyllabusTemplate = z.infer<typeof syllabusTemplateSchema>;
+
 // Options for syllabus generation
 export const syllabusGenerationOptionsSchema = z.object({
-  programType: z.enum(['initial_type_rating', 'recurrent', 'joc_mcc', 'custom']),
+  programType: z.enum(['initial_type_rating', 'recurrent', 'joc_mcc', 'type_conversion', 'instructor', 'custom']),
   aircraftType: z.string().optional(),
   regulatoryAuthority: z.enum(['faa', 'easa', 'icao', 'dgca', 'other']).optional(),
   includeSimulatorExercises: z.boolean().default(true),
@@ -10,6 +26,11 @@ export const syllabusGenerationOptionsSchema = z.object({
   includeAssessments: z.boolean().default(true),
   customizationLevel: z.enum(['minimal', 'moderate', 'extensive']).default('moderate'),
   defaultDuration: z.number().min(1).default(14), // Default duration in days
+  templateId: z.number().optional(), // Reference to a pre-configured template
+  applyRegulationVersion: z.string().optional(), // Specific regulatory version to apply
+  enableComplianceTracking: z.boolean().default(true),
+  knowledgeGraphGeneration: z.boolean().default(false), // For advanced document relationship analysis
+  multiLanguageSupport: z.array(z.string()).optional(), // List of languages to support
 });
 
 export type SyllabusGenerationOptions = z.infer<typeof syllabusGenerationOptionsSchema>;
@@ -43,8 +64,39 @@ export interface ExtractedLesson {
   learningObjectives: string[];
 }
 
+// Regulatory reference with versioning
+export interface RegulatoryReference {
+  code: string;
+  authority: string;
+  version: string;
+  description: string;
+  url?: string;
+  effectiveDate?: Date;
+  expirationDate?: Date;
+}
+
+// Compliance impact for changes to syllabus
+export interface ComplianceImpact {
+  affectedRequirements: RegulatoryReference[];
+  impactLevel: 'none' | 'low' | 'medium' | 'high' | 'critical';
+  description: string;
+  mitigationSteps?: string[];
+  approvalRequired: boolean;
+}
+
+// Version history entry for syllabus
+export interface SyllabusVersion {
+  versionNumber: string;
+  changedBy: number; // User ID
+  changeDate: Date;
+  changeDescription: string;
+  complianceImpact: ComplianceImpact;
+  previousVersion?: string;
+}
+
 // Complete generated syllabus structure
 export interface GeneratedSyllabus {
+  id?: number;
   name: string;
   description: string;
   programType: string;
@@ -55,11 +107,23 @@ export interface GeneratedSyllabus {
   lessons: ExtractedLesson[];
   regulatoryCompliance: {
     authority: string;
-    requirementsMet: string[];
-    requirementsPartiallyMet: string[];
-    requirementsNotMet: string[];
+    requirementsMet: RegulatoryReference[];
+    requirementsPartiallyMet: RegulatoryReference[];
+    requirementsNotMet: RegulatoryReference[];
   };
   confidenceScore: number; // 0-100% confidence in extraction accuracy
+  version: string;
+  versionHistory?: SyllabusVersion[];
+  createdFrom?: {
+    templateId?: number;
+    documentId?: number;
+  };
+  knowledgeGraph?: {
+    nodes: Array<{id: string, type: string, content: string}>;
+    edges: Array<{source: string, target: string, relationship: string}>;
+  };
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 // Schema for saving a generated syllabus

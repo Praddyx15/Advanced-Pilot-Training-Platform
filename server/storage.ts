@@ -26,7 +26,11 @@ import {
   SyllabusGenerationOptions, 
   GeneratedSyllabus, 
   ExtractedModule, 
-  ExtractedLesson 
+  ExtractedLesson,
+  SyllabusTemplate,
+  SyllabusVersion,
+  ComplianceImpact,
+  RegulatoryReference
 } from "@shared/syllabus-types";
 import session from "express-session";
 import createMemoryStore from "memorystore";
@@ -44,6 +48,28 @@ export interface IStorage {
   // Syllabus Generator methods
   generateSyllabusFromDocument(documentId: number, options: SyllabusGenerationOptions): Promise<GeneratedSyllabus>;
   saveSyllabusAsProgram(syllabus: GeneratedSyllabus, createdById: number): Promise<TrainingProgram>;
+  
+  // Syllabus Template methods
+  getSyllabusTemplate(id: number): Promise<SyllabusTemplate | undefined>;
+  getAllSyllabusTemplates(): Promise<SyllabusTemplate[]>;
+  getSyllabusTemplatesByType(programType: string): Promise<SyllabusTemplate[]>;
+  createSyllabusTemplate(template: SyllabusTemplate): Promise<SyllabusTemplate>;
+  updateSyllabusTemplate(id: number, template: Partial<SyllabusTemplate>): Promise<SyllabusTemplate | undefined>;
+  deleteSyllabusTemplate(id: number): Promise<boolean>;
+  
+  // Syllabus Version Control methods
+  getSyllabusVersionHistory(syllabusId: number): Promise<SyllabusVersion[]>;
+  createSyllabusVersion(syllabusId: number, version: SyllabusVersion): Promise<SyllabusVersion>;
+  compareSyllabusVersions(syllabusId: number, version1: string, version2: string): Promise<{
+    addedModules: ExtractedModule[];
+    removedModules: ExtractedModule[];
+    modifiedModules: Array<{before: ExtractedModule, after: ExtractedModule}>;
+    complianceImpact: ComplianceImpact;
+  }>;
+  
+  // Compliance Analysis methods
+  analyzeComplianceImpact(syllabusId: number, changes: any): Promise<ComplianceImpact>;
+  getRegulatoryReferences(authority: string, version?: string): Promise<RegulatoryReference[]>;
 
   // Training Program methods
   getProgram(id: number): Promise<TrainingProgram | undefined>;
@@ -126,6 +152,9 @@ export class MemStorage implements IStorage {
   private documents: Map<number, Document>;
   private resources: Map<number, Resource>;
   private notifications: Map<number, Notification>;
+  private syllabusTemplates: Map<number, SyllabusTemplate>;
+  private syllabusVersions: Map<number, SyllabusVersion[]>;
+  private regulatoryReferences: Map<string, RegulatoryReference[]>;
   public sessionStore: session.Store;
 
   private userIdCounter: number;
@@ -139,6 +168,7 @@ export class MemStorage implements IStorage {
   private documentIdCounter: number;
   private resourceIdCounter: number;
   private notificationIdCounter: number;
+  private syllabusTemplateIdCounter: number;
 
   constructor() {
     this.users = new Map();
