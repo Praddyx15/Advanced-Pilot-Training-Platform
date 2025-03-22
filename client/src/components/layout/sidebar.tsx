@@ -10,7 +10,9 @@ import {
   Settings,
   LogOut,
   Wand2,
-  Network
+  Network,
+  LineChart,
+  ActivitySquare
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
@@ -65,6 +67,13 @@ export default function Sidebar() {
           <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors">
             <Network className="h-5 w-5" />
             <span>Knowledge Graph</span>
+          </a>
+        </Link>
+        
+        <Link href="/analytics">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-green-600 hover:bg-green-50 transition-colors">
+            <ActivitySquare className="h-5 w-5" />
+            <span>Analytics Dashboard</span>
           </a>
         </Link>
         
