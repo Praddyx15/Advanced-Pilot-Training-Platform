@@ -8,25 +8,40 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  BookOpen, 
-  Calendar, 
+import {
   Loader2,
+  CalendarClock,
+  GraduationCap,
+  Trophy,
+  BookOpen,
+  CheckCircle2,
+  Star,
+  Clock,
+  ChevronRight,
+  BookMarked,
   Plane,
-  FileText,
-  Video,
-  ExternalLink,
+  XOctagon,
+  AlertCircle,
+  FileCheck,
+  ArrowRight,
 } from 'lucide-react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export function TraineeDashboard() {
-  const [activeTab] = useState('overview');
-
-  // Fetch trainee profile data
-  const { data: traineeProfile, isLoading: isProfileLoading } = useQuery({
+  // Fetch trainee profile and progress data
+  const { data: traineeData, isLoading: isTraineeLoading } = useQuery({
     queryKey: ['/api/trainee/profile'],
     queryFn: async () => {
       try {
@@ -35,150 +50,192 @@ export function TraineeDashboard() {
       } catch (error) {
         // Return mock data for development
         return {
-          id: "ST0972",
-          program: "ATPL",
-          phase: "Advanced",
-          overallProgress: 68,
-          flightHours: 142.5,
-          totalFlightHours: 215,
-          theoryProgress: 12,
-          totalTheoryExams: 14,
-          daysRemaining: 72,
-          isCriticalPath: true
+          firstName: "Emma",
+          lastName: "Wilson",
+          id: "ST1039",
+          program: "Commercial Pilot License (CPL)",
+          programCompletion: 68,
+          totalFlightHours: 153.5,
+          soloHours: 32.8,
+          instructorHours: 120.7,
+          nextMilestone: "Long Cross-Country Flight",
+          licenseProgress: {
+            groundTheory: 85,
+            flightTraining: 62,
+            skillTest: 0
+          }
         };
       }
     },
   });
 
-  // Fetch upcoming schedule
-  const { data: upcomingSchedule, isLoading: isScheduleLoading } = useQuery({
-    queryKey: ['/api/trainee/schedule'],
+  // Fetch upcoming sessions
+  const { data: upcomingSessions, isLoading: isSessionsLoading } = useQuery({
+    queryKey: ['/api/trainee/upcoming-sessions'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/trainee/schedule');
+        const response = await apiRequest('GET', '/api/trainee/upcoming-sessions');
         return await response.json();
       } catch (error) {
         // Return mock data for development
+        const today = new Date();
+        const tomorrow = new Date(today);
+        tomorrow.setDate(today.getDate() + 1);
+        
+        const dayAfter = new Date(today);
+        dayAfter.setDate(today.getDate() + 2);
+        
         return [
           {
             id: 1,
-            activity: "B737 Simulator Session",
-            date: new Date().toISOString(),
-            time: "14:00-17:00",
-            status: "today"
+            title: "Cross-Country Flight",
+            type: "Flight",
+            date: today.toISOString(),
+            time: "14:00-16:30",
+            instructor: "Robert Chen",
+            aircraft: "C172 (G-ABCD)",
+            status: "confirmed"
           },
           {
             id: 2,
-            activity: "Emergency Procedures",
-            date: new Date(Date.now() + 86400000).toISOString(),
-            time: "09:00-12:00",
+            title: "Navigation Theory Review",
+            type: "Ground",
+            date: tomorrow.toISOString(),
+            time: "10:00-12:00",
+            instructor: "Sarah Phillips",
+            location: "Classroom 3B",
             status: "confirmed"
           },
           {
             id: 3,
-            activity: "Flight Planning Seminar",
-            date: new Date(Date.now() + 86400000 * 2).toISOString(),
+            title: "Instrument Approaches",
+            type: "Simulator",
+            date: dayAfter.toISOString(),
             time: "13:00-15:00",
-            status: "confirmed"
-          },
-          {
-            id: 4,
-            activity: "Cross-Country Flight",
-            date: new Date(Date.now() + 86400000 * 3).toISOString(),
-            time: "10:00-16:00",
-            status: "pending"
+            instructor: "Michael Johnson",
+            location: "FNTP II Sim",
+            status: "tentative"
           }
         ];
       }
     },
   });
 
-  // Fetch recommended resources
-  const { data: resources, isLoading: isResourcesLoading } = useQuery({
-    queryKey: ['/api/trainee/resources'],
+  // Fetch learning resources
+  const { data: learningResources, isLoading: isResourcesLoading } = useQuery({
+    queryKey: ['/api/trainee/learning-resources'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/trainee/resources');
+        const response = await apiRequest('GET', '/api/trainee/learning-resources');
         return await response.json();
       } catch (error) {
         // Return mock data for development
         return [
           {
             id: 1,
-            title: "Emergency Procedures Handbook",
-            description: "B737 Quick Reference",
-            type: "pdf",
-            icon: "P"
+            title: "Navigation VOR & ILS",
+            type: "E-Learning Module",
+            progress: 80,
+            dueDate: "Mar 26, 2025",
+            priority: "high",
+            requiredFor: "Radio Navigation"
           },
           {
             id: 2,
-            title: "Decision Making Under Pressure",
-            description: "Training Video",
-            type: "video",
-            duration: 45
+            title: "Radio Communications",
+            type: "Video Course",
+            progress: 100,
+            completedOn: "Mar 15, 2025",
+            priority: "completed"
+          },
+          {
+            id: 3,
+            title: "Complex Flight Planning",
+            type: "Interactive Exercise",
+            progress: 0,
+            dueDate: "Apr 2, 2025",
+            priority: "medium",
+            requiredFor: "Long Cross-Country"
           }
         ];
       }
     },
   });
 
-  // Fetch instructor feedback
-  const { data: feedback, isLoading: isFeedbackLoading } = useQuery({
-    queryKey: ['/api/trainee/feedback'],
+  // Fetch performance goals
+  const { data: performanceGoals, isLoading: isGoalsLoading } = useQuery({
+    queryKey: ['/api/trainee/performance-goals'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/trainee/feedback');
-        return await response.json();
-      } catch (error) {
-        // Return mock data for development
-        return {
-          latestFeedback: "Michael demonstrates strong technical knowledge but needs to improve communication during complex procedures.",
-          instructorName: "Sarah Phillips"
-        };
-      }
-    }
-  });
-
-  // Fetch training goals
-  const { data: goals, isLoading: isGoalsLoading } = useQuery({
-    queryKey: ['/api/trainee/goals'],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest('GET', '/api/trainee/goals');
+        const response = await apiRequest('GET', '/api/trainee/performance-goals');
         return await response.json();
       } catch (error) {
         // Return mock data for development
         return [
-          { id: 1, title: "Complete Emergency Procedures Training", progress: 75 },
-          { id: 2, title: "Pass All Theory Exams", progress: 85 },
-          { id: 3, title: "Complete Cross-Country Flight Requirements", progress: 60 }
+          {
+            id: 1,
+            title: "Precision Landing Accuracy",
+            current: 75,
+            target: 90,
+            deadline: "Apr 30, 2025"
+          },
+          {
+            id: 2,
+            title: "Navigation Accuracy",
+            current: 85,
+            target: 90,
+            deadline: "Apr 15, 2025"
+          },
+          {
+            id: 3,
+            title: "Instrument Approach Procedures",
+            current: 60,
+            target: 85,
+            deadline: "May 10, 2025"
+          }
         ];
       }
-    }
+    },
   });
 
-  // Fetch performance analytics
-  const { data: performance, isLoading: isPerformanceLoading } = useQuery({
-    queryKey: ['/api/trainee/performance'],
+  // Fetch recent achievements
+  const { data: recentAchievements, isLoading: isAchievementsLoading } = useQuery({
+    queryKey: ['/api/trainee/achievements'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/trainee/performance');
+        const response = await apiRequest('GET', '/api/trainee/achievements');
         return await response.json();
       } catch (error) {
         // Return mock data for development
-        return {
-          technicalKnowledge: 85,
-          procedures: 75,
-          flightSkills: 80,
-          decisionMaking: 70,
-          crm: 65
-        };
+        return [
+          {
+            id: 1,
+            title: "Solo Cross-Country Master",
+            date: "Mar 12, 2025",
+            description: "Completed a 150nm solo cross-country flight with 3 landings at different airports.",
+            badge: "gold"
+          },
+          {
+            id: 2,
+            title: "Perfect Navigation Quiz",
+            date: "Mar 05, 2025",
+            description: "Scored 100% on the advanced navigation systems quiz.",
+            badge: "silver"
+          },
+          {
+            id: 3,
+            title: "Radio Communications Expert",
+            date: "Feb 25, 2025",
+            description: "Demonstrated excellent radio communication skills during busy airspace operations.",
+            badge: "bronze"
+          }
+        ];
       }
-    }
+    },
   });
 
-  // Loading states
-  if (isProfileLoading || isScheduleLoading || isResourcesLoading || isFeedbackLoading || isGoalsLoading || isPerformanceLoading) {
+  // Loading state
+  if (isTraineeLoading || isSessionsLoading || isResourcesLoading || isGoalsLoading || isAchievementsLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -186,235 +243,336 @@ export function TraineeDashboard() {
     );
   }
 
+  // Format date
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  // Check if today
+  const isToday = (dateString) => {
+    const today = new Date();
+    const date = new Date(dateString);
+    return date.setHours(0, 0, 0, 0) === today.setHours(0, 0, 0, 0);
+  };
+
   return (
     <div className="container mx-auto py-6">
       <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
+        {/* Welcome and summary */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
           <div>
-            <h1 className="text-2xl font-bold">My Training Dashboard</h1>
+            <h1 className="text-2xl font-bold">Welcome back, {traineeData?.firstName}</h1>
             <p className="text-sm text-muted-foreground">
-              Program: {traineeProfile?.program} • ID: {traineeProfile?.id} • Phase: {traineeProfile?.phase}
+              Student ID: {traineeData?.id} • Program: {traineeData?.program}
             </p>
           </div>
-          <div className="flex items-center mt-4 md:mt-0">
-            <Badge variant="outline" className="mr-2">
-              3 New notifications
-            </Badge>
+          <div className="mt-4 md:mt-0 flex-shrink-0">
+            <div className="flex items-center space-x-1">
+              <GraduationCap className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium">
+                Program Progress: {traineeData?.programCompletion}%
+              </span>
+            </div>
+            <Progress 
+              value={traineeData?.programCompletion} 
+              className="h-2 w-40 mt-1" 
+            />
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {/* Overall Progress */}
-          <Card>
+        {/* Training summary cards */}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">Overall Progress</CardTitle>
+              <CardTitle className="text-sm font-medium text-purple-100">Total Flight Hours</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold pb-2">{traineeProfile?.overallProgress}%</div>
-              <Progress value={traineeProfile?.overallProgress} className="h-2" />
-            </CardContent>
-          </Card>
-
-          {/* Flight Hours */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Flight Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{traineeProfile?.flightHours} <span className="text-sm font-normal text-muted-foreground">/ {traineeProfile?.totalFlightHours} hrs</span></div>
-              <Progress 
-                value={(traineeProfile?.flightHours / traineeProfile?.totalFlightHours) * 100} 
-                className="h-2 mt-2" 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Theory Progress */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Theory Progress</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{traineeProfile?.theoryProgress} <span className="text-sm font-normal text-muted-foreground">/ {traineeProfile?.totalTheoryExams} exams</span></div>
-              <Progress 
-                value={(traineeProfile?.theoryProgress / traineeProfile?.totalTheoryExams) * 100} 
-                className="h-2 mt-2" 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Days Remaining */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-base">Days Remaining</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{traineeProfile?.daysRemaining}</div>
-              <div className={`text-xs ${traineeProfile?.isCriticalPath ? 'text-destructive' : 'text-muted-foreground'} mt-1`}>
-                {traineeProfile?.isCriticalPath ? 'Critical path' : 'On track'}
-              </div>
-              <Progress 
-                value={(traineeProfile?.daysRemaining / 90) * 100} 
-                className={`h-2 mt-2 ${traineeProfile?.isCriticalPath ? 'bg-destructive/20' : ''}`}
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* My Upcoming Schedule */}
-          <Card>
-            <CardHeader>
-              <CardTitle>My Upcoming Schedule</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingSchedule?.map((item, index) => (
-                  <div key={index} className="flex items-start">
-                    <div className="mr-4 flex-shrink-0">
-                      <div className="bg-primary/10 rounded-md p-2">
-                        <Calendar className="h-5 w-5 text-primary" />
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{item.activity}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(item.date).toLocaleDateString('en-US', { 
-                          weekday: 'short', 
-                          month: 'short', 
-                          day: 'numeric' 
-                        })}, {item.time}
-                      </p>
-                    </div>
-                    <Badge 
-                      className={
-                        item.status === 'today' ? 'bg-blue-500' : 
-                        item.status === 'confirmed' ? 'bg-green-500' : 
-                        'bg-purple-500'
-                      }
-                    >
-                      {item.status === 'today' ? 'Today' : 
-                       item.status === 'confirmed' ? 'Confirmed' : 
-                       'Pending'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Performance Analytics */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance Analytics</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="relative h-64">
-                {/* This is a placeholder for a radar chart */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-48 h-48 rounded-full border-2 border-dashed border-gray-200 flex items-center justify-center">
-                    <div className="w-36 h-36 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center">
-                      <div className="w-24 h-24 rounded-full border-2 border-dashed border-gray-400 flex items-center justify-center">
-                        <div className="w-12 h-12 rounded-full bg-primary/20"></div>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Radar points */}
-                  <div className="absolute" style={{ top: '30%', left: '30%' }}>
-                    <div className="size-3 rounded-full bg-primary"></div>
-                  </div>
-                  <div className="absolute" style={{ top: '40%', left: '70%' }}>
-                    <div className="size-3 rounded-full bg-primary"></div>
-                  </div>
-                  <div className="absolute" style={{ top: '60%', left: '60%' }}>
-                    <div className="size-3 rounded-full bg-primary"></div>
-                  </div>
-                  <div className="absolute" style={{ top: '70%', left: '30%' }}>
-                    <div className="size-3 rounded-full bg-primary"></div>
-                  </div>
-                  <div className="absolute" style={{ top: '50%', left: '20%' }}>
-                    <div className="size-3 rounded-full bg-primary"></div>
-                  </div>
-                  
-                  {/* Labels */}
-                  <div className="absolute text-xs font-medium" style={{ top: '20%', left: '50%', transform: 'translateX(-50%)' }}>
-                    Technical Knowledge
-                  </div>
-                  <div className="absolute text-xs font-medium" style={{ top: '50%', right: '10%' }}>
-                    Procedures
-                  </div>
-                  <div className="absolute text-xs font-medium" style={{ bottom: '25%', right: '20%' }}>
-                    Flight Skills
-                  </div>
-                  <div className="absolute text-xs font-medium" style={{ bottom: '20%', left: '50%', transform: 'translateX(-50%)' }}>
-                    Decision Making
-                  </div>
-                  <div className="absolute text-xs font-medium" style={{ top: '50%', left: '10%' }}>
-                    CRM
-                  </div>
+              <div className="text-3xl font-bold">{traineeData?.totalFlightHours}</div>
+              <div className="flex flex-col mt-2">
+                <div className="flex justify-between text-xs">
+                  <span>Solo: {traineeData?.soloHours}h</span>
+                  <span>Dual: {traineeData?.instructorHours}h</span>
+                </div>
+                <div className="h-1.5 bg-white/20 rounded-full mt-1 overflow-hidden">
+                  <div 
+                    className="h-full bg-white rounded-full" 
+                    style={{ width: `${(traineeData?.soloHours / traineeData?.totalFlightHours) * 100}%` }}
+                  ></div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Recommended Resources */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recommended Resources</CardTitle>
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-purple-100">Ground Theory</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {resources?.map((resource, index) => (
-                  <div key={index} className="flex items-center">
-                    <div className="mr-4 flex-shrink-0">
-                      <div className={`size-10 rounded-md flex items-center justify-center ${
-                        resource.type === 'pdf' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
-                      }`}>
-                        {resource.type === 'pdf' ? (
-                          <FileText className="h-5 w-5" />
-                        ) : (
-                          <Video className="h-5 w-5" />
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium">{resource.title}</p>
-                      <p className="text-sm text-muted-foreground">{resource.description}</p>
-                    </div>
-                    <Button size="sm" variant="secondary">
-                      {resource.type === 'pdf' ? 'Open' : 'Watch'}
-                    </Button>
-                  </div>
-                ))}
+              <div className="text-3xl font-bold">{traineeData?.licenseProgress.groundTheory}%</div>
+              <div className="text-sm text-purple-100 mt-1">
+                Complete
+              </div>
+              <div className="h-1.5 bg-white/20 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full" 
+                  style={{ width: `${traineeData?.licenseProgress.groundTheory}%` }}
+                ></div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Recent Instructor Feedback & Training Goals */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent Instructor Feedback</CardTitle>
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-purple-100">Flight Training</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="mb-8">
-                <p className="italic text-muted-foreground">"{feedback?.latestFeedback}"</p>
-                <p className="text-sm mt-2 text-right">- {feedback?.instructorName}</p>
+              <div className="text-3xl font-bold">{traineeData?.licenseProgress.flightTraining}%</div>
+              <div className="text-sm text-purple-100 mt-1">
+                Complete
               </div>
+              <div className="h-1.5 bg-white/20 rounded-full mt-2 overflow-hidden">
+                <div 
+                  className="h-full bg-white rounded-full" 
+                  style={{ width: `${traineeData?.licenseProgress.flightTraining}%` }}
+                ></div>
+              </div>
+            </CardContent>
+          </Card>
 
-              <h3 className="font-semibold mb-4">My Training Goals</h3>
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-purple-100">Next Milestone</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-medium">{traineeData?.nextMilestone}</div>
+              <div className="mt-2 flex items-center text-xs text-purple-100">
+                <Trophy className="h-3 w-3 mr-1" />
+                <span>Key program requirement</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Upcoming sessions */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center">
+                <CalendarClock className="h-5 w-5 mr-2 text-purple-600" />
+                Upcoming Training Sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="space-y-4">
-                {goals?.map((goal, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-sm">{goal.title}</span>
-                      <span className="text-sm font-medium">{goal.progress}%</span>
+                {upcomingSessions?.map((item, index) => (
+                  <div key={index} className="flex gap-4 items-start pb-4 border-b last:border-0 last:pb-0">
+                    <div className={`
+                      size-10 flex-shrink-0 rounded-md flex items-center justify-center
+                      ${item.type === 'Flight' ? 'bg-blue-100 text-blue-600' : 
+                        item.type === 'Simulator' ? 'bg-purple-100 text-purple-600' : 
+                        'bg-green-100 text-green-600'}
+                    `}>
+                      {item.type === 'Flight' ? (
+                        <Plane className="h-5 w-5" />
+                      ) : item.type === 'Simulator' ? (
+                        <BookMarked className="h-5 w-5" />
+                      ) : (
+                        <BookOpen className="h-5 w-5" />
+                      )}
                     </div>
-                    <Progress value={goal.progress} className="h-2" />
+                    <div className="flex-1">
+                      <div className="flex justify-between">
+                        <h3 className="font-medium">{item.title}</h3>
+                        <Badge 
+                          variant={item.status === 'confirmed' ? 'default' : 'outline'}
+                          className={item.status === 'tentative' ? 'border-amber-500 text-amber-500' : ''}
+                        >
+                          {item.status === 'tentative' ? 'Tentative' : 'Confirmed'}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        {isToday(item.date) ? 'Today' : formatDate(item.date)}, {item.time}
+                      </p>
+                      <div className="flex justify-between text-sm text-muted-foreground mt-1">
+                        <span>Instructor: {item.instructor}</span>
+                        <span>{item.aircraft || item.location}</span>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
             </CardContent>
+            <CardFooter className="border-t pt-4 px-6">
+              <Button variant="outline" className="w-full" asChild>
+                <Link to="/my-schedule">
+                  View Full Schedule
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Learning resources */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center">
+                <BookOpen className="h-5 w-5 mr-2 text-purple-600" />
+                Learning Resources
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {learningResources?.map((resource, index) => (
+                  <div key={index} className="pb-4 border-b last:border-0 last:pb-0">
+                    <div className="flex justify-between items-start">
+                      <h3 className="font-medium">{resource.title}</h3>
+                      {resource.priority === 'high' ? (
+                        <Badge className="bg-red-500">{resource.priority}</Badge>
+                      ) : resource.priority === 'medium' ? (
+                        <Badge className="bg-amber-500">{resource.priority}</Badge>
+                      ) : resource.priority === 'completed' ? (
+                        <Badge className="bg-green-500">Completed</Badge>
+                      ) : (
+                        <Badge>{resource.priority}</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-muted-foreground">{resource.type}</p>
+                    <div className="mt-2">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Progress</span>
+                        <span>
+                          {resource.progress}%
+                          {resource.priority === 'completed' ? (
+                            <CheckCircle2 className="h-3 w-3 ml-1 inline text-green-500" />
+                          ) : resource.dueDate ? (
+                            <span className="text-muted-foreground"> • Due {resource.dueDate}</span>
+                          ) : null}
+                        </span>
+                      </div>
+                      <Progress 
+                        value={resource.progress} 
+                        className="h-2" 
+                      />
+                    </div>
+                    {resource.requiredFor && (
+                      <div className="mt-2 text-xs text-muted-foreground">
+                        <span className="flex items-center">
+                          <AlertCircle className="h-3 w-3 mr-1 text-amber-500" />
+                          Required for: {resource.requiredFor}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4 px-6">
+              <Button variant="outline" className="w-full" asChild>
+                <Link to="/elearning">
+                  Go to E-Learning Platform
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Performance Goals */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center">
+                <Trophy className="h-5 w-5 mr-2 text-purple-600" />
+                Performance Goals
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {performanceGoals?.map((goal, index) => (
+                  <div key={index} className="pb-4 border-b last:border-0 last:pb-0">
+                    <div className="flex justify-between">
+                      <h3 className="font-medium">{goal.title}</h3>
+                      <span className="text-sm font-medium">
+                        {goal.current}
+                        <span className="text-muted-foreground">/{goal.target}</span>
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(goal.current / goal.target) * 100} 
+                      className="h-2 mt-2" 
+                    />
+                    <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Target date: {goal.deadline}
+                      </span>
+                      <span className="flex items-center">
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        {goal.target - goal.current} points to target
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4 px-6">
+              <Button variant="outline" className="w-full" asChild>
+                <Link to="/progress">
+                  View All Performance Metrics
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
+          </Card>
+
+          {/* Recent achievements */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center">
+                <Star className="h-5 w-5 mr-2 text-purple-600" />
+                Recent Achievements
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentAchievements?.map((achievement) => (
+                  <div key={achievement.id} className="flex gap-4 items-start pb-4 border-b last:border-0 last:pb-0">
+                    <div 
+                      className={`
+                        size-10 flex-shrink-0 rounded-full flex items-center justify-center
+                        ${achievement.badge === 'gold' ? 'bg-amber-100' : 
+                          achievement.badge === 'silver' ? 'bg-gray-100' : 
+                          'bg-amber-50'}
+                      `}
+                    >
+                      <Trophy 
+                        className={`h-5 w-5 
+                          ${achievement.badge === 'gold' ? 'text-amber-600' : 
+                            achievement.badge === 'silver' ? 'text-gray-500' : 
+                            'text-amber-700'}`
+                        } 
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-medium">{achievement.title}</h3>
+                      <p className="text-sm text-muted-foreground">{achievement.description}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Awarded: {achievement.date}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+            <CardFooter className="border-t pt-4 px-6">
+              <Button variant="outline" className="w-full" asChild>
+                <Link to="/achievements">
+                  View Achievement History
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       </div>
