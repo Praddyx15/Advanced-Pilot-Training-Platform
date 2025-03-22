@@ -1,25 +1,99 @@
 import express, { type Request, Response, NextFunction } from "express";
+import compression from "compression";
+import helmet from "helmet";
+import cors from "cors";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { 
+  initializeCore, 
+  logger, 
+  configManager, 
+  globalErrorHandler,
+  asyncHandler
+} from "./core";
 
+// Initialize core modules
+initializeCore();
+
+// Get configuration
+const serverConfig = configManager.get('server');
+const securityConfig = configManager.get('security');
+const performanceConfig = configManager.get('performance');
+
+// Create Express application
 const app = express();
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
 
+// Security middleware
+if (securityConfig.helmetEnabled) {
+  app.use(helmet({
+    contentSecurityPolicy: false, // Disable CSP in development
+  }));
+}
+
+if (securityConfig.corsEnabled) {
+  app.use(cors({
+    origin: securityConfig.corsOrigins,
+    credentials: true,
+  }));
+}
+
+// Performance middleware
+if (performanceConfig.compressionEnabled) {
+  app.use(compression());
+}
+
+// Request parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Request logging middleware
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
   let capturedJsonResponse: Record<string, any> | undefined = undefined;
 
+  // Track request context for logger
+  logger.setContext({
+    requestId: req.headers['x-request-id'] || crypto.randomUUID(),
+    method: req.method,
+    path: req.path,
+    ip: req.ip,
+    userAgent: req.get('user-agent'),
+  });
+
+  // Capture response data for logging
   const originalResJson = res.json;
   res.json = function (bodyJson, ...args) {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
 
+  // Log on request completion
   res.on("finish", () => {
     const duration = Date.now() - start;
+    
     if (path.startsWith("/api")) {
+      const logContext = {
+        status: res.statusCode,
+        duration: `${duration}ms`,
+        contentLength: res.get('content-length'),
+      };
+      
+      // Don't log response body for large responses
+      if (capturedJsonResponse && 
+          JSON.stringify(capturedJsonResponse).length < 500) {
+        logContext['response'] = capturedJsonResponse;
+      }
+      
+      if (res.statusCode >= 500) {
+        logger.error(`${req.method} ${path} ${res.statusCode} in ${duration}ms`, logContext);
+      } else if (res.statusCode >= 400) {
+        logger.warn(`${req.method} ${path} ${res.statusCode} in ${duration}ms`, logContext);
+      } else {
+        logger.info(`${req.method} ${path} ${res.statusCode} in ${duration}ms`, logContext);
+      }
+      
+      // Legacy logging for compatibility
       let logLine = `${req.method} ${path} ${res.statusCode} in ${duration}ms`;
       if (capturedJsonResponse) {
         logLine += ` :: ${JSON.stringify(capturedJsonResponse)}`;
@@ -31,40 +105,64 @@ app.use((req, res, next) => {
 
       log(logLine);
     }
+    
+    // Clear request context
+    logger.clearContext();
   });
 
   next();
 });
 
 (async () => {
+  // Register all routes
   const server = await registerRoutes(app);
-
-  app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
-
-    res.status(status).json({ message });
-    throw err;
-  });
-
-  // importantly only setup vite in development and after
-  // setting up all the other routes so the catch-all route
-  // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
+  
+  // Global error handler
+  app.use(globalErrorHandler);
+  
+  // Set up Vite for development or static serving for production
+  if (serverConfig.environment === 'development') {
     await setupVite(app, server);
   } else {
     serveStatic(app);
   }
 
-  // ALWAYS serve the app on port 5000
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = 5000;
+  // Get the configured port (default: 5000)
+  const port = serverConfig.port;
+  
+  // Start the server
   server.listen({
     port,
-    host: "0.0.0.0",
+    host: serverConfig.host,
     reusePort: true,
   }, () => {
+    logger.info(`Server started`, { 
+      port, 
+      environment: serverConfig.environment,
+      host: serverConfig.host 
+    });
     log(`serving on port ${port}`);
   });
+  
+  // Handle graceful shutdown
+  const handleShutdown = async () => {
+    logger.info('Received shutdown signal, closing server...');
+    
+    // Close the HTTP server
+    server.close(() => {
+      logger.info('HTTP server closed');
+      
+      // Perform any other cleanup here
+      process.exit(0);
+    });
+    
+    // Force exit after timeout
+    setTimeout(() => {
+      logger.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
+    }, 10000);
+  };
+  
+  process.on('SIGTERM', handleShutdown);
+  process.on('SIGINT', handleShutdown);
 })();
