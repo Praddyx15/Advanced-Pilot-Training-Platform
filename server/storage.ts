@@ -20,7 +20,39 @@ import {
   Resource,
   InsertResource,
   Notification,
-  InsertNotification
+  InsertNotification,
+  KnowledgeGraphNode,
+  InsertKnowledgeGraphNode,
+  KnowledgeGraphEdge,
+  InsertKnowledgeGraphEdge,
+  DocumentAnalysis,
+  InsertDocumentAnalysis,
+  RegulatoryRequirement,
+  InsertRegulatoryRequirement,
+  ProgramCompliance,
+  InsertProgramCompliance,
+  AuditLog,
+  InsertAuditLog,
+  PerformanceMetric,
+  InsertPerformanceMetric,
+  PredictiveModel,
+  InsertPredictiveModel,
+  SkillDecayPrediction,
+  InsertSkillDecayPrediction,
+  SessionReplay,
+  InsertSessionReplay,
+  SessionEvent,
+  InsertSessionEvent,
+  Achievement,
+  InsertAchievement,
+  UserAchievement,
+  InsertUserAchievement,
+  Leaderboard,
+  InsertLeaderboard,
+  LeaderboardEntry,
+  InsertLeaderboardEntry,
+  SharedScenario,
+  InsertSharedScenario
 } from "@shared/schema";
 import { 
   SyllabusGenerationOptions, 
@@ -136,6 +168,111 @@ export interface IStorage {
   createNotification(notification: InsertNotification): Promise<Notification>;
   updateNotificationStatus(id: number, status: string): Promise<Notification | undefined>;
 
+  // Knowledge Graph methods
+  getKnowledgeGraphNodes(options?: { nodeType?: string, documentId?: number }): Promise<KnowledgeGraphNode[]>;
+  getKnowledgeGraphNode(id: number): Promise<KnowledgeGraphNode | undefined>;
+  createKnowledgeGraphNode(node: InsertKnowledgeGraphNode): Promise<KnowledgeGraphNode>;
+  updateKnowledgeGraphNode(id: number, node: Partial<KnowledgeGraphNode>): Promise<KnowledgeGraphNode | undefined>;
+  deleteKnowledgeGraphNode(id: number): Promise<boolean>;
+  
+  getKnowledgeGraphEdges(options?: { sourceNodeId?: number, targetNodeId?: number, relationship?: string }): Promise<KnowledgeGraphEdge[]>;
+  getKnowledgeGraphEdge(id: number): Promise<KnowledgeGraphEdge | undefined>;
+  createKnowledgeGraphEdge(edge: InsertKnowledgeGraphEdge): Promise<KnowledgeGraphEdge>;
+  deleteKnowledgeGraphEdge(id: number): Promise<boolean>;
+  
+  // Document Analysis methods
+  getDocumentAnalysis(id: number): Promise<DocumentAnalysis | undefined>;
+  getDocumentAnalysisByDocument(documentId: number, analysisType?: string): Promise<DocumentAnalysis[]>;
+  createDocumentAnalysis(analysis: InsertDocumentAnalysis): Promise<DocumentAnalysis>;
+  updateDocumentAnalysisStatus(id: number, status: string, results?: any): Promise<DocumentAnalysis | undefined>;
+  
+  // Regulatory Requirements methods
+  getRegulatoryRequirement(id: number): Promise<RegulatoryRequirement | undefined>;
+  getRegulatoryRequirementByCode(code: string, authority: string): Promise<RegulatoryRequirement | undefined>;
+  getAllRegulatoryRequirements(authority?: string): Promise<RegulatoryRequirement[]>;
+  createRegulatoryRequirement(requirement: InsertRegulatoryRequirement): Promise<RegulatoryRequirement>;
+  updateRegulatoryRequirement(id: number, requirement: Partial<RegulatoryRequirement>): Promise<RegulatoryRequirement | undefined>;
+  deleteRegulatoryRequirement(id: number): Promise<boolean>;
+  
+  // Program Compliance methods
+  getProgramCompliance(id: number): Promise<ProgramCompliance | undefined>;
+  getProgramCompliancesByProgram(programId: number): Promise<ProgramCompliance[]>;
+  createProgramCompliance(compliance: InsertProgramCompliance): Promise<ProgramCompliance>;
+  updateProgramCompliance(id: number, compliance: Partial<ProgramCompliance>): Promise<ProgramCompliance | undefined>;
+  deleteProgramCompliance(id: number): Promise<boolean>;
+  
+  // Audit Log methods
+  getAuditLog(id: number): Promise<AuditLog | undefined>;
+  getAuditLogsByEntity(entityType: string, entityId: number): Promise<AuditLog[]>;
+  getAuditLogsByUser(userId: number): Promise<AuditLog[]>;
+  createAuditLog(log: InsertAuditLog): Promise<AuditLog>;
+  verifyAuditLog(id: number, blockchainTransactionId: string): Promise<AuditLog | undefined>;
+  
+  // Performance Metrics methods
+  getPerformanceMetric(id: number): Promise<PerformanceMetric | undefined>;
+  getPerformanceMetricsByTrainee(traineeId: number): Promise<PerformanceMetric[]>;
+  getPerformanceMetricsBySession(sessionId: number): Promise<PerformanceMetric[]>;
+  createPerformanceMetric(metric: InsertPerformanceMetric): Promise<PerformanceMetric>;
+  
+  // Predictive Models methods
+  getPredictiveModel(id: number): Promise<PredictiveModel | undefined>;
+  getAllPredictiveModels(active?: boolean): Promise<PredictiveModel[]>;
+  createPredictiveModel(model: InsertPredictiveModel): Promise<PredictiveModel>;
+  updatePredictiveModel(id: number, model: Partial<PredictiveModel>): Promise<PredictiveModel | undefined>;
+  deletePredictiveModel(id: number): Promise<boolean>;
+  
+  // Skill Decay Predictions methods
+  getSkillDecayPrediction(id: number): Promise<SkillDecayPrediction | undefined>;
+  getSkillDecayPredictionsByTrainee(traineeId: number): Promise<SkillDecayPrediction[]>;
+  createSkillDecayPrediction(prediction: InsertSkillDecayPrediction): Promise<SkillDecayPrediction>;
+  updateSkillDecayPrediction(id: number, prediction: Partial<SkillDecayPrediction>): Promise<SkillDecayPrediction | undefined>;
+  
+  // Session Replay methods
+  getSessionReplay(id: number): Promise<SessionReplay | undefined>;
+  getSessionReplaysBySession(sessionId: number): Promise<SessionReplay[]>;
+  createSessionReplay(replay: InsertSessionReplay): Promise<SessionReplay>;
+  
+  // Session Events methods
+  getSessionEvent(id: number): Promise<SessionEvent | undefined>;
+  getSessionEventsByReplay(replayId: number): Promise<SessionEvent[]>;
+  createSessionEvent(event: InsertSessionEvent): Promise<SessionEvent>;
+  
+  // Achievements methods
+  getAchievement(id: number): Promise<Achievement | undefined>;
+  getAllAchievements(active?: boolean): Promise<Achievement[]>;
+  createAchievement(achievement: InsertAchievement): Promise<Achievement>;
+  updateAchievement(id: number, achievement: Partial<Achievement>): Promise<Achievement | undefined>;
+  deleteAchievement(id: number): Promise<boolean>;
+  
+  // User Achievements methods
+  getUserAchievement(id: number): Promise<UserAchievement | undefined>;
+  getUserAchievementsByUser(userId: number): Promise<UserAchievement[]>;
+  createUserAchievement(userAchievement: InsertUserAchievement): Promise<UserAchievement>;
+  updateUserAchievement(id: number, userAchievement: Partial<UserAchievement>): Promise<UserAchievement | undefined>;
+  
+  // Leaderboards methods
+  getLeaderboard(id: number): Promise<Leaderboard | undefined>;
+  getAllLeaderboards(active?: boolean): Promise<Leaderboard[]>;
+  createLeaderboard(leaderboard: InsertLeaderboard): Promise<Leaderboard>;
+  updateLeaderboard(id: number, leaderboard: Partial<Leaderboard>): Promise<Leaderboard | undefined>;
+  deleteLeaderboard(id: number): Promise<boolean>;
+  
+  // Leaderboard Entries methods
+  getLeaderboardEntry(id: number): Promise<LeaderboardEntry | undefined>;
+  getLeaderboardEntriesByLeaderboard(leaderboardId: number): Promise<LeaderboardEntry[]>;
+  createLeaderboardEntry(entry: InsertLeaderboardEntry): Promise<LeaderboardEntry>;
+  updateLeaderboardEntry(id: number, entry: Partial<LeaderboardEntry>): Promise<LeaderboardEntry | undefined>;
+  
+  // Shared Scenarios methods
+  getSharedScenario(id: number): Promise<SharedScenario | undefined>;
+  getAllSharedScenarios(status?: string): Promise<SharedScenario[]>;
+  getSharedScenariosByUser(userId: number): Promise<SharedScenario[]>;
+  createSharedScenario(scenario: InsertSharedScenario): Promise<SharedScenario>;
+  updateSharedScenario(id: number, scenario: Partial<SharedScenario>): Promise<SharedScenario | undefined>;
+  deleteSharedScenario(id: number): Promise<boolean>;
+  verifySharedScenario(id: number, verifiedById: number): Promise<SharedScenario | undefined>;
+  incrementScenarioDownloadCount(id: number): Promise<SharedScenario | undefined>;
+
   // Session store for authentication
   sessionStore: session.Store;
 }
@@ -155,6 +292,22 @@ export class MemStorage implements IStorage {
   private syllabusTemplates: Map<number, SyllabusTemplate>;
   private syllabusVersions: Map<number, SyllabusVersion[]>;
   private regulatoryReferences: Map<string, RegulatoryReference[]>;
+  private knowledgeGraphNodes: Map<number, KnowledgeGraphNode>;
+  private knowledgeGraphEdges: Map<number, KnowledgeGraphEdge>;
+  private documentAnalyses: Map<number, DocumentAnalysis>;
+  private regulatoryRequirements: Map<number, RegulatoryRequirement>;
+  private programCompliances: Map<number, ProgramCompliance>;
+  private auditLogs: Map<number, AuditLog>;
+  private performanceMetrics: Map<number, PerformanceMetric>;
+  private predictiveModels: Map<number, PredictiveModel>;
+  private skillDecayPredictions: Map<number, SkillDecayPrediction>;
+  private sessionReplays: Map<number, SessionReplay>;
+  private sessionEvents: Map<number, SessionEvent>;
+  private achievements: Map<number, Achievement>;
+  private userAchievements: Map<number, UserAchievement>;
+  private leaderboards: Map<number, Leaderboard>;
+  private leaderboardEntries: Map<number, LeaderboardEntry>;
+  private sharedScenarios: Map<number, SharedScenario>;
   public sessionStore: session.Store;
 
   private userIdCounter: number;
@@ -169,6 +322,22 @@ export class MemStorage implements IStorage {
   private resourceIdCounter: number;
   private notificationIdCounter: number;
   private syllabusTemplateIdCounter: number;
+  private knowledgeGraphNodeIdCounter: number;
+  private knowledgeGraphEdgeIdCounter: number;
+  private documentAnalysisIdCounter: number;
+  private regulatoryRequirementIdCounter: number;
+  private programComplianceIdCounter: number;
+  private auditLogIdCounter: number;
+  private performanceMetricIdCounter: number;
+  private predictiveModelIdCounter: number;
+  private skillDecayPredictionIdCounter: number;
+  private sessionReplayIdCounter: number;
+  private sessionEventIdCounter: number;
+  private achievementIdCounter: number;
+  private userAchievementIdCounter: number;
+  private leaderboardIdCounter: number;
+  private leaderboardEntryIdCounter: number;
+  private sharedScenarioIdCounter: number;
 
   constructor() {
     this.users = new Map();
@@ -185,6 +354,22 @@ export class MemStorage implements IStorage {
     this.syllabusTemplates = new Map();
     this.syllabusVersions = new Map();
     this.regulatoryReferences = new Map();
+    this.knowledgeGraphNodes = new Map();
+    this.knowledgeGraphEdges = new Map();
+    this.documentAnalyses = new Map();
+    this.regulatoryRequirements = new Map();
+    this.programCompliances = new Map();
+    this.auditLogs = new Map();
+    this.performanceMetrics = new Map();
+    this.predictiveModels = new Map();
+    this.skillDecayPredictions = new Map();
+    this.sessionReplays = new Map();
+    this.sessionEvents = new Map();
+    this.achievements = new Map();
+    this.userAchievements = new Map();
+    this.leaderboards = new Map();
+    this.leaderboardEntries = new Map();
+    this.sharedScenarios = new Map();
 
     this.userIdCounter = 1;
     this.programIdCounter = 1;
@@ -198,6 +383,22 @@ export class MemStorage implements IStorage {
     this.resourceIdCounter = 1;
     this.notificationIdCounter = 1;
     this.syllabusTemplateIdCounter = 1;
+    this.knowledgeGraphNodeIdCounter = 1;
+    this.knowledgeGraphEdgeIdCounter = 1;
+    this.documentAnalysisIdCounter = 1;
+    this.regulatoryRequirementIdCounter = 1;
+    this.programComplianceIdCounter = 1;
+    this.auditLogIdCounter = 1;
+    this.performanceMetricIdCounter = 1;
+    this.predictiveModelIdCounter = 1;
+    this.skillDecayPredictionIdCounter = 1;
+    this.sessionReplayIdCounter = 1;
+    this.sessionEventIdCounter = 1;
+    this.achievementIdCounter = 1;
+    this.userAchievementIdCounter = 1;
+    this.leaderboardIdCounter = 1;
+    this.leaderboardEntryIdCounter = 1;
+    this.sharedScenarioIdCounter = 1;
 
     // Initialize with some common regulatory references
     this.initializeRegulatoryReferences();
