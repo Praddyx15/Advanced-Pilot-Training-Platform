@@ -1542,6 +1542,134 @@ export class MemStorage implements IStorage {
     return updatedAnalysis;
   }
 
+  // Regulatory Requirements methods
+  async getRegulatoryRequirement(id: number): Promise<RegulatoryRequirement | undefined> {
+    return this.regulatoryRequirements.get(id);
+  }
+
+  async getRegulatoryRequirementByCode(code: string, authority: string): Promise<RegulatoryRequirement | undefined> {
+    return Array.from(this.regulatoryRequirements.values())
+      .find(req => req.code === code && req.authority === authority);
+  }
+
+  async getAllRegulatoryRequirements(authority?: string): Promise<RegulatoryRequirement[]> {
+    const requirements = Array.from(this.regulatoryRequirements.values());
+    if (authority) {
+      return requirements.filter(req => req.authority === authority);
+    }
+    return requirements;
+  }
+
+  async createRegulatoryRequirement(requirement: InsertRegulatoryRequirement): Promise<RegulatoryRequirement> {
+    const id = this.regulatoryRequirementIdCounter++;
+    const newRequirement: RegulatoryRequirement = {
+      ...requirement,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.regulatoryRequirements.set(id, newRequirement);
+    return newRequirement;
+  }
+
+  async updateRegulatoryRequirement(id: number, requirement: Partial<RegulatoryRequirement>): Promise<RegulatoryRequirement | undefined> {
+    const existingRequirement = this.regulatoryRequirements.get(id);
+    if (!existingRequirement) return undefined;
+    
+    const updatedRequirement: RegulatoryRequirement = {
+      ...existingRequirement,
+      ...requirement,
+      updatedAt: new Date()
+    };
+    this.regulatoryRequirements.set(id, updatedRequirement);
+    return updatedRequirement;
+  }
+
+  async deleteRegulatoryRequirement(id: number): Promise<boolean> {
+    return this.regulatoryRequirements.delete(id);
+  }
+
+  // Program Compliance methods
+  async getProgramCompliance(id: number): Promise<ProgramCompliance | undefined> {
+    return this.programCompliances.get(id);
+  }
+
+  async getProgramCompliancesByProgram(programId: number): Promise<ProgramCompliance[]> {
+    return Array.from(this.programCompliances.values())
+      .filter(compliance => compliance.programId === programId);
+  }
+
+  async createProgramCompliance(compliance: InsertProgramCompliance): Promise<ProgramCompliance> {
+    const id = this.programComplianceIdCounter++;
+    const newCompliance: ProgramCompliance = {
+      ...compliance,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.programCompliances.set(id, newCompliance);
+    return newCompliance;
+  }
+
+  async updateProgramCompliance(id: number, compliance: Partial<ProgramCompliance>): Promise<ProgramCompliance | undefined> {
+    const existingCompliance = this.programCompliances.get(id);
+    if (!existingCompliance) return undefined;
+    
+    const updatedCompliance: ProgramCompliance = {
+      ...existingCompliance,
+      ...compliance,
+      updatedAt: new Date()
+    };
+    this.programCompliances.set(id, updatedCompliance);
+    return updatedCompliance;
+  }
+
+  async deleteProgramCompliance(id: number): Promise<boolean> {
+    return this.programCompliances.delete(id);
+  }
+
+  // Audit Log methods
+  async getAuditLog(id: number): Promise<AuditLog | undefined> {
+    return this.auditLogs.get(id);
+  }
+
+  async getAuditLogsByEntity(entityType: string, entityId: number): Promise<AuditLog[]> {
+    return Array.from(this.auditLogs.values())
+      .filter(log => log.entityType === entityType && log.entityId === entityId);
+  }
+
+  async getAuditLogsByUser(userId: number): Promise<AuditLog[]> {
+    return Array.from(this.auditLogs.values())
+      .filter(log => log.userId === userId);
+  }
+
+  async createAuditLog(log: InsertAuditLog): Promise<AuditLog> {
+    const id = this.auditLogIdCounter++;
+    const newLog: AuditLog = {
+      ...log,
+      id,
+      timestamp: log.timestamp || new Date(),
+      metadata: log.metadata || null,
+      blockchainTransactionId: log.blockchainTransactionId || null,
+      verified: log.verified || false
+    };
+    this.auditLogs.set(id, newLog);
+    return newLog;
+  }
+
+  async verifyAuditLog(id: number, blockchainTransactionId: string): Promise<AuditLog | undefined> {
+    const log = this.auditLogs.get(id);
+    if (!log) return undefined;
+    
+    const verifiedLog: AuditLog = {
+      ...log,
+      blockchainTransactionId,
+      verified: true
+    };
+    this.auditLogs.set(id, verifiedLog);
+    return verifiedLog;
+  }
+
   // Performance Metrics methods
   async getPerformanceMetric(id: number): Promise<PerformanceMetric | undefined> {
     return this.performanceMetrics.get(id);
