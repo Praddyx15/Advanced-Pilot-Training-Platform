@@ -1230,6 +1230,99 @@ export class MemStorage implements IStorage {
     this.notifications.set(id, updatedNotification);
     return updatedNotification;
   }
+
+  // Knowledge Graph methods
+  async getKnowledgeGraphNodes(options?: { nodeType?: string, documentId?: number }): Promise<KnowledgeGraphNode[]> {
+    const nodes = Array.from(this.knowledgeGraphNodes.values());
+    
+    if (!options) return nodes;
+    
+    return nodes.filter(node => {
+      if (options.nodeType && node.nodeType !== options.nodeType) return false;
+      if (options.documentId && node.documentId !== options.documentId) return false;
+      return true;
+    });
+  }
+
+  async getKnowledgeGraphNode(id: number): Promise<KnowledgeGraphNode | undefined> {
+    return this.knowledgeGraphNodes.get(id);
+  }
+
+  async createKnowledgeGraphNode(node: InsertKnowledgeGraphNode): Promise<KnowledgeGraphNode> {
+    const id = this.knowledgeGraphNodeIdCounter++;
+    const now = new Date();
+    const newNode: KnowledgeGraphNode = {
+      ...node,
+      id,
+      createdAt: node.createdAt || now,
+      updatedAt: node.updatedAt || now
+    };
+    
+    this.knowledgeGraphNodes.set(id, newNode);
+    return newNode;
+  }
+
+  async updateKnowledgeGraphNode(id: number, node: Partial<KnowledgeGraphNode>): Promise<KnowledgeGraphNode | undefined> {
+    const existingNode = this.knowledgeGraphNodes.get(id);
+    if (!existingNode) return undefined;
+
+    const updatedNode = { 
+      ...existingNode, 
+      ...node,
+      updatedAt: new Date()
+    };
+    
+    this.knowledgeGraphNodes.set(id, updatedNode);
+    return updatedNode;
+  }
+
+  async deleteKnowledgeGraphNode(id: number): Promise<boolean> {
+    // Delete all edges connected to this node first
+    const edges = Array.from(this.knowledgeGraphEdges.values());
+    const connectedEdges = edges.filter(edge => 
+      edge.sourceNodeId === id || edge.targetNodeId === id
+    );
+    
+    for (const edge of connectedEdges) {
+      this.knowledgeGraphEdges.delete(edge.id);
+    }
+    
+    return this.knowledgeGraphNodes.delete(id);
+  }
+
+  async getKnowledgeGraphEdges(options?: { sourceNodeId?: number, targetNodeId?: number, relationship?: string }): Promise<KnowledgeGraphEdge[]> {
+    const edges = Array.from(this.knowledgeGraphEdges.values());
+    
+    if (!options) return edges;
+    
+    return edges.filter(edge => {
+      if (options.sourceNodeId && edge.sourceNodeId !== options.sourceNodeId) return false;
+      if (options.targetNodeId && edge.targetNodeId !== options.targetNodeId) return false;
+      if (options.relationship && edge.relationship !== options.relationship) return false;
+      return true;
+    });
+  }
+
+  async getKnowledgeGraphEdge(id: number): Promise<KnowledgeGraphEdge | undefined> {
+    return this.knowledgeGraphEdges.get(id);
+  }
+
+  async createKnowledgeGraphEdge(edge: InsertKnowledgeGraphEdge): Promise<KnowledgeGraphEdge> {
+    const id = this.knowledgeGraphEdgeIdCounter++;
+    const now = new Date();
+    const newEdge: KnowledgeGraphEdge = {
+      ...edge,
+      id,
+      createdAt: edge.createdAt || now
+    };
+    
+    this.knowledgeGraphEdges.set(id, newEdge);
+    return newEdge;
+  }
+
+  async deleteKnowledgeGraphEdge(id: number): Promise<boolean> {
+    return this.knowledgeGraphEdges.delete(id);
+  }
 }
 
 export const storage = new MemStorage();
