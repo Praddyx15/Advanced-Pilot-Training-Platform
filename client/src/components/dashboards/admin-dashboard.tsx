@@ -212,15 +212,17 @@ export function AdminDashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-bold">{overviewData?.activeStudents.count}</div>
-                <Badge className="bg-green-500">
+                <Badge className="bg-teal-500">
                   <ArrowUp className="h-3 w-3 mr-1"/>
                   {overviewData?.activeStudents.change}%
                 </Badge>
               </div>
-              <Progress 
-                value={75} 
-                className="h-1.5 mt-2" 
-              />
+              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-teal-500 rounded-full" 
+                  style={{ width: '75%' }}
+                ></div>
+              </div>
             </CardContent>
           </Card>
 
@@ -232,15 +234,17 @@ export function AdminDashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-bold">{overviewData?.completionRate.percentage}%</div>
-                <Badge className="bg-green-500">
+                <Badge className="bg-teal-500">
                   <ArrowUp className="h-3 w-3 mr-1"/>
                   {overviewData?.completionRate.change}%
                 </Badge>
               </div>
-              <Progress 
-                value={overviewData?.completionRate.percentage} 
-                className="h-1.5 mt-2" 
-              />
+              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-teal-500 rounded-full" 
+                  style={{ width: `${overviewData?.completionRate.percentage}%` }}
+                ></div>
+              </div>
             </CardContent>
           </Card>
 
@@ -252,15 +256,17 @@ export function AdminDashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-3xl font-bold">{overviewData?.resourceUtilization.percentage}%</div>
-                <Badge className="bg-green-500">
+                <Badge className="bg-teal-500">
                   <ArrowUp className="h-3 w-3 mr-1"/>
                   {overviewData?.resourceUtilization.change}%
                 </Badge>
               </div>
-              <Progress 
-                value={overviewData?.resourceUtilization.percentage} 
-                className="h-1.5 mt-2" 
-              />
+              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-teal-500 rounded-full" 
+                  style={{ width: `${overviewData?.resourceUtilization.percentage}%` }}
+                ></div>
+              </div>
             </CardContent>
           </Card>
 
@@ -270,11 +276,13 @@ export function AdminDashboard() {
               <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-green-500">{overviewData?.complianceStatus}</div>
-              <Progress 
-                value={85} 
-                className="h-1.5 mt-2 bg-green-100" 
-              />
+              <div className="text-3xl font-bold text-teal-500">{overviewData?.complianceStatus}</div>
+              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-teal-500 rounded-full" 
+                  style={{ width: '85%' }}
+                ></div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -290,7 +298,7 @@ export function AdminDashboard() {
                 {programsProgress?.map((program, i) => (
                   <div key={i} className="flex flex-col items-center flex-1">
                     <div 
-                      className="w-full bg-blue-500 rounded-t-sm mt-auto"
+                      className="w-full bg-teal-500 rounded-t-sm mt-auto"
                       style={{ height: `${program.progress * 0.6}%` }}
                     ></div>
                     <span className="text-xs font-medium mt-2">{program.name}</span>
@@ -320,7 +328,7 @@ export function AdminDashboard() {
                         return (
                           <div 
                             key={slotIndex}
-                            className="absolute left-0 right-0 bg-blue-300"
+                            className="absolute left-0 right-0 bg-teal-300"
                             style={{
                               top: `${startPosition}%`,
                               height: `${duration}%`
@@ -344,11 +352,11 @@ export function AdminDashboard() {
               <div className="space-y-4">
                 {upcomingSessions?.map((session, index) => (
                   <div key={index} className="flex gap-3 border-b pb-4">
-                    <div className="size-10 bg-blue-100 rounded-md flex items-center justify-center flex-shrink-0">
+                    <div className="size-10 bg-teal-100 rounded-md flex items-center justify-center flex-shrink-0">
                       {session.aircraft ? (
-                        <Plane className="h-5 w-5 text-blue-600" />
+                        <Plane className="h-5 w-5 text-teal-600" />
                       ) : (
-                        <BookOpen className="h-5 w-5 text-blue-600" />
+                        <BookOpen className="h-5 w-5 text-teal-600" />
                       )}
                     </div>
                     <div className="flex-1">
@@ -387,7 +395,12 @@ export function AdminDashboard() {
                       <span className="text-sm">{resource.type}</span>
                       <span className="text-sm">{resource.utilization}%</span>
                     </div>
-                    <Progress value={resource.utilization} className="h-2" />
+                    <div className="h-2 bg-teal-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-teal-500 rounded-full" 
+                        style={{ width: `${resource.utilization}%` }}
+                      ></div>
+                    </div>
                   </div>
                 ))}
               </div>
