@@ -15,7 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { FileVersion, History, CheckCircle } from "lucide-react";
+import { FileDiff, History, CheckCircle } from "lucide-react";
 
 interface DocumentVersionsProps {
   documentId: number;
@@ -65,7 +65,7 @@ export function DocumentVersions({ documentId, currentVersionId }: DocumentVersi
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <FileVersion className="h-5 w-5 text-muted-foreground" />
+            <FileDiff className="h-5 w-5 text-muted-foreground" />
             Document Versions
           </CardTitle>
         </CardHeader>
@@ -89,7 +89,7 @@ export function DocumentVersions({ documentId, currentVersionId }: DocumentVersi
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <FileVersion className="h-5 w-5 text-muted-foreground" />
+            <FileDiff className="h-5 w-5 text-muted-foreground" />
             Document Versions
           </div>
           <Button 
