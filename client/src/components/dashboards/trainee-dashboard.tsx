@@ -29,6 +29,8 @@ import {
   AlertCircle,
   FileCheck,
   ArrowRight,
+  BarChart3,
+  PieChart,
 } from 'lucide-react';
 import {
   Table,
@@ -38,6 +40,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Radar,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  PolarRadiusAxis,
+  ResponsiveContainer,
+  Tooltip,
+} from 'recharts';
 
 export function TraineeDashboard() {
   // Fetch trainee profile and progress data
@@ -357,6 +368,56 @@ export function TraineeDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Performance Analytics Chart */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart3 className="h-5 w-5 mr-2 text-purple-600" />
+              Performance Analytics
+            </CardTitle>
+            <CardDescription>
+              Your current performance across key competency areas
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-80">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadarChart outerRadius="80%" data={[
+                  { subject: 'Navigation', score: 78, fullMark: 100 },
+                  { subject: 'Communication', score: 82, fullMark: 100 },
+                  { subject: 'Aircraft Control', score: 85, fullMark: 100 },
+                  { subject: 'Emergency Procedures', score: 70, fullMark: 100 },
+                  { subject: 'Decision Making', score: 76, fullMark: 100 },
+                  { subject: 'Technical Knowledge', score: 88, fullMark: 100 },
+                ]}>
+                  <PolarGrid />
+                  <PolarAngleAxis dataKey="subject" />
+                  <PolarRadiusAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Radar 
+                    name="Performance" 
+                    dataKey="score" 
+                    stroke="#8b5cf6" 
+                    fill="#8b5cf6" 
+                    fillOpacity={0.6} 
+                  />
+                </RadarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+          <CardFooter className="flex justify-between border-t pt-4 px-6">
+            <div className="text-sm text-muted-foreground">
+              Last assessment: March 15, 2025
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/my-performance">
+                View Details
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Link>
+            </Button>
+          </CardFooter>
+        </Card>
 
         <div className="grid gap-6 md:grid-cols-2">
           {/* Upcoming sessions */}

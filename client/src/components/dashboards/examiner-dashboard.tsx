@@ -8,6 +8,7 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -19,6 +20,8 @@ import {
   CheckCircle2,
   CalendarClock,
   Clock,
+  PieChart,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Table,
@@ -28,6 +31,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  PieChart as RechartsPieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer
+} from 'recharts';
 
 export function ExaminerDashboard() {
   // Fetch examiner profile data
