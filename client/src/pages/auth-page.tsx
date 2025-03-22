@@ -154,12 +154,12 @@ export default function AuthPage() {
                         name="username"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Email</FormLabel>
+                            <FormLabel>Email or Username</FormLabel>
                             <FormControl>
                               <Input 
                                 {...field} 
-                                type="email" 
-                                placeholder={`instructor@${organizationType === 'ato' ? 'ato.com' : organizationType === 'airline' ? 'airline.com' : 'example.com'}`}
+                                type="text" 
+                                placeholder="Enter your email or username"
                               />
                             </FormControl>
                             <FormMessage />
