@@ -187,6 +187,14 @@ export default function AuthPage() {
                           </FormItem>
                         )}
                       />
+                      <div className="text-sm p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
+                        <p className="font-medium text-gray-800 dark:text-gray-200">Pre-configured Test Accounts:</p>
+                        <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
+                          <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
+                          <li><strong>Username:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
+                          <li><strong>Username:</strong> student | <strong>Password:</strong> Student@123</li>
+                        </ul>
+                      </div>
                       <Button
                         type="submit"
                         className="w-full"
@@ -304,7 +312,13 @@ export default function AuthPage() {
                       <div className="space-y-2">
                         <FormMessage className="text-center">
                           <div className="text-sm p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
-                            <p className="font-medium text-gray-800 dark:text-gray-200">User Role Based on Email:</p>
+                            <p className="font-medium text-gray-800 dark:text-gray-200">Pre-configured Test Accounts:</p>
+                            <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
+                              <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
+                              <li><strong>Username:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
+                              <li><strong>Username:</strong> student | <strong>Password:</strong> Student@123</li>
+                            </ul>
+                            <p className="font-medium text-gray-800 dark:text-gray-200 mt-2">User Role Based on Email:</p>
                             <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
                               <li><strong>admin@example.com</strong> - Administrator access</li>
                               <li><strong>ato@example.com</strong> - ATO Instructor access</li>
