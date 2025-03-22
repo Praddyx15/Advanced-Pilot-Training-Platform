@@ -154,7 +154,14 @@ export interface IStorage {
   getDocument(id: number): Promise<Document | undefined>;
   getAllDocuments(): Promise<Document[]>;
   createDocument(document: InsertDocument): Promise<Document>;
+  updateDocument(id: number, document: Partial<Document>): Promise<Document | undefined>;
   deleteDocument(id: number): Promise<boolean>;
+  
+  // Document Version methods
+  getDocumentVersion(id: number): Promise<DocumentVersion | undefined>;
+  getDocumentVersionsByDocument(documentId: number): Promise<DocumentVersion[]>;
+  createDocumentVersion(version: InsertDocumentVersion): Promise<DocumentVersion>;
+  updateDocumentCurrentVersion(documentId: number, versionId: number): Promise<Document | undefined>;
 
   // Resource methods
   getResource(id: number): Promise<Resource | undefined>;
@@ -287,6 +294,7 @@ export class MemStorage implements IStorage {
   private assessments: Map<number, Assessment>;
   private grades: Map<number, Grade>;
   private documents: Map<number, Document>;
+  private documentVersions: Map<number, DocumentVersion>;
   private resources: Map<number, Resource>;
   private notifications: Map<number, Notification>;
   private syllabusTemplates: Map<number, SyllabusTemplate>;
@@ -319,6 +327,7 @@ export class MemStorage implements IStorage {
   private assessmentIdCounter: number;
   private gradeIdCounter: number;
   private documentIdCounter: number;
+  private documentVersionIdCounter: number;
   private resourceIdCounter: number;
   private notificationIdCounter: number;
   private syllabusTemplateIdCounter: number;
@@ -349,6 +358,7 @@ export class MemStorage implements IStorage {
     this.assessments = new Map();
     this.grades = new Map();
     this.documents = new Map();
+    this.documentVersions = new Map();
     this.resources = new Map();
     this.notifications = new Map();
     this.syllabusTemplates = new Map();

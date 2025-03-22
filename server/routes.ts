@@ -721,6 +721,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to fetch documents" });
     }
   });
+  
+  app.get("/api/documents/:id", async (req, res) => {
+    try {
+      const documentId = parseInt(req.params.id);
+      const document = await storage.getDocument(documentId);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      res.json(document);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch document" });
+    }
+  });
 
   app.post("/api/protected/documents", async (req, res) => {
     try {
@@ -740,6 +755,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Validation failed", errors: error.errors });
       }
       res.status(500).json({ message: "Failed to create document" });
+    }
+  });
+  
+  app.delete("/api/protected/documents/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      const document = await storage.getDocument(documentId);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Check if user is allowed to delete (admin or uploaded by them)
+      if (req.user.role !== 'admin' && document.uploadedById !== req.user.id) {
+        return res.status(403).json({ message: "You don't have permission to delete this document" });
+      }
+      
+      await storage.deleteDocument(documentId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete document" });
+    }
+  });
+  
+  // === Document Analysis API ===
+  app.get("/api/document-analysis/:id", async (req, res) => {
+    try {
+      const analysisId = parseInt(req.params.id);
+      const analysis = await storage.getDocumentAnalysis(analysisId);
+      
+      if (!analysis) {
+        return res.status(404).json({ message: "Document analysis not found" });
+      }
+      
+      res.json(analysis);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch document analysis" });
+    }
+  });
+  
+  app.get("/api/documents/:id/analysis", async (req, res) => {
+    try {
+      const documentId = parseInt(req.params.id);
+      const analysisType = req.query.type as string | undefined;
+      
+      // Check if document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      const analysisResults = await storage.getDocumentAnalysisByDocument(documentId, analysisType);
+      res.json(analysisResults);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch analysis for document" });
+    }
+  });
+  
+  app.post("/api/protected/documents/:id/analyze", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      
+      // Check if document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      const { analysisType } = req.body;
+      if (!analysisType) {
+        return res.status(400).json({ message: "Analysis type is required" });
+      }
+      
+      // Create initial analysis record
+      const analysisData = insertDocumentAnalysisSchema.parse({
+        documentId,
+        analysisType,
+        status: 'pending',
+        createdAt: new Date()
+      });
+      
+      const analysis = await storage.createDocumentAnalysis(analysisData);
+      
+      // In a real-world scenario, we would trigger an async analysis job here
+      // For demo purposes, we'll update the status immediately
+      setTimeout(async () => {
+        try {
+          const sampleResults = {
+            metadata: {
+              processingTime: Math.floor(Math.random() * 5000) + 1000
+            },
+            content: {}
+          };
+          
+          // Different mock results based on analysis type
+          if (analysisType === 'text_extraction') {
+            sampleResults.content = {
+              text: `Extracted text content from ${document.title}`,
+              pageCount: Math.floor(Math.random() * 20) + 1
+            };
+          } else if (analysisType === 'structure_recognition') {
+            sampleResults.content = {
+              sections: ['Introduction', 'Methods', 'Results', 'Discussion'],
+              figures: Math.floor(Math.random() * 10),
+              tables: Math.floor(Math.random() * 8)
+            };
+          } else if (analysisType === 'entity_extraction') {
+            sampleResults.content = {
+              people: ['John Smith', 'Mary Johnson'],
+              organizations: ['FAA', 'EASA', 'ICAO'],
+              locations: ['New York', 'London', 'Tokyo']
+            };
+          }
+          
+          await storage.updateDocumentAnalysisStatus(
+            analysis.id, 
+            'completed', 
+            sampleResults
+          );
+        } catch (error) {
+          console.error('Error in analysis job:', error);
+          await storage.updateDocumentAnalysisStatus(
+            analysis.id, 
+            'failed', 
+            { error: 'Analysis processing failed' }
+          );
+        }
+      }, 2000);
+      
+      res.status(202).json({
+        ...analysis,
+        message: "Analysis started"
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: "Validation failed", errors: error.errors });
+      }
+      res.status(500).json({ message: "Failed to create document analysis" });
     }
   });
 

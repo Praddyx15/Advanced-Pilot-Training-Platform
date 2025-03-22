@@ -152,6 +152,12 @@ export const documents = pgTable("documents", {
   fileType: text("file_type").notNull(),
   url: text("url").notNull(),
   uploadedById: integer("uploaded_by_id").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  tags: text("tags").array(),
+  currentVersionId: integer("current_version_id"),
 });
 
 export const insertDocumentSchema = createInsertSchema(documents).pick({
@@ -160,6 +166,31 @@ export const insertDocumentSchema = createInsertSchema(documents).pick({
   fileType: true,
   url: true,
   uploadedById: true,
+  fileName: true,
+  fileSize: true,
+  tags: true,
+});
+
+// Document Version schema
+export const documentVersions = pgTable("document_versions", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull(),
+  versionNumber: text("version_number").notNull(),
+  url: text("url").notNull(),
+  changedById: integer("changed_by_id").notNull(),
+  changeDate: timestamp("change_date").notNull().defaultNow(),
+  changeDescription: text("change_description"),
+  fileSize: integer("file_size"),
+});
+
+export const insertDocumentVersionSchema = createInsertSchema(documentVersions).pick({
+  documentId: true,
+  versionNumber: true,
+  url: true,
+  changedById: true,
+  changeDate: true,
+  changeDescription: true,
+  fileSize: true,
 });
 
 // Resource schema
@@ -623,6 +654,9 @@ export type InsertGrade = z.infer<typeof insertGradeSchema>;
 
 export type Document = typeof documents.$inferSelect;
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+
+export type DocumentVersion = typeof documentVersions.$inferSelect;
+export type InsertDocumentVersion = z.infer<typeof insertDocumentVersionSchema>;
 
 export type Resource = typeof resources.$inferSelect;
 export type InsertResource = z.infer<typeof insertResourceSchema>;
