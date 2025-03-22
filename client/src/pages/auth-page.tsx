@@ -93,10 +93,34 @@ export default function AuthPage() {
     loginMutation.mutate(values);
   };
 
+  // Function to determine role and organization type based on email pattern
+  const determineRoleFromEmail = (email: string): { role: string; organizationType: string } => {
+    const lowerEmail = email.toLowerCase();
+    
+    if (lowerEmail.includes('admin@')) {
+      return { role: 'admin', organizationType: 'personal' };
+    } else if (lowerEmail.includes('ato@')) {
+      return { role: 'instructor', organizationType: 'ato' };
+    } else if (lowerEmail.includes('airline@')) {
+      return { role: 'instructor', organizationType: 'airline' };
+    } else if (lowerEmail.includes('student@')) {
+      return { role: 'trainee', organizationType: 'personal' };
+    } else {
+      // Default
+      return { role: 'trainee', organizationType: 'personal' };
+    }
+  };
+
   // Submit registration form
   const onRegisterSubmit = (values: RegisterFormValues) => {
     // Remove confirmPassword as it's not part of the API schema
     const { confirmPassword, ...registerData } = values;
+    
+    // Set role and organization type based on email pattern
+    const { role, organizationType } = determineRoleFromEmail(values.email);
+    registerData.role = role;
+    registerData.organizationType = organizationType;
+    
     registerMutation.mutate(registerData);
   };
 
