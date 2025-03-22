@@ -5,6 +5,8 @@ import { setupAuth } from "./auth";
 import { extendedSessionSchema, insertProgramSchema, insertModuleSchema, insertLessonSchema, insertAssessmentSchema, insertGradeSchema, insertDocumentSchema, insertResourceSchema, insertNotificationSchema } from "@shared/schema";
 import { syllabusGenerationOptionsSchema, syllabusImportSchema } from "@shared/syllabus-types";
 import { z } from "zod";
+import * as syllabusGenerator from "./services/syllabus-generator";
+import * as templateManager from "./services/syllabus-template-manager";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes and middleware
