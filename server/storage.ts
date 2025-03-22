@@ -28,6 +28,8 @@ import {
   KnowledgeGraphEdge,
   InsertKnowledgeGraphEdge,
   DocumentAnalysis,
+  MfaCredential,
+  InsertMfaCredential,
   InsertDocumentAnalysis,
   RegulatoryRequirement,
   InsertRegulatoryRequirement,
@@ -282,6 +284,18 @@ export interface IStorage {
   verifySharedScenario(id: number, verifiedById: number): Promise<SharedScenario | undefined>;
   incrementScenarioDownloadCount(id: number): Promise<SharedScenario | undefined>;
 
+  // MFA methods
+  getMfaCredential(id: number): Promise<MfaCredential | undefined>;
+  getMfaCredentialsByUser(userId: number): Promise<MfaCredential[]>;
+  getMfaCredentialByUserAndType(userId: number, type: string): Promise<MfaCredential | undefined>;
+  createMfaCredential(credential: InsertMfaCredential): Promise<MfaCredential>;
+  updateMfaCredential(id: number, credential: Partial<MfaCredential>): Promise<MfaCredential | undefined>;
+  deleteMfaCredential(id: number): Promise<boolean>;
+  
+  // User update method
+  updateUser(id: number, user: Partial<User>): Promise<User | undefined>;
+  deleteUser(id: number): Promise<boolean>;
+  
   // Session store for authentication
   sessionStore: session.Store;
   
