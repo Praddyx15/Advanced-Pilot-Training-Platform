@@ -52,6 +52,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import DocumentCard from '@/components/documents/document-card';
+import { DocumentDetailDialog } from '@/components/documents/document-detail';
 import { Document } from '@shared/schema';
 import { queryClient, apiRequest } from '@/lib/queryClient';
 
@@ -67,6 +68,7 @@ export default function DocumentsPage() {
   const [uploadTags, setUploadTags] = useState('');
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null);
   const [documentToAnalyze, setDocumentToAnalyze] = useState<Document | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
 
   // Fetch documents
   const { data: documents, isLoading } = useQuery({
