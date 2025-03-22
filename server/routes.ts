@@ -8,10 +8,31 @@ import { z } from "zod";
 import * as syllabusGenerator from "./services/syllabus-generator";
 import * as templateManager from "./services/syllabus-template-manager";
 import { registerDocumentRoutes } from "./routes/document-routes";
+import { apiVersioning } from "./api/api-versioning";
+import { setupApiDocs } from "./api/api-docs";
+import v1Router from "./api/v1-router";
+import { logger } from "./core";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes and middleware
   setupAuth(app);
+  
+  // Set up API versioning
+  apiVersioning.registerVersion({
+    version: 'v1',
+    status: 'stable',
+    releaseDate: new Date('2025-03-22'),
+    router: v1Router
+  });
+  
+  // Apply API versioning middleware
+  apiVersioning.applyVersioning(app);
+  
+  // Set up Swagger API documentation
+  setupApiDocs(app);
+  
+  // Log API setup
+  logger.info('API versioning and documentation initialized');
 
   // Initialize with seed data if no users exist
   const seedDatabase = async () => {
