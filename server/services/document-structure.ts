@@ -318,7 +318,7 @@ function processLists(
   lines: string[],
   structure: DocumentStructure,
 ): void {
-  let currentList: DocumentElement = null;
+  let currentList: DocumentElement | undefined = undefined;
   const listMarkerRegex = /^\s*[•\-\*\d+\.\+]\s+/;
   
   for (let i = 0; i < lines.length; i++) {
@@ -349,6 +349,7 @@ function processLists(
           bestParent.children.push(currentList);
           currentList.parent = bestParent;
         } else {
+          structure.hierarchy.children = structure.hierarchy.children || [];
           structure.hierarchy.children.push(currentList);
           currentList.parent = structure.hierarchy;
         }
@@ -368,17 +369,21 @@ function processLists(
         parent: currentList,
       };
       
-      currentList.children.push(listItem);
+      if (currentList.children) {
+        currentList.children.push(listItem);
+      }
       structure.elements.push(listItem);
     } else if (currentList && line.trim().length > 0 && !line.match(/^\s+/)) {
       // A non-indented, non-empty line that doesn't match list pattern - end current list
-      currentList.metadata.endLine = i - 1;
-      currentList = null;
+      if (currentList.metadata) {
+        currentList.metadata.endLine = i - 1;
+      }
+      currentList = undefined;
     }
   }
   
   // Close any open list at the end
-  if (currentList) {
+  if (currentList && currentList.metadata) {
     currentList.metadata.endLine = lines.length - 1;
   }
 }
@@ -451,7 +456,7 @@ function processReferences(
   ];
   
   // Find the references section
-  let refSection: DocumentElement = null;
+  let refSection: DocumentElement | undefined = undefined;
   for (const pattern of referencePatterns) {
     if (pattern.test(text)) {
       // Find the section by looking through existing headings/sections
@@ -512,6 +517,48 @@ function processReferences(
 /**
  * Find the best parent for a new element in the document hierarchy
  */
+// Helper function defined outside of the block (prevents strict mode error)
+function findSectionOnPageHelper(node: DocumentElement, pageNumber: number): DocumentElement | null {
+  if (node.type === StructureType.SECTION && node.metadata?.pageNumber === pageNumber) {
+    // Search children first to find the deepest matching section
+    for (const child of node.children || []) {
+      const result = findSectionOnPageHelper(child, pageNumber);
+      if (result) return result;
+    }
+    return node;
+  }
+  
+  // If this isn't a matching section, check all children
+  for (const child of node.children || []) {
+    const result = findSectionOnPageHelper(child, pageNumber);
+    if (result) return result;
+  }
+  
+  return null;
+}
+
+// Helper function for finding most recent section (prevents strict mode error)
+function findMostRecentSectionHelper(node: DocumentElement): DocumentElement | null {
+  if (node.type === StructureType.SECTION) {
+    // Check if any children are sections
+    let lastSection: DocumentElement | null = null;
+    for (const child of node.children || []) {
+      if (child.type === StructureType.SECTION) {
+        lastSection = child;
+      }
+    }
+    
+    if (lastSection) {
+      const deeperSection = findMostRecentSectionHelper(lastSection);
+      return deeperSection || lastSection;
+    }
+    
+    return node;
+  }
+  
+  return null;
+}
+
 function findBestParentForElement(
   element: DocumentElement,
   root: DocumentElement,
@@ -523,53 +570,13 @@ function findBestParentForElement(
   const pageNumber = element.metadata?.pageNumber;
   
   if (pageNumber) {
-    // Do a depth-first search for the best section
-    function findSectionOnPage(node: DocumentElement): DocumentElement | null {
-      if (node.type === StructureType.SECTION && node.metadata?.pageNumber === pageNumber) {
-        // Search children first to find the deepest matching section
-        for (const child of node.children || []) {
-          const result = findSectionOnPage(child);
-          if (result) return result;
-        }
-        return node;
-      }
-      
-      // If this isn't a matching section, check all children
-      for (const child of node.children || []) {
-        const result = findSectionOnPage(child);
-        if (result) return result;
-      }
-      
-      return null;
-    }
-    
-    const sectionOnPage = findSectionOnPage(root);
+    // Use the helper function defined outside the block
+    const sectionOnPage = findSectionOnPageHelper(root, pageNumber);
     if (sectionOnPage) return sectionOnPage;
   }
   
   // If no section found based on page, return the most recently added section
-  function findMostRecentSection(node: DocumentElement): DocumentElement | null {
-    if (node.type === StructureType.SECTION) {
-      // Check if any children are sections
-      let lastSection = null;
-      for (const child of node.children || []) {
-        if (child.type === StructureType.SECTION) {
-          lastSection = child;
-        }
-      }
-      
-      if (lastSection) {
-        const deeperSection = findMostRecentSection(lastSection);
-        return deeperSection || lastSection;
-      }
-      
-      return node;
-    }
-    
-    return null;
-  }
-  
-  return findMostRecentSection(root) || root;
+  return findMostRecentSectionHelper(root) || root;
 }
 
 /**
