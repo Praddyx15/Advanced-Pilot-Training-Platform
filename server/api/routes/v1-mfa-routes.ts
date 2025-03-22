@@ -13,14 +13,18 @@ import { logger } from '../../core';
 import { insertMfaCredentialSchema, MfaCredential } from '@shared/schema';
 import { z } from 'zod';
 import * as mfaService from '../../services/mfa-service';
+import { BiometricType } from '../../services/mfa-service';
 
 const router = Router();
 
 // Middleware to ensure user is authenticated
-const ensureAuthenticated = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
+const ensureAuthenticated = (req: Request, res: Response, next: NextFunction) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }
+  
+  // TypeScript type guard to ensure req.user is defined throughout the rest of the route
+  req.user = req.user as Express.User;
   next();
 };
 
@@ -63,7 +67,7 @@ router.get('/mfa/status', ensureAuthenticated, async (req, res) => {
       enforced: mfaRequired && !sessionMfaVerified && mfaEnabled
     });
   } catch (error) {
-    logger.error('Error fetching MFA status', { userId: req.user?.id }, error);
+    logger.error('Error fetching MFA status', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to fetch MFA status' });
   }
 });
@@ -116,7 +120,7 @@ router.post('/mfa/totp/setup', ensureAuthenticated, async (req, res) => {
       recoveryCodes
     });
   } catch (error) {
-    logger.error('Error setting up TOTP', { userId: req.user?.id }, error);
+    logger.error('Error setting up TOTP', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to set up TOTP' });
   }
 });
@@ -171,7 +175,7 @@ router.post('/mfa/totp/verify', ensureAuthenticated, async (req, res) => {
     }
     
     // Verify the token
-    const isValid = mfaService.validateTotpToken(token, credential.secret);
+    const isValid = credential.secret ? mfaService.validateTotpToken(token, credential.secret) : false;
     
     if (!isValid) {
       return res.status(400).json({ message: 'Invalid token' });
@@ -263,16 +267,16 @@ router.post('/mfa/login/verify', ensureAuthenticated, async (req, res) => {
     // Verify based on method
     switch (method) {
       case 'totp':
-        isValid = mfaService.validateTotpToken(token, credential.secret);
+        isValid = credential.secret ? mfaService.validateTotpToken(token, credential.secret) : false;
         break;
       case 'recovery':
-        isValid = mfaService.validateRecoveryCode(token, credential.recoveryCodes);
+        isValid = credential.recoveryCodes ? mfaService.validateRecoveryCode(token, credential.recoveryCodes) : false;
         
         // If valid, remove the used recovery code
-        if (isValid) {
+        if (isValid && credential.recoveryCodes) {
           const normalizedToken = token.replace(/-/g, '').toUpperCase();
           const updatedCodes = credential.recoveryCodes.filter(
-            code => code.replace(/-/g, '').toUpperCase() !== normalizedToken
+            code => code && code.replace(/-/g, '').toUpperCase() !== normalizedToken
           );
           
           // Update recovery codes, removing the used one
@@ -288,7 +292,7 @@ router.post('/mfa/login/verify', ensureAuthenticated, async (req, res) => {
         }
         break;
       case 'biometric':
-        isValid = mfaService.verifyBiometricSample(token, credential.biometricTemplate);
+        isValid = credential.biometricTemplate ? mfaService.verifyBiometricSample(token, credential.biometricTemplate) : false;
         break;
       default:
         return res.status(400).json({ message: 'Unsupported verification method' });
@@ -366,9 +370,10 @@ router.post('/mfa/biometric/register', ensureAuthenticated, async (req, res) => 
     // Validate request
     const { type, template, deviceInfo } = schema.parse(req.body);
     
-    // Process biometric template
+    // Process biometric template - convert string type to BiometricType enum
+    const biometricType = type as BiometricType; // Type assertion
     const processedTemplate = mfaService.registerBiometricTemplate({
-      type,
+      type: biometricType,
       template,
       deviceInfo
     });
@@ -379,7 +384,7 @@ router.post('/mfa/biometric/register', ensureAuthenticated, async (req, res) => 
     if (existingCredential) {
       // Update existing credential
       await storage.updateMfaCredential(existingCredential.id, {
-        biometricType: type,
+        biometricType: biometricType,  // Use the converted type
         biometricTemplate: processedTemplate,
         lastUsed: new Date(),
         enabled: true
@@ -389,7 +394,7 @@ router.post('/mfa/biometric/register', ensureAuthenticated, async (req, res) => 
       await storage.createMfaCredential({
         userId,
         type: 'biometric',
-        biometricType: type,
+        biometricType: biometricType,  // Use the converted type
         biometricTemplate: processedTemplate,
         enabled: true,
         lastUsed: new Date()
