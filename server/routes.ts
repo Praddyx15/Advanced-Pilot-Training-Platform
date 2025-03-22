@@ -783,6 +783,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // === Document Version API ===
+  app.get("/api/documents/:documentId/versions", async (req, res) => {
+    try {
+      const documentId = parseInt(req.params.documentId);
+      
+      // Check if the document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      const versions = await storage.getDocumentVersionsByDocument(documentId);
+      res.json(versions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch document versions" });
+    }
+  });
+  
+  app.get("/api/document-versions/:id", async (req, res) => {
+    try {
+      const versionId = parseInt(req.params.id);
+      const version = await storage.getDocumentVersion(versionId);
+      
+      if (!version) {
+        return res.status(404).json({ message: "Document version not found" });
+      }
+      
+      res.json(version);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch document version" });
+    }
+  });
+  
+  app.post("/api/protected/documents/:documentId/versions", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const documentId = parseInt(req.params.documentId);
+      
+      // Check if the document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Only admins or the uploader can add versions to a document
+      if (req.user.role !== 'admin' && document.uploadedById !== req.user.id) {
+        return res.status(403).json({ message: "You don't have permission to add versions to this document" });
+      }
+      
+      // Create the new version
+      const versionData = {
+        ...req.body,
+        documentId
+      };
+      
+      const newVersion = await storage.createDocumentVersion(versionData);
+      
+      // Update the document to point to this version as current
+      await storage.updateDocumentCurrentVersion(documentId, newVersion.id);
+      
+      res.status(201).json(newVersion);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create document version" });
+    }
+  });
+  
+  app.patch("/api/protected/documents/:documentId/current-version/:versionId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const documentId = parseInt(req.params.documentId);
+      const versionId = parseInt(req.params.versionId);
+      
+      // Check if the document exists
+      const document = await storage.getDocument(documentId);
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+      
+      // Only admins or the uploader can change the current version
+      if (req.user.role !== 'admin' && document.uploadedById !== req.user.id) {
+        return res.status(403).json({ message: "You don't have permission to update this document" });
+      }
+      
+      // Check if the version exists
+      const version = await storage.getDocumentVersion(versionId);
+      if (!version) {
+        return res.status(404).json({ message: "Document version not found" });
+      }
+      
+      // Check if the version belongs to the document
+      if (version.documentId !== documentId) {
+        return res.status(400).json({ message: "Version does not belong to this document" });
+      }
+      
+      const updatedDocument = await storage.updateDocumentCurrentVersion(documentId, versionId);
+      res.json(updatedDocument);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update current document version" });
+    }
+  });
+  
   // === Document Analysis API ===
   app.get("/api/document-analysis/:id", async (req, res) => {
     try {
