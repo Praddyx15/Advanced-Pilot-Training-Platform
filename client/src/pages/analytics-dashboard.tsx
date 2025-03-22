@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { BarChart, LineChart, Activity, TrendingUp, PercentCircle, Layers, Users, Clock, Brain, AlertTriangle } from "lucide-react";
+import { Activity, TrendingUp, PercentCircle, Layers, Clock, Brain, AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,30 +8,20 @@ import PerformanceMetricsChart from "@/components/analytics/performance-metrics-
 import SkillDecayPrediction from "@/components/analytics/skill-decay-prediction";
 import TraineeComparisonChart from "@/components/analytics/trainee-comparison-chart";
 import SessionAnalysisTable from "@/components/analytics/session-analysis-table";
-import { apiRequest } from "@/lib/queryClient";
+
+interface TraineeData {
+  id: number;
+  username: string;
+  firstName?: string;
+  lastName?: string;
+}
 
 export default function AnalyticsDashboardPage() {
   const { user } = useAuth();
   const [selectedView, setSelectedView] = useState("overview");
-  const [selectedTrainee, setSelectedTrainee] = useState<string>("all");
   const [dateRange, setDateRange] = useState<string>("30");
 
-  const { data: trainees } = useQuery({
-    queryKey: ["/api/protected/users/trainees"],
-    enabled: !!user,
-  });
-
-  const { data: performanceMetrics } = useQuery({
-    queryKey: ["/api/analytics/performance/trainee", selectedTrainee !== "all" ? parseInt(selectedTrainee) : null],
-    enabled: !!user && selectedTrainee !== "all",
-  });
-
-  const { data: skillDecay } = useQuery({
-    queryKey: ["/api/analytics/skill-decay", selectedTrainee !== "all" ? parseInt(selectedTrainee) : null],
-    enabled: !!user && selectedTrainee !== "all",
-  });
-
-  // Mock analytics data (to be replaced with real API calls)
+  // Mock analytics data for overview section until API endpoints are ready
   const overviewData = {
     totalSessions: 248,
     completionRate: 94,
@@ -54,19 +43,6 @@ export default function AnalyticsDashboardPage() {
           </p>
         </div>
         <div className="flex space-x-4">
-          <Select value={selectedTrainee} onValueChange={setSelectedTrainee}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Select trainee" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Trainees</SelectItem>
-              {trainees?.map((trainee: any) => (
-                <SelectItem key={trainee.id} value={trainee.id.toString()}>
-                  {trainee.firstName} {trainee.lastName}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Select value={dateRange} onValueChange={setDateRange}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Date range" />
@@ -218,7 +194,7 @@ export default function AnalyticsDashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="h-[400px]">
-                <PerformanceMetricsChart showDetailed={true} />
+                <PerformanceMetricsChart />
               </CardContent>
             </Card>
             <Card>

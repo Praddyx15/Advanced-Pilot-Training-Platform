@@ -1,144 +1,194 @@
-import { useState } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { 
+  Radar, 
+  RadarChart, 
+  PolarGrid, 
+  PolarAngleAxis, 
+  PolarRadiusAxis, 
   ResponsiveContainer,
-  ReferenceLine,
-} from "recharts";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+  Legend,
+  Tooltip
+} from 'recharts';
+import { useQuery } from '@tanstack/react-query';
+import { useAuth } from '@/hooks/use-auth';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Loader2 } from 'lucide-react';
 
-// Generate comparison data for trainees
-const generateTraineeComparisonData = (competency: string) => {
-  // List of trainees
-  const trainees = [
-    "Johnson, T.", "Smith, A.", "Williams, R.", "Brown, J.", 
-    "Garcia, M.", "Davis, S.", "Rodriguez, J.", "Miller, P."
-  ];
-  
-  // Base values for different competencies
-  const baseValues = {
-    'Overall': 2.8,
-    'Technical Knowledge': 3.0,
-    'Aircraft Handling': 2.7,
-    'Procedures': 2.9,
-    'CRM': 3.1,
-    'Decision Making': 2.6
-  };
-  
-  // Use the base value for the selected competency
-  const baseValue = baseValues[competency as keyof typeof baseValues] || 2.8;
-  
-  // Generate realistic performance data for each trainee
-  return trainees.map(trainee => {
-    // Random variation +/- 0.7
-    const variation = (Math.random() * 1.4) - 0.7;
-    // Ensure value is between 1 and 4
-    let value = Math.min(Math.max(baseValue + variation, 1), 4);
-    // Round to one decimal place
-    value = Math.round(value * 10) / 10;
-    
-    return {
-      name: trainee,
-      value: value,
-      avgValue: baseValue // Class average
-    };
-  }).sort((a, b) => b.value - a.value); // Sort by performance, highest first
-};
+interface TraineeComparisonData {
+  area: string;
+  [key: string]: string | number;
+}
 
 export default function TraineeComparisonChart() {
-  const [selectedCompetency, setSelectedCompetency] = useState<string>('Overall');
-  const data = generateTraineeComparisonData(selectedCompetency);
+  const { user } = useAuth();
+  const [selectedMetric, setSelectedMetric] = useState<string>('reactionTime');
+  const [selectedTrainees, setSelectedTrainees] = useState<number[]>([]);
+  const [chartData, setChartData] = useState<TraineeComparisonData[]>([]);
   
-  // Calculate fleet average
-  const fleetAverage = data.reduce((sum, item) => sum + item.value, 0) / data.length;
+  const { data: trainees, isLoading: isLoadingTrainees } = useQuery({
+    queryKey: ['/api/users/trainees'],
+    enabled: user?.role === 'instructor' || user?.role === 'admin',
+  });
+  
+  const { data: metrics, isLoading: isLoadingMetrics } = useQuery({
+    queryKey: ['/api/analytics/comparison', selectedTrainees, selectedMetric],
+    enabled: selectedTrainees.length > 0,
+  });
+  
+  useEffect(() => {
+    if (trainees && trainees.length > 0 && selectedTrainees.length === 0) {
+      // Initially select the first two trainees if available
+      setSelectedTrainees(trainees.slice(0, Math.min(2, trainees.length)).map(t => t.id));
+    }
+  }, [trainees, selectedTrainees]);
+  
+  useEffect(() => {
+    if (metrics) {
+      setChartData(processComparisonData(metrics, selectedTrainees));
+    }
+  }, [metrics, selectedTrainees]);
+  
+  const processComparisonData = (metricsData: any, traineeIds: number[]): TraineeComparisonData[] => {
+    // If we don't have metrics yet, return empty array
+    if (!metricsData || !metricsData.trainees) return [];
+    
+    // Get unique skill areas from the metrics
+    const areas = [...new Set(metricsData.metrics.map((m: any) => m.area))];
+    
+    // Create a data structure for the radar chart
+    return areas.map(area => {
+      const areaData: TraineeComparisonData = { area: area as string };
+      
+      // Add a data point for each trainee
+      traineeIds.forEach(traineeId => {
+        const traineeData = metricsData.trainees.find((t: any) => t.id === traineeId);
+        if (traineeData) {
+          // Find the metric for this area
+          const metric = metricsData.metrics.find((m: any) => 
+            m.area === area && m.traineeId === traineeId && m.metricType === selectedMetric
+          );
+          
+          areaData[traineeData.username] = metric ? metric.value : 0;
+        }
+      });
+      
+      return areaData;
+    });
+  };
+  
+  const isLoading = isLoadingTrainees || isLoadingMetrics || chartData.length === 0;
+  
+  const metricOptions = [
+    { value: 'reactionTime', label: 'Reaction Time' },
+    { value: 'cognitiveWorkload', label: 'Cognitive Workload' },
+    { value: 'proceduralCompliance', label: 'Procedural Compliance' },
+    { value: 'overallPerformance', label: 'Overall Performance' }
+  ];
+  
+  const toggleTrainee = (traineeId: number) => {
+    if (selectedTrainees.includes(traineeId)) {
+      // Only remove if we have more than one trainee selected
+      if (selectedTrainees.length > 1) {
+        setSelectedTrainees(prev => prev.filter(id => id !== traineeId));
+      }
+    } else {
+      // Add trainee to selection (limit to 3)
+      if (selectedTrainees.length < 3) {
+        setSelectedTrainees(prev => [...prev, traineeId]);
+      }
+    }
+  };
+  
+  // Generate colors for each trainee
+  const colors = ['#8884d8', '#82ca9d', '#ffc658'];
+  
+  const getTraineeName = (id: number) => {
+    if (!trainees) return '';
+    const trainee = trainees.find((t: any) => t.id === id);
+    return trainee ? trainee.username : '';
+  };
   
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="text-sm font-medium">
-          Trainee Performance Comparison - {selectedCompetency}
-        </h3>
-        <Select 
-          value={selectedCompetency} 
-          onValueChange={setSelectedCompetency}
-        >
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select competency" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="Overall">Overall Performance</SelectItem>
-            <SelectItem value="Technical Knowledge">Technical Knowledge</SelectItem>
-            <SelectItem value="Aircraft Handling">Aircraft Handling</SelectItem>
-            <SelectItem value="Procedures">Procedures</SelectItem>
-            <SelectItem value="CRM">CRM</SelectItem>
-            <SelectItem value="Decision Making">Decision Making</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="h-[300px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart
-            data={data}
-            layout="vertical"
-            margin={{ top: 5, right: 30, left: 80, bottom: 5 }}
+    <Card className="col-span-2">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle>Trainee Comparison</CardTitle>
+        <div className="flex space-x-2">
+          <Select
+            value={selectedMetric}
+            onValueChange={setSelectedMetric}
           >
-            <CartesianGrid strokeDasharray="3 3" opacity={0.2} horizontal />
-            <XAxis 
-              type="number" 
-              domain={[0, 4]} 
-              ticks={[0, 1, 2, 3, 4]} 
-            />
-            <YAxis 
-              dataKey="name" 
-              type="category" 
-              scale="point" 
-              interval={0} 
-            />
-            <Tooltip 
-              formatter={(value: any) => [`${value} (1-4)`, '']}
-              labelFormatter={(label) => `Trainee: ${label}`}
-            />
-            <Legend />
-            <Bar 
-              dataKey="value" 
-              name="Performance Score" 
-              fill="#8884d8" 
-              radius={[0, 4, 4, 0]} 
-              barSize={20}
-            />
-            <ReferenceLine 
-              x={fleetAverage} 
-              stroke="red" 
-              strokeDasharray="3 3" 
-              label={{ 
-                value: `Fleet Avg: ${fleetAverage.toFixed(1)}`, 
-                position: 'top',
-                fill: 'red',
-                fontSize: 12
-              }} 
-            />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-      
-      <div className="flex justify-between text-sm px-2">
-        <div>
-          <span className="text-muted-foreground">Top performer: </span>
-          <span className="font-medium">{data[0]?.name || 'N/A'}</span>
-          <span className="ml-1 text-emerald-600 font-medium">({data[0]?.value || 'N/A'})</span>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select metric" />
+            </SelectTrigger>
+            <SelectContent>
+              {metricOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <div>
-          <span className="text-muted-foreground">Needs improvement: </span>
-          <span className="font-medium">{data[data.length - 1]?.name || 'N/A'}</span>
-          <span className="ml-1 text-amber-600 font-medium">({data[data.length - 1]?.value || 'N/A'})</span>
+      </CardHeader>
+      <CardContent>
+        {trainees && trainees.length > 0 && (
+          <div className="mb-4 flex flex-wrap gap-2">
+            {trainees.map((trainee: any, index: number) => (
+              <button
+                key={trainee.id}
+                className={`rounded-full px-3 py-1 text-sm font-semibold transition-colors ${
+                  selectedTrainees.includes(trainee.id)
+                    ? `bg-[${colors[selectedTrainees.indexOf(trainee.id) % colors.length]}] text-white`
+                    : 'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+                }`}
+                onClick={() => toggleTrainee(trainee.id)}
+                style={
+                  selectedTrainees.includes(trainee.id)
+                    ? { backgroundColor: colors[selectedTrainees.indexOf(trainee.id) % colors.length] }
+                    : {}
+                }
+              >
+                {trainee.username}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="h-[300px]">
+          {isLoading ? (
+            <div className="flex h-full items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={chartData}>
+                <PolarGrid />
+                <PolarAngleAxis dataKey="area" />
+                <PolarRadiusAxis angle={30} domain={[0, 100]} />
+                <Tooltip />
+                <Legend />
+                {selectedTrainees.map((traineeId, index) => (
+                  <Radar
+                    key={traineeId}
+                    name={getTraineeName(traineeId)}
+                    dataKey={getTraineeName(traineeId)}
+                    stroke={colors[index % colors.length]}
+                    fill={colors[index % colors.length]}
+                    fillOpacity={0.2}
+                  />
+                ))}
+              </RadarChart>
+            </ResponsiveContainer>
+          )}
         </div>
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
