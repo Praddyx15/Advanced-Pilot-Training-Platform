@@ -35,11 +35,30 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// Calculate password strength on a scale of 0-4
+const calculatePasswordStrength = (password: string): number => {
+  if (!password) return 0;
+  
+  let strength = 0;
+  
+  // Length check
+  if (password.length >= 8) strength += 1;
+  
+  // Character type checks
+  if (/[A-Z]/.test(password)) strength += 1;
+  if (/[a-z]/.test(password)) strength += 1;
+  if (/[0-9]/.test(password)) strength += 1;
+  if (/[^A-Za-z0-9]/.test(password)) strength += 1;
+  
+  return strength;
+};
+
 export default function AuthPage() {
   const [, navigate] = useLocation();
   const { user, loginMutation, registerMutation } = useAuth();
   const [authTab, setAuthTab] = useState<"login" | "register">("login");
   const [organizationType, setOrganizationType] = useState<"ato" | "airline" | "personal" | "admin">("ato");
+  const [passwordStrength, setPasswordStrength] = useState<number>(0);
 
   // Login form
   const loginForm = useForm<LoginFormData>({
@@ -334,8 +353,58 @@ export default function AuthPage() {
                           <FormItem>
                             <FormLabel>Password</FormLabel>
                             <FormControl>
-                              <Input type="password" {...field} />
+                              <Input 
+                                type="password" 
+                                {...field} 
+                                onChange={(e) => {
+                                  field.onChange(e);
+                                  setPasswordStrength(calculatePasswordStrength(e.target.value));
+                                }}
+                              />
                             </FormControl>
+                            {field.value && (
+                              <div className="mt-2">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <div className="h-2 flex-1 bg-slate-200 rounded-full overflow-hidden">
+                                    <div 
+                                      className={`h-full transition-all ${
+                                        passwordStrength <= 2 ? "bg-red-500" :
+                                        passwordStrength <= 3 ? "bg-yellow-500" :
+                                        "bg-green-500"
+                                      }`}
+                                      style={{ width: `${Math.min(100, passwordStrength * 25)}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs font-medium">
+                                    {passwordStrength <= 2 ? "Weak" :
+                                     passwordStrength <= 3 ? "Fair" :
+                                     "Strong"}
+                                  </span>
+                                </div>
+                                <ul className="text-xs space-y-1 mt-1 text-slate-600">
+                                  <li className={`flex items-center gap-1 ${/[A-Z]/.test(field.value) ? "text-green-600" : ""}`}>
+                                    {/[A-Z]/.test(field.value) ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                    At least one uppercase letter
+                                  </li>
+                                  <li className={`flex items-center gap-1 ${/[a-z]/.test(field.value) ? "text-green-600" : ""}`}>
+                                    {/[a-z]/.test(field.value) ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                    At least one lowercase letter
+                                  </li>
+                                  <li className={`flex items-center gap-1 ${/[0-9]/.test(field.value) ? "text-green-600" : ""}`}>
+                                    {/[0-9]/.test(field.value) ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                    At least one number
+                                  </li>
+                                  <li className={`flex items-center gap-1 ${/[^A-Za-z0-9]/.test(field.value) ? "text-green-600" : ""}`}>
+                                    {/[^A-Za-z0-9]/.test(field.value) ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                    At least one special character
+                                  </li>
+                                  <li className={`flex items-center gap-1 ${field.value.length >= 8 ? "text-green-600" : ""}`}>
+                                    {field.value.length >= 8 ? <CheckCircle2 className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                                    Minimum 8 characters
+                                  </li>
+                                </ul>
+                              </div>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}

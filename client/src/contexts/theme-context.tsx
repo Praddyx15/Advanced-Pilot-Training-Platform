@@ -33,10 +33,24 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (theme === "system") {
       const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       root.classList.add(systemTheme);
+      
+      // Apply data-theme attribute for components that use it
+      document.body.setAttribute('data-theme', systemTheme);
     } else {
       root.classList.add(theme);
+      
+      // Apply data-theme attribute for components that use it
+      document.body.setAttribute('data-theme', theme);
     }
 
+    // Apply theme to all elements that might need it
+    const themeColor = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches) 
+      ? "#1e293b" // dark slate color
+      : "#f8fafc"; // light slate color
+    
+    // Set CSS variables for theme colors
+    document.documentElement.style.setProperty('--theme-bg', themeColor);
+    
     // Update the theme.json appearance (just visual feedback, actual change will be server-side)
     fetch('/api/update-theme', {
       method: 'POST',
