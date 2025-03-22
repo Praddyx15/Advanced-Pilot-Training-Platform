@@ -330,6 +330,56 @@ export default function AuthPage() {
                         
                         <FormField
                           control={registerForm.control}
+                          name="role"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>User Role</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a role" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="admin">Administrator</SelectItem>
+                                  <SelectItem value="instructor">ATO/Airline Instructor</SelectItem>
+                                  <SelectItem value="trainee">Student/Trainee</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormDescription>
+                                Select your role in the system. The application features will adapt based on your role.
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={registerForm.control}
+                          name="organizationType"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Organization Type</FormLabel>
+                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <FormControl>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select organization type" />
+                                  </SelectTrigger>
+                                </FormControl>
+                                <SelectContent>
+                                  <SelectItem value="Airline">Airline</SelectItem>
+                                  <SelectItem value="ATO">ATO (Approved Training Organization)</SelectItem>
+                                  <SelectItem value="Personal">Personal</SelectItem>
+                                  <SelectItem value="Admin">Admin</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={registerForm.control}
                           name="organizationName"
                           render={({ field }) => (
                             <FormItem>
@@ -341,10 +391,6 @@ export default function AuthPage() {
                             </FormItem>
                           )}
                         />
-
-                        {/* Hidden fields for role and organizationType - these will be determined by email pattern */}
-                        <input type="hidden" {...registerForm.register("role")} />
-                        <input type="hidden" {...registerForm.register("organizationType")} />
                       </div>
                       <Button
                         type="submit"

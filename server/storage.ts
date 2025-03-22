@@ -473,7 +473,7 @@ export class MemStorage implements IStorage {
     const adminUser: User = {
       id: this.userIdCounter++,
       username: 'admin',
-      password: '$2b$10$7zUDXTKMXKfxMfOG7Dkbuu/gDy9h0Jk8KsEZnZm5hW.4URqgC5ZMq', // hashed 'Admin@123'
+      password: 'Admin@123', // Plaintext for testing
       email: 'admin@example.com',
       firstName: 'Admin',
       lastName: 'User',
@@ -497,7 +497,7 @@ export class MemStorage implements IStorage {
     const atoUser: User = {
       id: this.userIdCounter++,
       username: 'ato_airline',
-      password: '$2b$10$KGuxHUdw7NcJwfU3E.g47eTpqh0X9lIx2EsqAGmMy70eS6NvXSTtu', // hashed 'ATO@airline123'
+      password: 'ATO@airline123', // Plaintext for testing
       email: 'Airline@example.com',
       firstName: 'Airline',
       lastName: 'Instructor',
@@ -521,7 +521,7 @@ export class MemStorage implements IStorage {
     const studentUser: User = {
       id: this.userIdCounter++,
       username: 'student',
-      password: '$2b$10$.V5wNBkwLnY7mTN1vEGRbOqQJWMZ/E/T.1bfO.WLX3TxHNLLnZhbe', // hashed 'Student@123'
+      password: 'Student@123', // Plaintext for testing
       email: 'student@example.com',
       firstName: 'Student',
       lastName: 'Trainee',
