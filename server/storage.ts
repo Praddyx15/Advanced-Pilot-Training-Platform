@@ -390,6 +390,7 @@ export class MemStorage implements IStorage {
     this.assessmentIdCounter = 1;
     this.gradeIdCounter = 1;
     this.documentIdCounter = 1;
+    this.documentVersionIdCounter = 1;
     this.resourceIdCounter = 1;
     this.notificationIdCounter = 1;
     this.syllabusTemplateIdCounter = 1;
@@ -1187,6 +1188,57 @@ export class MemStorage implements IStorage {
 
   async deleteDocument(id: number): Promise<boolean> {
     return this.documents.delete(id);
+  }
+
+  // Document Version methods
+  async getDocumentVersion(id: number): Promise<DocumentVersion | undefined> {
+    return this.documentVersions.get(id);
+  }
+
+  async getDocumentVersionsByDocument(documentId: number): Promise<DocumentVersion[]> {
+    const versions: DocumentVersion[] = [];
+    for (const version of this.documentVersions.values()) {
+      if (version.documentId === documentId) {
+        versions.push(version);
+      }
+    }
+    return versions;
+  }
+
+  async createDocumentVersion(version: InsertDocumentVersion): Promise<DocumentVersion> {
+    const id = this.documentVersionIdCounter++;
+    const now = new Date();
+    
+    const newVersion: DocumentVersion = {
+      ...version,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    this.documentVersions.set(id, newVersion);
+    return newVersion;
+  }
+
+  async updateDocumentCurrentVersion(documentId: number, versionId: number): Promise<Document | undefined> {
+    const document = await this.getDocument(documentId);
+    if (!document) {
+      return undefined;
+    }
+
+    const version = await this.getDocumentVersion(versionId);
+    if (!version) {
+      return undefined;
+    }
+
+    const updatedDocument = {
+      ...document,
+      currentVersionId: versionId,
+      updatedAt: new Date()
+    };
+
+    this.documents.set(documentId, updatedDocument);
+    return updatedDocument;
   }
 
   // Resource methods
