@@ -808,6 +808,286 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // === Performance Analytics API ===
+  app.get("/api/analytics/performance/trainee/:traineeId", async (req, res) => {
+    try {
+      const traineeId = parseInt(req.params.traineeId);
+      const metrics = await storage.getPerformanceMetricsByTrainee(traineeId);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch performance metrics" });
+    }
+  });
+
+  app.get("/api/analytics/performance/session/:sessionId", async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.sessionId);
+      const metrics = await storage.getPerformanceMetricsBySession(sessionId);
+      res.json(metrics);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch session performance metrics" });
+    }
+  });
+
+  app.post("/api/protected/analytics/performance", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const metricData = req.body;
+      if (!metricData) {
+        return res.status(400).json({ message: "Performance metric data is required" });
+      }
+      
+      const metric = await storage.createPerformanceMetric(metricData);
+      res.status(201).json(metric);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create performance metric" });
+    }
+  });
+
+  // === Predictive Analytics API ===
+  app.get("/api/analytics/predictive-models", async (req, res) => {
+    try {
+      const active = req.query.active === 'true';
+      const models = await storage.getAllPredictiveModels(active);
+      res.json(models);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch predictive models" });
+    }
+  });
+
+  app.get("/api/analytics/skill-decay/:traineeId", async (req, res) => {
+    try {
+      const traineeId = parseInt(req.params.traineeId);
+      const predictions = await storage.getSkillDecayPredictionsByTrainee(traineeId);
+      res.json(predictions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch skill decay predictions" });
+    }
+  });
+
+  app.post("/api/protected/analytics/skill-decay", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const predictionData = req.body;
+      if (!predictionData) {
+        return res.status(400).json({ message: "Prediction data is required" });
+      }
+      
+      const prediction = await storage.createSkillDecayPrediction(predictionData);
+      res.status(201).json(prediction);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create skill decay prediction" });
+    }
+  });
+
+  // === Session Replay API ===
+  app.get("/api/replays/session/:sessionId", async (req, res) => {
+    try {
+      const sessionId = parseInt(req.params.sessionId);
+      const replays = await storage.getSessionReplaysBySession(sessionId);
+      res.json(replays);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch session replays" });
+    }
+  });
+
+  app.get("/api/replays/:replayId/events", async (req, res) => {
+    try {
+      const replayId = parseInt(req.params.replayId);
+      const events = await storage.getSessionEventsByReplay(replayId);
+      res.json(events);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch replay events" });
+    }
+  });
+
+  app.post("/api/protected/replays", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const replayData = req.body;
+      if (!replayData) {
+        return res.status(400).json({ message: "Replay data is required" });
+      }
+      
+      const replay = await storage.createSessionReplay(replayData);
+      res.status(201).json(replay);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create session replay" });
+    }
+  });
+
+  app.post("/api/protected/replays/:replayId/events", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const replayId = parseInt(req.params.replayId);
+      const eventData = req.body;
+      
+      if (!eventData) {
+        return res.status(400).json({ message: "Event data is required" });
+      }
+      
+      // Add the replay ID to the event data
+      eventData.replayId = replayId;
+      
+      const event = await storage.createSessionEvent(eventData);
+      res.status(201).json(event);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create replay event" });
+    }
+  });
+
+  // === Gamification API ===
+  app.get("/api/gamification/achievements", async (req, res) => {
+    try {
+      const active = req.query.active === 'true';
+      const achievements = await storage.getAllAchievements(active);
+      res.json(achievements);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch achievements" });
+    }
+  });
+
+  app.get("/api/gamification/achievements/user/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const achievements = await storage.getUserAchievementsByUser(userId);
+      res.json(achievements);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user achievements" });
+    }
+  });
+
+  app.post("/api/protected/gamification/achievements/:userId", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const userId = parseInt(req.params.userId);
+      const achievementData = req.body;
+      
+      if (!achievementData) {
+        return res.status(400).json({ message: "Achievement data is required" });
+      }
+      
+      // Add the user ID to the achievement data
+      achievementData.userId = userId;
+      
+      const achievement = await storage.createUserAchievement(achievementData);
+      res.status(201).json(achievement);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create user achievement" });
+    }
+  });
+
+  app.get("/api/gamification/leaderboards", async (req, res) => {
+    try {
+      const active = req.query.active === 'true';
+      const leaderboards = await storage.getAllLeaderboards(active);
+      res.json(leaderboards);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch leaderboards" });
+    }
+  });
+
+  app.get("/api/gamification/leaderboards/:leaderboardId/entries", async (req, res) => {
+    try {
+      const leaderboardId = parseInt(req.params.leaderboardId);
+      const entries = await storage.getLeaderboardEntriesByLeaderboard(leaderboardId);
+      res.json(entries);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch leaderboard entries" });
+    }
+  });
+
+  // === Community Collaboration API ===
+  app.get("/api/community/scenarios", async (req, res) => {
+    try {
+      const status = req.query.status as string;
+      const scenarios = await storage.getAllSharedScenarios(status);
+      res.json(scenarios);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch shared scenarios" });
+    }
+  });
+
+  app.get("/api/community/scenarios/user/:userId", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const scenarios = await storage.getSharedScenariosByUser(userId);
+      res.json(scenarios);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch user shared scenarios" });
+    }
+  });
+
+  app.post("/api/protected/community/scenarios", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const scenarioData = req.body;
+      if (!scenarioData) {
+        return res.status(400).json({ message: "Scenario data is required" });
+      }
+      
+      // Add the creator ID
+      scenarioData.createdById = req.user.id;
+      
+      const scenario = await storage.createSharedScenario(scenarioData);
+      res.status(201).json(scenario);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create shared scenario" });
+    }
+  });
+
+  app.post("/api/protected/community/scenarios/:id/verify", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const scenarioId = parseInt(req.params.id);
+      const verifiedScenario = await storage.verifySharedScenario(scenarioId, req.user.id);
+      
+      if (!verifiedScenario) {
+        return res.status(404).json({ message: "Scenario not found" });
+      }
+      
+      res.json(verifiedScenario);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to verify scenario" });
+    }
+  });
+
+  app.post("/api/community/scenarios/:id/download", async (req, res) => {
+    try {
+      const scenarioId = parseInt(req.params.id);
+      const scenario = await storage.incrementScenarioDownloadCount(scenarioId);
+      
+      if (!scenario) {
+        return res.status(404).json({ message: "Scenario not found" });
+      }
+      
+      res.json({ success: true, downloads: scenario.downloads });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to record scenario download" });
+    }
+  });
+
   // === Knowledge Graph API ===
   app.get("/api/knowledge-graph/nodes", async (req, res) => {
     try {
