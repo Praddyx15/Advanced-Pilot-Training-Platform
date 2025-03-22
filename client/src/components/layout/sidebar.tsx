@@ -9,7 +9,8 @@ import {
   Airplay,
   Settings,
   LogOut,
-  Wand2
+  Wand2,
+  Network
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { Link } from "wouter";
@@ -57,6 +58,13 @@ export default function Sidebar() {
           <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-purple-600 hover:bg-purple-50 transition-colors">
             <Wand2 className="h-5 w-5" />
             <span>AI Syllabus Generator</span>
+          </a>
+        </Link>
+        
+        <Link href="/knowledge-graph">
+          <a className="sidebar-item flex items-center gap-x-3 py-2 px-3 rounded-md text-sm font-medium text-blue-600 hover:bg-blue-50 transition-colors">
+            <Network className="h-5 w-5" />
+            <span>Knowledge Graph</span>
           </a>
         </Link>
         
