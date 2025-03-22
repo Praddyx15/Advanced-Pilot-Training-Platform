@@ -634,6 +634,36 @@ export const insertSharedScenarioSchema = createInsertSchema(sharedScenarios).pi
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 
+// MFA Credentials schema
+export const mfaCredentials = pgTable("mfa_credentials", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id).notNull(),
+  type: text("type").notNull(), // 'totp', 'biometric', 'recovery'
+  secret: text("secret"),
+  biometricType: text("biometric_type"), // 'fingerprint', 'face', 'voice'
+  biometricTemplate: text("biometric_template"),
+  recoveryCodes: text("recovery_codes").array(),
+  lastUsed: timestamp("last_used"),
+  enabled: boolean("enabled").default(true),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  metadata: jsonb("metadata")
+});
+
+export const insertMfaCredentialSchema = createInsertSchema(mfaCredentials).pick({
+  userId: true,
+  type: true,
+  secret: true,
+  biometricType: true,
+  biometricTemplate: true,
+  recoveryCodes: true,
+  enabled: true,
+  metadata: true
+});
+
+export type MfaCredential = typeof mfaCredentials.$inferSelect;
+export type InsertMfaCredential = z.infer<typeof insertMfaCredentialSchema>;
+
 export type TrainingProgram = typeof trainingPrograms.$inferSelect;
 export type InsertTrainingProgram = z.infer<typeof insertProgramSchema>;
 
@@ -691,34 +721,7 @@ export type InsertPerformanceMetric = z.infer<typeof insertPerformanceMetricSche
 export type PredictiveModel = typeof predictiveModels.$inferSelect;
 export type InsertPredictiveModel = z.infer<typeof insertPredictiveModelSchema>;
 
-// MFA Credentials schema
-export const mfaCredentials = pgTable("mfa_credentials", {
-  id: serial("id").primaryKey(),
-  userId: integer("user_id").notNull(),
-  type: text("type").notNull(), // 'totp', 'biometric', 'recovery'
-  secret: text("secret"),
-  biometricType: text("biometric_type"), // 'fingerprint', 'face', 'voice'
-  biometricTemplate: text("biometric_template"),
-  recoveryCodes: text("recovery_codes").array(),
-  lastUsed: timestamp("last_used"),
-  enabled: boolean("enabled").default(true),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
 
-export const insertMfaCredentialSchema = createInsertSchema(mfaCredentials).pick({
-  userId: true,
-  type: true,
-  secret: true,
-  biometricType: true,
-  biometricTemplate: true,
-  recoveryCodes: true,
-  lastUsed: true,
-  enabled: true,
-});
-
-export type MfaCredential = typeof mfaCredentials.$inferSelect;
-export type InsertMfaCredential = z.infer<typeof insertMfaCredentialSchema>;
 
 export type SkillDecayPrediction = typeof skillDecayPredictions.$inferSelect;
 export type InsertSkillDecayPrediction = z.infer<typeof insertSkillDecayPredictionSchema>;

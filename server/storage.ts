@@ -366,6 +366,8 @@ export class MemStorage implements IStorage {
   private leaderboardIdCounter: number;
   private leaderboardEntryIdCounter: number;
   private sharedScenarioIdCounter: number;
+  private mfaCredentialIdCounter: number;
+  private mfaCredentials: Map<number, MfaCredential>;
 
   constructor() {
     this.users = new Map();
@@ -399,6 +401,7 @@ export class MemStorage implements IStorage {
     this.leaderboards = new Map();
     this.leaderboardEntries = new Map();
     this.sharedScenarios = new Map();
+    this.mfaCredentials = new Map();
 
     this.userIdCounter = 1;
     this.programIdCounter = 1;
@@ -429,6 +432,7 @@ export class MemStorage implements IStorage {
     this.leaderboardIdCounter = 1;
     this.leaderboardEntryIdCounter = 1;
     this.sharedScenarioIdCounter = 1;
+    this.mfaCredentialIdCounter = 1;
 
     // Initialize with some common regulatory references
     this.initializeRegulatoryReferences();
