@@ -2062,6 +2062,70 @@ export class MemStorage implements IStorage {
     this.sharedScenarios.set(id, updatedScenario);
     return updatedScenario;
   }
+
+  // MFA methods
+  async getMfaCredential(id: number): Promise<MfaCredential | undefined> {
+    return this.mfaCredentials.get(id);
+  }
+
+  async getMfaCredentialsByUser(userId: number): Promise<MfaCredential[]> {
+    return Array.from(this.mfaCredentials.values())
+      .filter(cred => cred.userId === userId);
+  }
+
+  async getMfaCredentialByUserAndType(userId: number, type: string): Promise<MfaCredential | undefined> {
+    return Array.from(this.mfaCredentials.values())
+      .find(cred => cred.userId === userId && cred.type === type);
+  }
+
+  async createMfaCredential(credential: InsertMfaCredential): Promise<MfaCredential> {
+    const id = this.mfaCredentialIdCounter++;
+    const newCredential: MfaCredential = {
+      id,
+      ...credential,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    this.mfaCredentials.set(id, newCredential);
+    return newCredential;
+  }
+
+  async updateMfaCredential(id: number, credential: Partial<MfaCredential>): Promise<MfaCredential | undefined> {
+    const existingCredential = this.mfaCredentials.get(id);
+    if (!existingCredential) return undefined;
+
+    const updatedCredential = {
+      ...existingCredential,
+      ...credential,
+      updatedAt: new Date()
+    };
+    this.mfaCredentials.set(id, updatedCredential);
+    return updatedCredential;
+  }
+
+  async deleteMfaCredential(id: number): Promise<boolean> {
+    if (!this.mfaCredentials.has(id)) return false;
+    return this.mfaCredentials.delete(id);
+  }
+
+  // User update method
+  async updateUser(id: number, user: Partial<User>): Promise<User | undefined> {
+    const existingUser = this.users.get(id);
+    if (!existingUser) return undefined;
+
+    const updatedUser = {
+      ...existingUser,
+      ...user,
+      updatedAt: new Date()
+    };
+    this.users.set(id, updatedUser);
+    return updatedUser;
+  }
+
+  async deleteUser(id: number): Promise<boolean> {
+    if (!this.users.has(id)) return false;
+    return this.users.delete(id);
+  }
 }
 
 export const storage = new MemStorage();
