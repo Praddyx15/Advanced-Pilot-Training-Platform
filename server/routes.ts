@@ -64,6 +64,191 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to import syllabus" });
     }
   });
+  
+  // === Syllabus Templates API ===
+  app.get("/api/syllabus/templates", async (req, res) => {
+    try {
+      const templates = await storage.getAllSyllabusTemplates();
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch syllabus templates" });
+    }
+  });
+  
+  app.get("/api/syllabus/templates/:id", async (req, res) => {
+    try {
+      const templateId = parseInt(req.params.id);
+      const template = await storage.getSyllabusTemplate(templateId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      res.json(template);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch template details" });
+    }
+  });
+  
+  app.get("/api/syllabus/templates/type/:programType", async (req, res) => {
+    try {
+      const { programType } = req.params;
+      const templates = await storage.getSyllabusTemplatesByType(programType);
+      res.json(templates);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch templates by type" });
+    }
+  });
+  
+  app.post("/api/protected/syllabus/templates", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const { template } = req.body;
+      if (!template) {
+        return res.status(400).json({ message: "Template data is required" });
+      }
+      
+      // Add user ID and current date
+      template.createdById = req.user.id;
+      template.createdAt = new Date();
+      template.updatedAt = new Date();
+      
+      const createdTemplate = await storage.createSyllabusTemplate(template);
+      res.status(201).json(createdTemplate);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create syllabus template" });
+    }
+  });
+  
+  app.put("/api/protected/syllabus/templates/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const templateId = parseInt(req.params.id);
+      const template = await storage.getSyllabusTemplate(templateId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      const { updates } = req.body;
+      if (!updates) {
+        return res.status(400).json({ message: "Update data is required" });
+      }
+      
+      // Update the template
+      updates.updatedAt = new Date();
+      const updatedTemplate = await storage.updateSyllabusTemplate(templateId, updates);
+      
+      res.json(updatedTemplate);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to update template" });
+    }
+  });
+  
+  app.delete("/api/protected/syllabus/templates/:id", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const templateId = parseInt(req.params.id);
+      const template = await storage.getSyllabusTemplate(templateId);
+      
+      if (!template) {
+        return res.status(404).json({ message: "Template not found" });
+      }
+      
+      await storage.deleteSyllabusTemplate(templateId);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Failed to delete template" });
+    }
+  });
+  
+  // === Regulatory References API ===
+  app.get("/api/syllabus/regulatory/:authority", async (req, res) => {
+    try {
+      const { authority } = req.params;
+      const { version } = req.query;
+      
+      const references = await storage.getRegulatoryReferences(authority, version as string);
+      res.json(references);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch regulatory references" });
+    }
+  });
+  
+  // === Syllabus Version Control API ===
+  app.get("/api/syllabus/:syllabusId/versions", async (req, res) => {
+    try {
+      const syllabusId = parseInt(req.params.syllabusId);
+      const versions = await storage.getSyllabusVersionHistory(syllabusId);
+      res.json(versions);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to fetch syllabus versions" });
+    }
+  });
+  
+  app.post("/api/protected/syllabus/:syllabusId/versions", async (req, res) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      const syllabusId = parseInt(req.params.syllabusId);
+      const { version } = req.body;
+      
+      if (!version) {
+        return res.status(400).json({ message: "Version data is required" });
+      }
+      
+      // Set the user ID
+      version.changedBy = req.user.id;
+      
+      const createdVersion = await storage.createSyllabusVersion(syllabusId, version);
+      res.status(201).json(createdVersion);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to create syllabus version" });
+    }
+  });
+  
+  app.post("/api/protected/syllabus/:syllabusId/compare", async (req, res) => {
+    try {
+      const syllabusId = parseInt(req.params.syllabusId);
+      const { version1, version2 } = req.body;
+      
+      if (!version1 || !version2) {
+        return res.status(400).json({ message: "Two version numbers are required for comparison" });
+      }
+      
+      const comparisonResult = await storage.compareSyllabusVersions(syllabusId, version1, version2);
+      res.json(comparisonResult);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to compare syllabus versions" });
+    }
+  });
+  
+  app.post("/api/protected/syllabus/:syllabusId/analyze-impact", async (req, res) => {
+    try {
+      const syllabusId = parseInt(req.params.syllabusId);
+      const { changes } = req.body;
+      
+      if (!changes) {
+        return res.status(400).json({ message: "Change data is required" });
+      }
+      
+      const impactAnalysis = await storage.analyzeComplianceImpact(syllabusId, changes);
+      res.json(impactAnalysis);
+    } catch (error) {
+      res.status(500).json({ message: "Failed to analyze compliance impact" });
+    }
+  });
 
   // === Training Programs API ===
   app.get("/api/programs", async (req, res) => {

@@ -182,6 +182,9 @@ export class MemStorage implements IStorage {
     this.documents = new Map();
     this.resources = new Map();
     this.notifications = new Map();
+    this.syllabusTemplates = new Map();
+    this.syllabusVersions = new Map();
+    this.regulatoryReferences = new Map();
 
     this.userIdCounter = 1;
     this.programIdCounter = 1;
@@ -194,10 +197,99 @@ export class MemStorage implements IStorage {
     this.documentIdCounter = 1;
     this.resourceIdCounter = 1;
     this.notificationIdCounter = 1;
+    this.syllabusTemplateIdCounter = 1;
+
+    // Initialize with some common regulatory references
+    this.initializeRegulatoryReferences();
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
     });
+  }
+
+  // Helper method to convert string requirements to RegulatoryReference objects
+  private getRegulatoryRequirementsArray(authority: string, requirementNames: string[]): RegulatoryReference[] {
+    const references = this.regulatoryReferences.get(authority) || [];
+    
+    // For each requirement name, find a matching regulatory reference or create a generic one
+    return requirementNames.map(name => {
+      const matchingRef = references.find(ref => ref.description.includes(name) || ref.code.includes(name));
+      if (matchingRef) {
+        return matchingRef;
+      }
+      
+      // Create a generic reference if no match found
+      return {
+        code: name,
+        authority,
+        version: '2023',
+        description: name,
+        effectiveDate: new Date()
+      };
+    });
+  }
+
+  // Initialize regulatory references for different authorities
+  private initializeRegulatoryReferences() {
+    // FAA references
+    this.regulatoryReferences.set('faa', [
+      {
+        code: 'FAR 61.31',
+        authority: 'faa',
+        version: '2023',
+        description: 'Type rating requirements, additional training, and authorization requirements',
+        url: 'https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-A/section-61.31',
+        effectiveDate: new Date('2023-01-01')
+      },
+      {
+        code: 'FAR 61.58',
+        authority: 'faa',
+        version: '2023',
+        description: 'Pilot proficiency check requirements',
+        url: 'https://www.ecfr.gov/current/title-14/chapter-I/subchapter-D/part-61/subpart-A/section-61.58',
+        effectiveDate: new Date('2023-01-01')
+      }
+    ]);
+
+    // EASA references
+    this.regulatoryReferences.set('easa', [
+      {
+        code: 'EASA FCL.725',
+        authority: 'easa',
+        version: '2023',
+        description: 'Requirements for the issue of class and type ratings',
+        url: 'https://www.easa.europa.eu/document-library/easy-access-rules/easy-access-rules-aircrew-regulation-eu-no-11782011',
+        effectiveDate: new Date('2023-01-01')
+      },
+      {
+        code: 'EASA FCL.740',
+        authority: 'easa',
+        version: '2023',
+        description: 'Validity and renewal of class and type ratings',
+        url: 'https://www.easa.europa.eu/document-library/easy-access-rules/easy-access-rules-aircrew-regulation-eu-no-11782011',
+        effectiveDate: new Date('2023-01-01')
+      },
+      {
+        code: 'EASA FCL.735.A',
+        authority: 'easa',
+        version: '2023',
+        description: 'Multi-crew cooperation training course — aeroplanes',
+        url: 'https://www.easa.europa.eu/document-library/easy-access-rules/easy-access-rules-aircrew-regulation-eu-no-11782011',
+        effectiveDate: new Date('2023-01-01')
+      }
+    ]);
+
+    // ICAO references
+    this.regulatoryReferences.set('icao', [
+      {
+        code: 'ICAO Annex 1',
+        authority: 'icao',
+        version: '12',
+        description: 'Personnel Licensing',
+        url: 'https://www.icao.int/safety/airnavigation/nationalitymarks/annexes_booklet_en.pdf',
+        effectiveDate: new Date('2018-07-16')
+      }
+    ]);
   }
 
   // Syllabus Generator methods
@@ -416,6 +508,11 @@ export class MemStorage implements IStorage {
       ];
     }
     
+    // Create regulatory references for the syllabus
+    const authority = options.regulatoryAuthority || 'easa';
+    const metRequirements = ['Basic training requirements', 'Minimum training hours'];
+    const partiallyMetRequirements = ['Specific aircraft procedures'];
+    
     // Return the generated syllabus
     return {
       name: `${options.programType.charAt(0).toUpperCase() + options.programType.slice(1)} Training Program${options.aircraftType ? ` - ${options.aircraftType}` : ''}`,
@@ -427,11 +524,37 @@ export class MemStorage implements IStorage {
       modules,
       lessons,
       regulatoryCompliance: {
-        authority: options.regulatoryAuthority || 'easa',
-        requirementsMet: ['Basic training requirements', 'Minimum training hours'],
-        requirementsPartiallyMet: ['Specific aircraft procedures'],
+        authority: authority,
+        requirementsMet: metRequirements.map(name => ({
+          code: name,
+          authority,
+          version: '2023',
+          description: name,
+          effectiveDate: new Date()
+        })),
+        requirementsPartiallyMet: partiallyMetRequirements.map(name => ({
+          code: name,
+          authority,
+          version: '2023',
+          description: name,
+          effectiveDate: new Date()
+        })),
         requirementsNotMet: []
       },
+      version: '1.0.0',
+      versionHistory: [{
+        versionNumber: '1.0.0',
+        changedBy: 1, // System user ID
+        changeDate: new Date(),
+        changeDescription: 'Initial syllabus generation',
+        complianceImpact: {
+          affectedRequirements: [],
+          impactLevel: 'none',
+          description: 'Initial version',
+          mitigationSteps: [],
+          approvalRequired: false
+        }
+      }],
       confidenceScore: 85 // 85% confidence in extraction accuracy
     };
   }
@@ -467,6 +590,105 @@ export class MemStorage implements IStorage {
     }
     
     return program;
+  }
+  
+  // Syllabus Template methods
+  async getSyllabusTemplate(id: number): Promise<SyllabusTemplate | undefined> {
+    return this.syllabusTemplates.get(id);
+  }
+  
+  async getAllSyllabusTemplates(): Promise<SyllabusTemplate[]> {
+    return Array.from(this.syllabusTemplates.values());
+  }
+  
+  async getSyllabusTemplatesByType(programType: string): Promise<SyllabusTemplate[]> {
+    return Array.from(this.syllabusTemplates.values()).filter(
+      template => template.programType === programType
+    );
+  }
+  
+  async createSyllabusTemplate(template: SyllabusTemplate): Promise<SyllabusTemplate> {
+    const id = this.syllabusTemplateIdCounter++;
+    const newTemplate: SyllabusTemplate = {
+      ...template,
+      id,
+      createdAt: template.createdAt || new Date(),
+      updatedAt: new Date()
+    };
+    this.syllabusTemplates.set(id, newTemplate);
+    return newTemplate;
+  }
+  
+  async updateSyllabusTemplate(id: number, template: Partial<SyllabusTemplate>): Promise<SyllabusTemplate | undefined> {
+    const existingTemplate = this.syllabusTemplates.get(id);
+    if (!existingTemplate) return undefined;
+    
+    const updatedTemplate = { 
+      ...existingTemplate, 
+      ...template,
+      updatedAt: new Date()
+    };
+    this.syllabusTemplates.set(id, updatedTemplate);
+    return updatedTemplate;
+  }
+  
+  async deleteSyllabusTemplate(id: number): Promise<boolean> {
+    return this.syllabusTemplates.delete(id);
+  }
+  
+  // Syllabus Version Control methods
+  async getSyllabusVersionHistory(syllabusId: number): Promise<SyllabusVersion[]> {
+    return this.syllabusVersions.get(syllabusId) || [];
+  }
+  
+  async createSyllabusVersion(syllabusId: number, version: SyllabusVersion): Promise<SyllabusVersion> {
+    const existingVersions = this.syllabusVersions.get(syllabusId) || [];
+    existingVersions.push(version);
+    this.syllabusVersions.set(syllabusId, existingVersions);
+    return version;
+  }
+  
+  async compareSyllabusVersions(syllabusId: number, version1: string, version2: string): Promise<{
+    addedModules: ExtractedModule[];
+    removedModules: ExtractedModule[];
+    modifiedModules: Array<{before: ExtractedModule, after: ExtractedModule}>;
+    complianceImpact: ComplianceImpact;
+  }> {
+    // In a real implementation, this would perform an actual diff between versions
+    // For this prototype, return a placeholder result
+    return {
+      addedModules: [],
+      removedModules: [],
+      modifiedModules: [],
+      complianceImpact: {
+        affectedRequirements: [],
+        impactLevel: 'none',
+        description: 'No significant regulatory impact detected',
+        mitigationSteps: [],
+        approvalRequired: false
+      }
+    };
+  }
+  
+  // Compliance Analysis methods
+  async analyzeComplianceImpact(syllabusId: number, changes: any): Promise<ComplianceImpact> {
+    // In a real implementation, this would analyze the regulatory impact of proposed changes
+    // For this prototype, return a placeholder result
+    return {
+      affectedRequirements: [],
+      impactLevel: 'low',
+      description: 'Minor changes with low regulatory impact',
+      mitigationSteps: ['Document changes in training records'],
+      approvalRequired: false
+    };
+  }
+  
+  async getRegulatoryReferences(authority: string, version?: string): Promise<RegulatoryReference[]> {
+    const references = this.regulatoryReferences.get(authority) || [];
+    if (version) {
+      return references.filter(ref => ref.version === version);
+    }
+    return references;
   }
 
   // User methods
