@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -84,7 +85,6 @@ export default function AuthPage() {
       role: "trainee", // Default role, will be determined by email
       organizationType: "Airline", // Default org type, will be determined by email
       organizationName: "", // Added organization name field
-      isActive: true,
     },
   });
 
