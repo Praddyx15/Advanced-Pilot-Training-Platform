@@ -306,14 +306,14 @@ export default function SessionForm() {
                 control={form.control}
                 render={({ field }) => (
                   <Select
-                    value={field.value?.toString() || ""}
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
+                    value={field.value?.toString() || "none"}
+                    onValueChange={(value) => field.onChange(value && value !== "none" ? parseInt(value) : null)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a resource" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">None</SelectItem>
+                      <SelectItem value="none">None</SelectItem>
                       {resources.map((resource) => (
                         <SelectItem key={resource.id} value={resource.id.toString()}>
                           {resource.name} ({resource.type}, {resource.location})
