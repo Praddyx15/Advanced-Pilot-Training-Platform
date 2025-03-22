@@ -588,11 +588,86 @@ export class MemStorage implements IStorage {
       notificationSettings: null
     };
 
+    // Add ATO examiner user
+    const atoExaminer: User = {
+      id: this.userIdCounter++,
+      username: 'examiner',
+      password: 'Examiner@123', // Plaintext for testing
+      email: 'examiner@ato.com',
+      firstName: 'ATO',
+      lastName: 'Examiner',
+      role: 'examiner',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'ATO',
+      organizationName: 'Aviation Training Organization',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+    
+    // Add Airline instructor (separate from ATO)
+    const airlineInstructor: User = {
+      id: this.userIdCounter++,
+      username: 'airline',
+      password: 'Airline@123', // Plaintext for testing
+      email: 'instructor@airline.com',
+      firstName: 'Airline',
+      lastName: 'Instructor',
+      role: 'instructor',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'Airline',
+      organizationName: 'Skyways Airlines',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
+    // Add ATO student (different from Airline student)
+    const atoStudent: User = {
+      id: this.userIdCounter++,
+      username: 'atostudent',
+      password: 'Student@123', // Plaintext for testing
+      email: 'student@ato.com',
+      firstName: 'ATO',
+      lastName: 'Student',
+      role: 'trainee',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      organizationType: 'ATO',
+      organizationName: 'Aviation Training Organization',
+      authProvider: 'local',
+      status: 'active',
+      lastLogin: null,
+      profilePicture: null,
+      authProviderId: null,
+      preferences: null,
+      bio: null,
+      phone: null,
+      notificationSettings: null
+    };
+
     this.users.set(adminUser.id, adminUser);
     this.users.set(atoUser.id, atoUser);
     this.users.set(studentUser.id, studentUser);
     this.users.set(secondStudent.id, secondStudent);
     this.users.set(secondAirline.id, secondAirline);
+    this.users.set(atoExaminer.id, atoExaminer);
+    this.users.set(airlineInstructor.id, airlineInstructor);
+    this.users.set(atoStudent.id, atoStudent);
     
     console.log('Initialized sample users:', 
       this.users.size, 

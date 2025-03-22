@@ -75,19 +75,19 @@ export function AppLayout({ children }: AppLayoutProps) {
   const getThemeColors = () => {
     if (userRole === 'admin') {
       return {
-        primary: '#0e7490', // Teal 600
-        secondary: '#0891b2', // Teal 500
-        sidebar: 'from-slate-800 to-slate-900',
-        header: 'bg-slate-800',
-        text: 'text-white',
-        logo: 'NextGen Flight Training Management'
-      };
-    } else if (userRole === 'instructor' && userOrgType === 'ATO') {
-      return {
         primary: '#0f766e', // Teal 700
         secondary: '#14b8a6', // Teal 400
         sidebar: 'from-teal-800 to-teal-900',
         header: 'bg-teal-800',
+        text: 'text-white',
+        logo: 'Admin Portal'
+      };
+    } else if (userRole === 'instructor' && userOrgType === 'ATO') {
+      return {
+        primary: '#0e7490', // Teal 600
+        secondary: '#0891b2', // Teal 500
+        sidebar: 'from-slate-800 to-slate-900',
+        header: 'bg-slate-800',
         text: 'text-white',
         logo: 'ATO Instructor Portal'
       };
@@ -408,8 +408,10 @@ export function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Main content */}
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900">
-          {children}
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 min-h-screen overflow-hidden">
+          <div className="container mx-auto py-6">
+            {children}
+          </div>
         </main>
       </div>
 

@@ -102,8 +102,8 @@ export function setupAuth(app: Express) {
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: z.string().email("Invalid email format"),
-    role: z.enum(["admin", "instructor", "trainee"], {
-      errorMap: () => ({ message: "Role must be either 'admin', 'instructor', or 'trainee'" }),
+    role: z.enum(["admin", "instructor", "trainee", "examiner"], {
+      errorMap: () => ({ message: "Role must be either 'admin', 'instructor', 'trainee', or 'examiner'" }),
     }).default("trainee"), // Default to trainee, will be overridden based on email pattern
     organizationType: z.enum(["ATO", "Airline", "Personal", "Admin"], {
       errorMap: () => ({ message: "Organization type must be one of 'ATO', 'Airline', 'Personal', or 'Admin'" }),
@@ -140,12 +140,18 @@ export function setupAuth(app: Express) {
       if (email.includes('admin@')) {
         role = 'admin';
         organizationType = 'Admin';
+      } else if (email.includes('examiner@')) {
+        role = 'examiner';
+        organizationType = 'ATO';
       } else if (email.includes('ato@')) {
         role = 'instructor';
         organizationType = 'ATO';
       } else if (email.includes('airline@')) {
         role = 'instructor';
         organizationType = 'Airline';
+      } else if (email.includes('student@ato')) {
+        role = 'trainee';
+        organizationType = 'ATO';
       } else if (email.includes('student@')) {
         role = 'trainee';
         organizationType = 'Airline';
