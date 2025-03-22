@@ -140,7 +140,7 @@ export function setupAuth(app: Express) {
       if (email.includes('admin@')) {
         role = 'admin';
         organizationType = 'Admin';
-      } else if (email.includes('examiner@')) {
+      } else if (email.includes('examiner@ato')) {
         role = 'examiner';
         organizationType = 'ATO';
       } else if (email.includes('ato@')) {
@@ -242,12 +242,18 @@ export function setupAuth(app: Express) {
         if (email.includes('admin@')) {
           role = 'admin';
           organizationType = 'Admin';
+        } else if (email.includes('examiner@ato')) {
+          role = 'examiner';
+          organizationType = 'ATO';
         } else if (email.includes('ato@')) {
           role = 'instructor';
           organizationType = 'ATO';
         } else if (email.includes('airline@')) {
           role = 'instructor';
           organizationType = 'Airline';
+        } else if (email.includes('student@ato')) {
+          role = 'trainee';
+          organizationType = 'ATO';
         } else if (email.includes('student@')) {
           role = 'trainee';
           organizationType = 'Airline';
@@ -319,6 +325,17 @@ export function setupAuth(app: Express) {
     }
     if (req.user.role !== "instructor") {
       return res.status(403).json({ message: "Access denied. Instructor role required." });
+    }
+    next();
+  });
+  
+  // Middleware for examiner-only routes
+  app.use("/api/examiner/*", (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (req.user.role !== "examiner") {
+      return res.status(403).json({ message: "Access denied. Examiner role required." });
     }
     next();
   });
