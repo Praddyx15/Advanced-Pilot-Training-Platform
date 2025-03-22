@@ -7,7 +7,7 @@
  * - Recovery codes management
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { storage } from '../../storage';
 import { logger } from '../../core';
 import { insertMfaCredentialSchema, MfaCredential } from '@shared/schema';
@@ -17,7 +17,7 @@ import * as mfaService from '../../services/mfa-service';
 const router = Router();
 
 // Middleware to ensure user is authenticated
-const ensureAuthenticated = (req, res, next) => {
+const ensureAuthenticated = (req: Express.Request, res: Express.Response, next: Express.NextFunction) => {
   if (!req.isAuthenticated() || !req.user) {
     return res.status(401).json({ message: 'Authentication required' });
   }

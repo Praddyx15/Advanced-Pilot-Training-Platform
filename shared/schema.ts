@@ -33,6 +33,9 @@ export const insertUserSchema = createInsertSchema(users).pick({
   authProvider: true,
   authProviderId: true,
   profilePicture: true,
+  mfaEnabled: true,
+  mfaMethod: true,
+  lastLoginAt: true,
 });
 
 // Training Program schema
@@ -658,6 +661,7 @@ export const insertMfaCredentialSchema = createInsertSchema(mfaCredentials).pick
   biometricTemplate: true,
   recoveryCodes: true,
   enabled: true,
+  lastUsed: true,
   metadata: true
 });
 
