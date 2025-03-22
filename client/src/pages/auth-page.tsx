@@ -86,7 +86,7 @@ export default function AuthPage() {
       firstName: "",
       lastName: "",
       role: "trainee", // Default role, will be determined by email
-      organizationType: "Airline", // Default org type, will be determined by email
+      organizationType: "Personal", // Default org type, will be determined by email
       organizationName: "", // Added organization name field
     },
   });
@@ -101,16 +101,16 @@ export default function AuthPage() {
     const lowerEmail = email.toLowerCase();
     
     if (lowerEmail.includes('admin@')) {
-      return { role: 'admin', organizationType: 'personal' };
+      return { role: 'admin', organizationType: 'Admin' };
     } else if (lowerEmail.includes('ato@')) {
-      return { role: 'instructor', organizationType: 'ato' };
+      return { role: 'instructor', organizationType: 'ATO' };
     } else if (lowerEmail.includes('airline@')) {
-      return { role: 'instructor', organizationType: 'airline' };
+      return { role: 'instructor', organizationType: 'Airline' };
     } else if (lowerEmail.includes('student@')) {
-      return { role: 'trainee', organizationType: 'personal' };
+      return { role: 'trainee', organizationType: 'Personal' };
     } else {
       // Default
-      return { role: 'trainee', organizationType: 'personal' };
+      return { role: 'trainee', organizationType: 'Personal' };
     }
   };
 
