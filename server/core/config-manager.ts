@@ -12,7 +12,14 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { EventEmitter } from 'events';
 import { z } from 'zod';
-import { logger } from './logger';
+
+// Use console logging instead of importing logger to avoid circular dependency
+const consoleLog = {
+  error: (message: string, context?: any) => console.error(message, context),
+  warn: (message: string, context?: any) => console.warn(message, context),
+  info: (message: string, context?: any) => console.info(message, context),
+  debug: (message: string, context?: any) => console.debug(message, context)
+};
 
 type ConfigSource = 'environment' | 'file' | 'database' | 'default';
 
@@ -150,12 +157,12 @@ class ConfigurationManager {
     try {
       this.loadFromFile();
     } catch (error) {
-      logger.warn('Failed to load configuration from file, using defaults and environment variables', {
+      consoleLog.warn('Failed to load configuration from file, using defaults and environment variables', {
         error: (error as Error).message
       });
     }
     
-    logger.info('Configuration manager initialized');
+    consoleLog.info('Configuration manager initialized');
   }
 
   /**
@@ -259,13 +266,13 @@ class ConfigurationManager {
         source
       });
       
-      logger.debug(`Configuration updated: ${String(section)}.${String(key)}`, {
+      consoleLog.debug(`Configuration updated: ${String(section)}.${String(key)}`, {
         oldValue,
         newValue: value,
         source
       });
     } catch (error) {
-      logger.error(`Invalid configuration value for ${String(section)}.${String(key)}`, {
+      consoleLog.error(`Invalid configuration value for ${String(section)}.${String(key)}`, {
         value,
         error: (error as Error).message
       });
@@ -301,7 +308,7 @@ class ConfigurationManager {
    * Reload configuration from all sources
    */
   public reload(): void {
-    logger.info('Reloading configuration');
+    consoleLog.info('Reloading configuration');
     
     // Reset to defaults
     this.config = this.getDefaultConfig();
@@ -314,7 +321,7 @@ class ConfigurationManager {
     try {
       this.loadFromFile();
     } catch (error) {
-      logger.warn('Failed to load configuration from file during reload', {
+      consoleLog.warn('Failed to load configuration from file during reload', {
         error: (error as Error).message
       });
     }
@@ -324,7 +331,7 @@ class ConfigurationManager {
       timestamp: new Date().toISOString()
     });
     
-    logger.info('Configuration reloaded');
+    consoleLog.info('Configuration reloaded');
   }
 
   /**
@@ -345,9 +352,9 @@ class ConfigurationManager {
         'utf8'
       );
       
-      logger.info(`Configuration saved to ${filePath}`);
+      consoleLog.info(`Configuration saved to ${filePath}`);
     } catch (error) {
-      logger.error(`Failed to save configuration to ${filePath}`, {
+      consoleLog.error(`Failed to save configuration to ${filePath}`, {
         error: (error as Error).message
       });
       throw error;
@@ -499,7 +506,7 @@ class ConfigurationManager {
             // Set the value
             this.setValue(section, configKey as any, parsedValue, 'environment');
           } catch (error) {
-            logger.warn(`Invalid environment variable value for ${key}`, {
+            consoleLog.warn(`Invalid environment variable value for ${key}`, {
               value,
               error: (error as Error).message
             });
@@ -525,9 +532,9 @@ class ConfigurationManager {
           }
         }
         
-        logger.info(`Configuration loaded from ${filePath}`);
+        consoleLog.info(`Configuration loaded from ${filePath}`);
       } catch (error) {
-        logger.error(`Failed to load configuration from ${filePath}`, {
+        consoleLog.error(`Failed to load configuration from ${filePath}`, {
           error: (error as Error).message
         });
         throw error;
@@ -556,7 +563,7 @@ class ConfigurationManager {
             configSource
           );
         } catch (error) {
-          logger.warn(`Invalid configuration value for ${String(section)}.${key}`, {
+          consoleLog.warn(`Invalid configuration value for ${String(section)}.${key}`, {
             value,
             error: (error as Error).message
           });

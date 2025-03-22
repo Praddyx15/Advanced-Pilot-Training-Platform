@@ -44,10 +44,15 @@ export function initializeCore() {
   // 1. Configuration should be initialized first
   // (already initialized by import)
   
-  // 2. Initialize logger
+  // 2. Connect the logger and config manager to break circular dependency
+  import('./logger').then(loggerModule => {
+    loggerModule.setConfigManager(configManager);
+  });
+  
+  // 3. Initialize logger
   initializeLogger();
   
-  // 3. Log initialization status
+  // 4. Log initialization status
   logger.info('Core components initialized successfully', {
     components: ['configManager', 'logger', 'errorHandler', 'securityManager', 'dbManager']
   });

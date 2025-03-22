@@ -7,6 +7,7 @@ import { syllabusGenerationOptionsSchema, syllabusImportSchema } from "@shared/s
 import { z } from "zod";
 import * as syllabusGenerator from "./services/syllabus-generator";
 import * as templateManager from "./services/syllabus-template-manager";
+import { registerDocumentRoutes } from "./routes/document-routes";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up authentication routes and middleware
@@ -1476,6 +1477,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).json({ message: "Failed to create knowledge graph edge" });
     }
   });
+
+  // Register document processing routes
+  registerDocumentRoutes(app);
 
   const httpServer = createServer(app);
   return httpServer;

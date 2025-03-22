@@ -13,7 +13,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
 import { AsyncLocalStorage } from 'async_hooks';
-import { configManager } from './config-manager';
+
+// Break circular dependency by avoiding direct import
+let _configManager: any = null;
+export function setConfigManager(manager: any) {
+  _configManager = manager;
+}
 
 export enum LogLevel {
   ERROR = 'error',
@@ -265,8 +270,8 @@ class Logger {
    * Write a log entry to the console
    */
   private writeToConsole(logEntry: LogEntry): void {
-    const format = configManager.getValue('logging', 'format') || 'text';
-    const colorize = configManager.getValue('logging', 'colorize') !== false;
+    const format = (_configManager || { getValue: () => null }).getValue('logging', 'format') || 'text';
+    const colorize = (_configManager || { getValue: () => null }).getValue('logging', 'colorize') !== false;
     
     if (format === 'json') {
       console.log(JSON.stringify(logEntry));
@@ -305,7 +310,7 @@ class Logger {
    */
   private writeToFile(logEntry: LogEntry): void {
     try {
-      const format = configManager.getValue('logging', 'format') || 'text';
+      const format = (_configManager || { getValue: () => null }).getValue('logging', 'format') || 'text';
       let content = '';
       
       if (format === 'json') {
@@ -342,7 +347,7 @@ class Logger {
       }
       
       const stats = fs.statSync(this.logFilePath);
-      const maxSize = configManager.getValue('logging', 'maxFileSize');
+      const maxSize = (_configManager || { getValue: () => null }).getValue('logging', 'maxFileSize');
       
       // If maxSize is a number and the file size exceeds it, rotate the log file
       if (typeof maxSize === 'number' && stats.size >= maxSize * 1024 * 1024) {
@@ -382,7 +387,7 @@ class Logger {
    */
   private cleanupOldLogs(dir: string, baseFileName: string): void {
     try {
-      const maxFiles = configManager.getValue('logging', 'maxFiles') || 10;
+      const maxFiles = (_configManager || { getValue: () => null }).getValue('logging', 'maxFiles') || 10;
       const files = fs.readdirSync(dir)
         .filter(file => file.startsWith(baseFileName) && file !== `${baseFileName}.log`)
         .map(file => path.join(dir, file))
@@ -426,10 +431,10 @@ class Logger {
    * Get the log file path based on configuration and current date
    */
   private getLogFilePath(): string {
-    const directory = configManager.getValue('logging', 'directory') || 'logs';
+    const directory = (_configManager || { getValue: () => null }).getValue('logging', 'directory') || 'logs';
     // Use server.environment to ensure it exists in our config schema
-    const appName = configManager.getValue('server', 'environment') ? 'aptp' : 'app';
-    const rotationFrequency = configManager.getValue('logging', 'rotationFrequency') || 'daily';
+    const appName = (_configManager || { getValue: () => null }).getValue('server', 'environment') ? 'aptp' : 'app';
+    const rotationFrequency = (_configManager || { getValue: () => null }).getValue('logging', 'rotationFrequency') || 'daily';
     
     let fileName = `${appName}`;
     
@@ -454,7 +459,7 @@ class Logger {
    * Get the minimum log level from configuration
    */
   private _getMinLogLevel(): LogLevel {
-    const configLevel = configManager.getValue('logging', 'level');
+    const configLevel = (_configManager || { getValue: () => null }).getValue('logging', 'level');
     
     if (configLevel && Object.values(LogLevel).includes(configLevel as LogLevel)) {
       return configLevel as LogLevel;
@@ -475,7 +480,7 @@ class Logger {
    * Check if file logging is enabled
    */
   private _isFileLoggingEnabled(): boolean {
-    return configManager.getValue('logging', 'file') === true;
+    return (_configManager || { getValue: () => null }).getValue('logging', 'file') === true;
   }
 }
 
