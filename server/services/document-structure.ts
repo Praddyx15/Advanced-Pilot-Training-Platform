@@ -201,7 +201,7 @@ function processHeadings(
     };
     
     // Add heading to its section
-    sectionElement.children.push(headingElement);
+    sectionElement.children?.push(headingElement);
     
     // Find the parent section for this heading based on its level
     let parentLevel = heading.level - 1;
@@ -265,7 +265,7 @@ function processTables(
             },
             parent: tableElement,
           };
-          tableElement.children.push(cellElement);
+          tableElement.children?.push(cellElement);
         });
       }
     });
@@ -277,6 +277,7 @@ function processTables(
       bestParent.children.push(tableElement);
       tableElement.parent = bestParent;
     } else {
+      structure.hierarchy.children = structure.hierarchy.children || [];
       structure.hierarchy.children.push(tableElement);
       tableElement.parent = structure.hierarchy;
     }
@@ -427,6 +428,7 @@ function processKeyValuePairs(
           bestParent.children.push(kvElement);
           kvElement.parent = bestParent;
         } else {
+          structure.hierarchy.children = structure.hierarchy.children || [];
           structure.hierarchy.children.push(kvElement);
           kvElement.parent = structure.hierarchy;
         }
@@ -482,6 +484,7 @@ function processReferences(
             element.parent.children = element.parent.children || [];
             element.parent.children.push(refSection);
           } else {
+            structure.hierarchy.children = structure.hierarchy.children || [];
             structure.hierarchy.children.push(refSection);
             refSection.parent = structure.hierarchy;
           }

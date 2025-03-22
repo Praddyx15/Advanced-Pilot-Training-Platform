@@ -268,8 +268,8 @@ async function extractFromHtml(filePath: string, options: any): Promise<Extracti
   return {
     text: textContent,
     metadata: {
-      title,
-      author,
+      title: title || undefined,
+      author: author || undefined,
       format: 'HTML',
       extractionEngine: 'jsdom',
     },
