@@ -100,12 +100,12 @@ export function setupAuth(app: Express) {
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: z.string().email("Invalid email format"),
-    role: z.enum(["instructor", "trainee"], {
-      errorMap: () => ({ message: "Role must be either 'instructor' or 'trainee'" }),
-    }),
+    role: z.enum(["admin", "instructor", "trainee"], {
+      errorMap: () => ({ message: "Role must be either 'admin', 'instructor', or 'trainee'" }),
+    }).default("trainee"), // Default to trainee, will be overridden based on email pattern
     organizationType: z.enum(["ATO", "Airline", "Personal", "Admin"], {
       errorMap: () => ({ message: "Organization type must be one of 'ATO', 'Airline', 'Personal', or 'Admin'" }),
-    }).optional(),
+    }).default("Airline"), // Default to Airline, will be overridden based on email pattern
     organizationName: z.string().optional(),
     authProvider: z.enum(["local", "google", "microsoft"], {
       errorMap: () => ({ message: "Auth provider must be one of 'local', 'google', or 'microsoft'" }),
@@ -120,11 +120,44 @@ export function setupAuth(app: Express) {
       
       const existingUser = await storage.getUserByUsername(validatedData.username);
       if (existingUser) {
-        return res.status(400).send("Username already exists");
+        return res.status(400).json({ message: "Username already exists" });
+      }
+
+      // Check if email already exists
+      const users = await storage.getAllUsers();
+      const emailExists = users.some(u => u.email.toLowerCase() === validatedData.email.toLowerCase());
+      if (emailExists) {
+        return res.status(400).json({ message: "Email already exists" });
+      }
+
+      // Determine role and organization type based on email pattern
+      const email = validatedData.email.toLowerCase();
+      let role = validatedData.role;
+      let organizationType = validatedData.organizationType;
+      
+      if (email.includes('admin@')) {
+        role = 'admin';
+        organizationType = 'Admin';
+      } else if (email.includes('ato@')) {
+        role = 'instructor';
+        organizationType = 'ATO';
+      } else if (email.includes('airline@')) {
+        role = 'instructor';
+        organizationType = 'Airline';
+      } else if (email.includes('student@')) {
+        role = 'trainee';
+        organizationType = 'Airline';
+      }
+      
+      // If no role identified, default to trainee
+      if (!role) {
+        role = 'trainee';
       }
 
       const user = await storage.createUser({
         ...validatedData,
+        role,
+        organizationType,
         password: await hashPassword(validatedData.password),
       });
 
@@ -193,6 +226,25 @@ export function setupAuth(app: Express) {
       let user = await storage.getUserByUsername(`${provider}_${profile.email}`);
       
       if (!user) {
+        // Determine role and organization type based on email pattern
+        const email = profile.email.toLowerCase();
+        let role = 'trainee'; // Default role
+        let organizationType = req.body.organizationType || 'Airline';
+        
+        if (email.includes('admin@')) {
+          role = 'admin';
+          organizationType = 'Admin';
+        } else if (email.includes('ato@')) {
+          role = 'instructor';
+          organizationType = 'ATO';
+        } else if (email.includes('airline@')) {
+          role = 'instructor';
+          organizationType = 'Airline';
+        } else if (email.includes('student@')) {
+          role = 'trainee';
+          organizationType = 'Airline';
+        }
+        
         // Create new user if not exists
         user = await storage.createUser({
           username: `${provider}_${profile.email}`,
@@ -200,9 +252,9 @@ export function setupAuth(app: Express) {
           email: profile.email,
           firstName: profile.firstName || profile.given_name || profile.name.split(" ")[0],
           lastName: profile.lastName || profile.family_name || profile.name.split(" ").slice(1).join(" "),
-          role: "trainee", // Default role
-          organizationType: req.body.organizationType,
-          organizationName: req.body.organizationName,
+          role: role,
+          organizationType: organizationType,
+          organizationName: req.body.organizationName || organizationType,
           authProvider: provider,
           authProviderId: profile.id || profile.sub,
           profilePicture: profile.picture || profile.avatar,
@@ -259,6 +311,17 @@ export function setupAuth(app: Express) {
     }
     if (req.user.role !== "instructor") {
       return res.status(403).json({ message: "Access denied. Instructor role required." });
+    }
+    next();
+  });
+  
+  // Middleware for admin-only routes
+  app.use("/api/admin/*", (req, res, next) => {
+    if (!req.isAuthenticated()) {
+      return res.status(401).json({ message: "Authentication required" });
+    }
+    if (req.user.role !== "admin") {
+      return res.status(403).json({ message: "Access denied. Admin role required." });
     }
     next();
   });
