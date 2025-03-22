@@ -11,10 +11,11 @@
 
 import * as crypto from 'crypto';
 import * as bcrypt from 'bcrypt';
-import { randomBytes, createHash } from 'crypto';
 import * as jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { configManager } from './config-manager';
 import { logger } from './logger';
+import { AppError, ErrorType } from './error-handler';
 
 interface RateLimitEntry {
   count: number;
@@ -27,10 +28,10 @@ class SecurityManager {
   private rateLimitCleanupInterval: NodeJS.Timeout | null = null;
 
   private constructor() {
-    // Set up the rate limit cleanup interval
+    // Set up rate limit cache cleanup every minute
     this.rateLimitCleanupInterval = setInterval(() => {
       this.cleanupRateLimitCache();
-    }, 60 * 1000); // Clean up every minute
+    }, 60 * 1000);
   }
 
   public static getInstance(): SecurityManager {
@@ -52,20 +53,15 @@ class SecurityManager {
    */
   public encrypt(data: string, keyString?: string): string {
     try {
-      const config = configManager.get('security');
-      const encKey = keyString || config.encryptionKey;
-      
-      if (!encKey) {
-        throw new Error('Encryption key is not set');
-      }
-      
-      // Convert the hex string key to a buffer
-      const key = Buffer.from(encKey, 'hex');
-      
-      // Generate a random IV
+      const key = Buffer.from(
+        keyString || configManager.getValue('security', 'encryptionKey') || this.generateEncryptionKey(),
+        'hex'
+      );
+
+      // Generate an initialization vector
       const iv = crypto.randomBytes(16);
       
-      // Create cipher
+      // Create the cipher
       const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
       
       // Encrypt the data
@@ -75,11 +71,11 @@ class SecurityManager {
       // Get the auth tag
       const authTag = cipher.getAuthTag();
       
-      // Return IV, encrypted data, and auth tag as a single string
-      return iv.toString('hex') + ':' + encrypted + ':' + authTag.toString('hex');
+      // Return iv:authTag:encryptedData
+      return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
     } catch (error) {
-      logger.error('Encryption failed', { error: (error as Error).message });
-      throw new Error('Encryption failed');
+      logger.error('Encryption failed', { error });
+      throw new AppError('Encryption failed', ErrorType.INTERNAL);
     }
   }
 
@@ -88,27 +84,22 @@ class SecurityManager {
    */
   public decrypt(encryptedData: string, keyString?: string): string {
     try {
-      const config = configManager.get('security');
-      const encKey = keyString || config.encryptionKey;
-      
-      if (!encKey) {
-        throw new Error('Encryption key is not set');
-      }
-      
-      // Convert the hex string key to a buffer
-      const key = Buffer.from(encKey, 'hex');
-      
-      // Split the encrypted data into IV, encrypted data, and auth tag
+      const key = Buffer.from(
+        keyString || configManager.getValue('security', 'encryptionKey') || '',
+        'hex'
+      );
+
+      // Split the encrypted data into iv, authTag, and actual encrypted data
       const parts = encryptedData.split(':');
       if (parts.length !== 3) {
         throw new Error('Invalid encrypted data format');
       }
       
       const iv = Buffer.from(parts[0], 'hex');
-      const encrypted = parts[1];
-      const authTag = Buffer.from(parts[2], 'hex');
+      const authTag = Buffer.from(parts[1], 'hex');
+      const encrypted = parts[2];
       
-      // Create decipher
+      // Create the decipher
       const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
       decipher.setAuthTag(authTag);
       
@@ -118,8 +109,8 @@ class SecurityManager {
       
       return decrypted;
     } catch (error) {
-      logger.error('Decryption failed', { error: (error as Error).message });
-      throw new Error('Decryption failed');
+      logger.error('Decryption failed', { error });
+      throw new AppError('Decryption failed', ErrorType.INTERNAL);
     }
   }
 
@@ -127,26 +118,22 @@ class SecurityManager {
    * Generate a JWT token
    */
   public generateToken(
-    payload: any,
+    payload: object,
     expiresIn?: string,
-    subject?: string
+    secret?: string
   ): string {
     try {
-      const config = configManager.get('security');
-      const secret = config.jwtSecret;
-      
-      if (!secret) {
-        throw new Error('JWT secret is not set');
-      }
-      
-      return jwt.sign(payload, secret, {
-        expiresIn: expiresIn || config.jwtExpiresIn,
-        issuer: config.jwtIssuer,
-        ...(subject && { subject }),
+      const jwtSecret = secret || configManager.getValue('security', 'jwtSecret') || 'default-secret-change-in-production';
+      const jwtExpiresIn = expiresIn || configManager.getValue('security', 'jwtExpiresIn') || '1h';
+      const issuer = configManager.getValue('security', 'jwtIssuer') || 'aptp-api';
+
+      return jwt.sign(payload, jwtSecret, {
+        expiresIn: jwtExpiresIn,
+        issuer,
       });
     } catch (error) {
-      logger.error('Token generation failed', { error: (error as Error).message });
-      throw error;
+      logger.error('Token generation failed', { error });
+      throw new AppError('Token generation failed', ErrorType.INTERNAL);
     }
   }
 
@@ -155,19 +142,17 @@ class SecurityManager {
    */
   public verifyToken<T = any>(token: string): T {
     try {
-      const config = configManager.get('security');
-      const secret = config.jwtSecret;
-      
-      if (!secret) {
-        throw new Error('JWT secret is not set');
-      }
-      
-      return jwt.verify(token, secret, {
-        issuer: config.jwtIssuer,
-      }) as T;
+      const jwtSecret = configManager.getValue('security', 'jwtSecret') || 'default-secret-change-in-production';
+      return jwt.verify(token, jwtSecret) as T;
     } catch (error) {
-      logger.error('Token verification failed', { error: (error as Error).message });
-      throw error;
+      if (error instanceof jwt.JsonWebTokenError) {
+        throw new AppError('Invalid token', ErrorType.AUTHENTICATION);
+      } else if (error instanceof jwt.TokenExpiredError) {
+        throw new AppError('Token expired', ErrorType.AUTHENTICATION);
+      } else {
+        logger.error('Token verification failed', { error });
+        throw new AppError('Token verification failed', ErrorType.INTERNAL);
+      }
     }
   }
 
@@ -176,13 +161,11 @@ class SecurityManager {
    */
   public async hashPassword(password: string): Promise<string> {
     try {
-      const config = configManager.get('security');
-      const saltRounds = config.saltRounds;
-      
+      const saltRounds = configManager.getValue('security', 'saltRounds') || 10;
       return await bcrypt.hash(password, saltRounds);
     } catch (error) {
-      logger.error('Password hashing failed', { error: (error as Error).message });
-      throw error;
+      logger.error('Password hashing failed', { error });
+      throw new AppError('Password hashing failed', ErrorType.INTERNAL);
     }
   }
 
@@ -196,8 +179,8 @@ class SecurityManager {
     try {
       return await bcrypt.compare(password, hash);
     } catch (error) {
-      logger.error('Password verification failed', { error: (error as Error).message });
-      return false;
+      logger.error('Password verification failed', { error });
+      throw new AppError('Password verification failed', ErrorType.INTERNAL);
     }
   }
 
@@ -205,7 +188,7 @@ class SecurityManager {
    * Generate a CSRF token
    */
   public generateCsrfToken(): string {
-    return randomBytes(32).toString('hex');
+    return randomUUID();
   }
 
   /**
@@ -213,33 +196,29 @@ class SecurityManager {
    */
   public checkRateLimit(
     key: string,
-    limit: number = 100,
-    windowMs: number = 60000
+    limit: number,
+    windowSecs: number
   ): { limited: boolean; remaining: number; resetAt: Date } {
     const now = Date.now();
-    const resetAt = now + windowMs;
-    
-    // Get the current rate limit entry or create a new one
-    let entry = this.rateLimitCache.get(key);
-    
-    if (!entry || entry.resetAt < now) {
-      // Create a new entry if none exists or the existing one has expired
-      entry = {
-        count: 1,
-        resetAt,
-      };
-    } else {
-      // Increment the count
-      entry.count++;
+    const entry = this.rateLimitCache.get(key) || {
+      count: 0,
+      resetAt: now + windowSecs * 1000,
+    };
+
+    // If the reset time has passed, reset the counter
+    if (now > entry.resetAt) {
+      entry.count = 0;
+      entry.resetAt = now + windowSecs * 1000;
     }
-    
-    // Update the entry in the cache
+
+    // Increment the counter
+    entry.count++;
     this.rateLimitCache.set(key, entry);
-    
-    // Check if the limit has been exceeded
+
+    // Check if limit is exceeded
     const limited = entry.count > limit;
     const remaining = Math.max(0, limit - entry.count);
-    
+
     return {
       limited,
       remaining,
@@ -254,7 +233,7 @@ class SecurityManager {
     const now = Date.now();
     
     for (const [key, entry] of this.rateLimitCache.entries()) {
-      if (entry.resetAt < now) {
+      if (now > entry.resetAt) {
         this.rateLimitCache.delete(key);
       }
     }
@@ -264,8 +243,8 @@ class SecurityManager {
    * Generate a random MFA backup code
    */
   public generateBackupCode(): string {
-    const code = randomBytes(4).toString('hex').toUpperCase();
-    return code.replace(/(.{4})/, '$1-');
+    // Generate a 10-digit random code
+    return crypto.randomBytes(5).toString('hex').toUpperCase();
   }
 
   /**
@@ -273,11 +252,9 @@ class SecurityManager {
    */
   public generateBackupCodes(count: number = 10): string[] {
     const codes: string[] = [];
-    
     for (let i = 0; i < count; i++) {
       codes.push(this.generateBackupCode());
     }
-    
     return codes;
   }
 
@@ -293,4 +270,3 @@ class SecurityManager {
 }
 
 export const securityManager = SecurityManager.getInstance();
-export default securityManager;

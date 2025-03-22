@@ -8,8 +8,10 @@ import {
   initializeCore, 
   logger, 
   configManager, 
+  AppError,
   globalErrorHandler,
-  asyncHandler
+  asyncHandler,
+  ErrorType
 } from "./core";
 
 // Initialize core modules
@@ -32,19 +34,26 @@ if (securityConfig.helmetEnabled) {
 
 if (securityConfig.corsEnabled) {
   app.use(cors({
-    origin: securityConfig.corsOrigins,
+    origin: '*', // Allow all origins in development
     credentials: true,
   }));
 }
 
 // Performance middleware
-if (performanceConfig.compressionEnabled) {
-  app.use(compression());
-}
+// Enable compression by default
+app.use(compression());
 
 // Request parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
+
+// Define a type for our log context
+interface ApiLogContext {
+  status: number;
+  duration: string;
+  contentLength: string | undefined;
+  response?: Record<string, any>;
+}
 
 // Request logging middleware
 app.use((req, res, next) => {
@@ -73,16 +82,23 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     
     if (path.startsWith("/api")) {
-      const logContext = {
+      // Create initial log context
+      const initialLogContext: ApiLogContext = {
         status: res.statusCode,
         duration: `${duration}ms`,
         contentLength: res.get('content-length'),
       };
       
+      // Final log context (potentially with response data)
+      let logContext = initialLogContext;
+      
       // Don't log response body for large responses
       if (capturedJsonResponse && 
           JSON.stringify(capturedJsonResponse).length < 500) {
-        logContext['response'] = capturedJsonResponse;
+        logContext = {
+          ...initialLogContext,
+          response: capturedJsonResponse
+        };
       }
       
       if (res.statusCode >= 500) {

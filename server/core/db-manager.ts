@@ -9,13 +9,14 @@
  * - Migrations support
  */
 
-import * as pg from 'pg';
-import { drizzle, PostgresJsDatabase } from 'drizzle-orm/postgres-js';
-import { migrate } from 'drizzle-orm/postgres-js/migrator';
-import { configManager } from './config-manager';
-import { logger } from './logger';
+import pg from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import * as fs from 'fs';
 import * as path from 'path';
+import { configManager } from './config-manager';
+import { logger } from './logger';
+import { AppError, ErrorType } from './error-handler';
 
 interface QueryParams {
   text: string;
@@ -32,49 +33,30 @@ interface PreparedStatement {
 class DatabaseManager {
   private static instance: DatabaseManager;
   private pool: pg.Pool;
-  private drizzleDb: PostgresJsDatabase | null = null;
+  private drizzleDb: pg.Pool | null = null;
   private preparedStatements: Map<string, PreparedStatement> = new Map();
   private migrationLock: boolean = false;
 
   private constructor() {
-    // Get database configuration
-    const dbConfig = configManager.get('database');
-    
-    // Configure connection pool options
-    const poolConfig: pg.PoolConfig = {
-      max: dbConfig.connectionPoolSize,
-      database: dbConfig.database,
-      port: dbConfig.port,
-      host: dbConfig.host,
-      user: dbConfig.username,
-      password: dbConfig.password,
-      ssl: dbConfig.ssl ? {
-        rejectUnauthorized: dbConfig.rejectUnauthorized,
-      } : undefined,
-      // Connect using connection string if provided
-      connectionString: dbConfig.url,
-      // Add performance monitoring
-      statement_timeout: configManager.get('performance').queryTimeout * 1000,
-      idle_in_transaction_session_timeout: configManager.get('performance').idleTimeout * 1000,
-      // Add application name for identification in PostgreSQL logs
-      application_name: 'aptp-server',
+    const dbConfig = {
+      host: configManager.getValue('database', 'host') || 'localhost',
+      port: configManager.getValue('database', 'port') || 5432,
+      database: configManager.getValue('database', 'name') || 'aptp',
+      user: configManager.getValue('database', 'user') || 'postgres',
+      password: configManager.getValue('database', 'password') || 'postgres',
+      max: configManager.getValue('database', 'poolSize') || 20,
+      idleTimeoutMillis: configManager.getValue('database', 'idleTimeout') || 30000,
+      connectionTimeoutMillis: configManager.getValue('database', 'connectionTimeout') || 2000,
     };
+
+    // Create a connection pool
+    this.pool = new pg.Pool(dbConfig);
     
-    // Create the connection pool
-    this.pool = new pg.Pool(poolConfig);
-    
-    // Set up event listeners on the pool
+    // Set up event listeners
     this.setupPoolEventListeners();
     
-    // Initialize Drizzle ORM
+    // Initialize Drizzle
     this.initializeDrizzle();
-    
-    logger.info('Database manager initialized', {
-      host: dbConfig.host,
-      port: dbConfig.port,
-      database: dbConfig.database,
-      maxConnections: dbConfig.connectionPoolSize,
-    });
   }
 
   public static getInstance(): DatabaseManager {
@@ -89,37 +71,32 @@ class DatabaseManager {
    */
   private initializeDrizzle(): void {
     try {
-      // Import DB schema from separate file
-      // We'll use postgres.js as the driver with Drizzle ORM
-      const dbConfig = configManager.get('database');
-      const connectionString = dbConfig.url ||
-        `postgres://${dbConfig.username}:${dbConfig.password}@${dbConfig.host}:${dbConfig.port}/${dbConfig.database}`;
+      // Create a separate pool for Drizzle to use
+      const drizzleConfig = {
+        host: configManager.getValue('database', 'host') || 'localhost',
+        port: configManager.getValue('database', 'port') || 5432,
+        database: configManager.getValue('database', 'name') || 'aptp',
+        user: configManager.getValue('database', 'user') || 'postgres',
+        password: configManager.getValue('database', 'password') || 'postgres'
+      };
+
+      this.drizzleDb = new pg.Pool(drizzleConfig);
       
-      // Create Drizzle instance
-      // Note: We're using the import dynamically to avoid circular dependencies
-      // This is just a placeholder until we implement the actual schema import
-      const postgres = require('postgres');
-      const sql = postgres(connectionString, {
-        max: 1,
-        ssl: dbConfig.ssl ? {
-          rejectUnauthorized: dbConfig.rejectUnauthorized,
-        } : undefined,
-      });
+      // This creates a drizzle instance but we don't store it as it's created on demand
+      drizzle(this.drizzleDb);
       
-      this.drizzleDb = drizzle(sql);
       logger.info('Drizzle ORM initialized');
     } catch (error) {
-      logger.error('Failed to initialize Drizzle ORM', { error: (error as Error).message });
-      // We'll continue without Drizzle ORM if it fails to initialize
+      logger.error('Failed to initialize Drizzle ORM', { error });
     }
   }
 
   /**
    * Get the Drizzle ORM instance
    */
-  public getDrizzle(): PostgresJsDatabase {
+  public getDrizzle(): pg.Pool {
     if (!this.drizzleDb) {
-      throw new Error('Drizzle ORM is not initialized');
+      throw new AppError('Drizzle ORM not initialized', ErrorType.DATABASE);
     }
     return this.drizzleDb;
   }
@@ -128,100 +105,42 @@ class DatabaseManager {
    * Run database migrations
    */
   public async runMigrations(migrationDirectory = './migrations'): Promise<void> {
+    if (this.migrationLock) {
+      logger.warn('Migration already in progress, skipping this request');
+      return;
+    }
+
     try {
-      // Check if migrations directory exists
-      if (!fs.existsSync(migrationDirectory)) {
-        logger.warn(`Migrations directory ${migrationDirectory} does not exist, skipping migrations`);
-        return;
-      }
-      
-      // Check if we're already running migrations
-      if (this.migrationLock) {
-        logger.warn('Migration is already in progress, skipping');
-        return;
-      }
-      
       this.migrationLock = true;
-      
-      // Get all migration files
-      const migrationFiles = fs.readdirSync(migrationDirectory)
-        .filter(file => file.endsWith('.sql'))
-        .sort();
-      
-      if (migrationFiles.length === 0) {
-        logger.info('No migration files found');
-        this.migrationLock = false;
-        return;
+      logger.info('Running database migrations', { directory: migrationDirectory });
+
+      if (!this.drizzleDb) {
+        this.initializeDrizzle();
       }
-      
-      logger.info(`Found ${migrationFiles.length} migration files`);
-      
-      try {
-        // Use Drizzle's migrate function
-        if (this.drizzleDb) {
-          await migrate(this.drizzleDb, { migrationsFolder: migrationDirectory });
-          logger.info('Migrations completed successfully using Drizzle');
-        } else {
-          // Fallback to manual migrations if Drizzle is not available
-          const client = await this.getClient();
-          
-          try {
-            // Begin transaction
-            await client.query('BEGIN');
-            
-            // Create migrations table if it doesn't exist
-            await client.query(`
-              CREATE TABLE IF NOT EXISTS "migrations" (
-                "id" SERIAL PRIMARY KEY,
-                "name" VARCHAR(255) NOT NULL,
-                "applied_at" TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-              )
-            `);
-            
-            // Get already applied migrations
-            const { rows: appliedMigrations } = await client.query(
-              'SELECT name FROM "migrations"'
-            );
-            const appliedMigrationNames = appliedMigrations.map(m => m.name);
-            
-            // Apply new migrations
-            for (const file of migrationFiles) {
-              if (appliedMigrationNames.includes(file)) {
-                logger.debug(`Migration ${file} already applied, skipping`);
-                continue;
-              }
-              
-              logger.info(`Applying migration: ${file}`);
-              const migrationPath = path.join(migrationDirectory, file);
-              const migrationSql = fs.readFileSync(migrationPath, 'utf8');
-              
-              // Execute migration
-              await client.query(migrationSql);
-              
-              // Record that we applied this migration
-              await client.query(
-                'INSERT INTO "migrations" (name) VALUES ($1)',
-                [file]
-              );
-            }
-            
-            // Commit transaction
-            await client.query('COMMIT');
-            logger.info('Migrations completed successfully');
-          } catch (error) {
-            // Rollback transaction on error
-            await client.query('ROLLBACK');
-            throw error;
-          } finally {
-            client.release();
-          }
+
+      if (this.drizzleDb) {
+        const db = drizzle(this.drizzleDb);
+        
+        // Check if the migration directory exists
+        if (!fs.existsSync(migrationDirectory)) {
+          fs.mkdirSync(migrationDirectory, { recursive: true });
+          logger.info('Created migration directory', { directory: migrationDirectory });
         }
-      } finally {
-        this.migrationLock = false;
+        
+        // Run migrations
+        await migrate(db, { migrationsFolder: migrationDirectory });
+        logger.info('Database migrations completed successfully');
+      } else {
+        throw new AppError('Drizzle ORM not initialized', ErrorType.DATABASE);
       }
     } catch (error) {
-      logger.error('Migration failed', { error: (error as Error).message });
-      throw error;
+      logger.error('Failed to run migrations', { error });
+      throw new AppError(
+        `Migration failed: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
+    } finally {
+      this.migrationLock = false;
     }
   }
 
@@ -230,79 +149,91 @@ class DatabaseManager {
    */
   public async getClient(): Promise<pg.PoolClient> {
     try {
-      return await this.pool.connect();
+      const client = await this.pool.connect();
+      return client;
     } catch (error) {
-      logger.error('Failed to get database client', { error: (error as Error).message });
-      throw error;
+      logger.error('Failed to get database client', { error });
+      throw new AppError(
+        `Failed to get database client: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
     }
   }
 
   /**
    * Execute a query
    */
-  public async query<T>(
-    textOrParams: string | QueryParams,
+  public async query<T extends pg.QueryResultRow>(
+    textOrConfig: string | QueryParams,
     values?: any[]
   ): Promise<pg.QueryResult<T>> {
-    const client = await this.getClient();
-    
     try {
       let query: QueryParams;
       
-      if (typeof textOrParams === 'string') {
-        query = {
-          text: textOrParams,
-          values: values,
-        };
+      if (typeof textOrConfig === 'string') {
+        query = { text: textOrConfig, values };
       } else {
-        query = textOrParams;
+        query = textOrConfig;
       }
+      
+      // We're passing the query with any potential values to the logger to help with debugging
+      logger.debug('Executing query', { query: query.text, params: query.values });
       
       const start = Date.now();
-      const result = await client.query<T>(query);
+      const result = await this.pool.query<T>(query);
       const duration = Date.now() - start;
       
-      // Log slow queries
-      const slowQueryThreshold = configManager.get('performance').slowQueryThreshold;
-      if (duration > slowQueryThreshold) {
-        logger.warn('Slow query detected', {
-          query: query.text,
-          duration: `${duration}ms`,
-          threshold: `${slowQueryThreshold}ms`,
-          rowCount: result.rowCount,
-        });
-      }
+      logger.debug('Query completed', {
+        query: query.text,
+        rowCount: result.rowCount,
+        duration: `${duration}ms`
+      });
       
       return result;
     } catch (error) {
       logger.error('Query failed', {
-        query: textOrParams,
-        error: (error as Error).message,
+        query: typeof textOrConfig === 'string' ? textOrConfig : textOrConfig.text,
+        values,
+        error
       });
-      throw error;
-    } finally {
-      client.release();
+      
+      throw new AppError(
+        `Query failed: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
     }
   }
 
   /**
    * Execute a prepared statement
    */
-  public async executeStatement<T>(
+  public async executeStatement<T extends pg.QueryResultRow>(
     name: string,
     values?: any[]
   ): Promise<pg.QueryResult<T>> {
     const statement = this.preparedStatements.get(name);
     
     if (!statement) {
-      throw new Error(`Prepared statement '${name}' not found`);
+      throw new AppError(`Prepared statement "${name}" not found`, ErrorType.DATABASE);
     }
     
-    return this.query<T>({
-      name,
-      text: statement.text,
-      values: values || statement.values,
-    });
+    try {
+      return await this.query<T>({
+        name,
+        text: statement.text,
+        values: values || statement.values
+      });
+    } catch (error) {
+      logger.error('Failed to execute prepared statement', {
+        name,
+        error
+      });
+      
+      throw new AppError(
+        `Failed to execute prepared statement: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
+    }
   }
 
   /**
@@ -313,55 +244,54 @@ class DatabaseManager {
     text: string,
     values?: any[]
   ): Promise<void> {
-    const client = await this.getClient();
-    
     try {
-      // Store the prepared statement
-      this.preparedStatements.set(name, {
-        name,
-        text,
-        values,
+      this.preparedStatements.set(name, { name, text, values });
+      
+      // Actually prepare the statement on the server
+      await this.query({
+        text: `PREPARE ${name} AS ${text}`,
       });
       
-      // Prepare the statement on the server
-      await client.query(`PREPARE ${name} AS ${text}`);
-      
-      logger.debug('Prepared statement created', { name });
+      logger.debug('Prepared statement', { name, text });
     } catch (error) {
       logger.error('Failed to prepare statement', {
         name,
-        error: (error as Error).message,
+        text,
+        error
       });
-      throw error;
-    } finally {
-      client.release();
+      
+      throw new AppError(
+        `Failed to prepare statement: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
     }
   }
 
   /**
    * Execute a transaction
    */
-  public async transaction<T>(
+  public async transaction<T extends pg.QueryResultRow>(
     callback: (client: pg.PoolClient) => Promise<T>
   ): Promise<T> {
     const client = await this.getClient();
     
     try {
-      // Begin transaction
       await client.query('BEGIN');
       
-      // Execute callback with transaction
       const result = await callback(client);
       
-      // Commit transaction
       await client.query('COMMIT');
       
       return result;
     } catch (error) {
-      // Rollback transaction on error
       await client.query('ROLLBACK');
-      logger.error('Transaction failed', { error: (error as Error).message });
-      throw error;
+      
+      logger.error('Transaction failed', { error });
+      
+      throw new AppError(
+        `Transaction failed: ${(error as Error).message}`,
+        ErrorType.DATABASE
+      );
     } finally {
       client.release();
     }
@@ -370,7 +300,7 @@ class DatabaseManager {
   /**
    * Execute multiple queries in a transaction
    */
-  public async transactionQueries<T = any>(
+  public async transactionQueries<T extends pg.QueryResultRow = any>(
     queries: QueryParams[]
   ): Promise<pg.QueryResult<T>[]> {
     return this.transaction(async (client) => {
@@ -395,18 +325,16 @@ class DatabaseManager {
   ): QueryParams {
     const columns = Object.keys(data);
     const values = Object.values(data);
-    const placeholders = columns.map((_, index) => `$${index + 1}`);
     
-    const query = {
-      text: `
-        INSERT INTO "${table}" (${columns.map(c => `"${c}"`).join(', ')})
-        VALUES (${placeholders.join(', ')})
-        ${returning ? `RETURNING ${returning}` : ''}
-      `,
-      values,
-    };
+    const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
     
-    return query;
+    const text = `
+      INSERT INTO ${table} (${columns.join(', ')})
+      VALUES (${placeholders})
+      ${returning ? `RETURNING ${returning}` : ''}
+    `;
+    
+    return { text, values };
   }
 
   /**
@@ -415,33 +343,32 @@ class DatabaseManager {
   public buildUpdateQuery(
     table: string,
     data: Record<string, any>,
-    whereConditions: Record<string, any>,
+    where: string,
+    whereParams: any[] = [],
     returning: string = '*'
   ): QueryParams {
     const columns = Object.keys(data);
     const values = Object.values(data);
     
-    const setClauses = columns.map((col, index) => `"${col}" = $${index + 1}`);
+    const setClause = columns
+      .map((col, i) => `${col} = $${i + 1}`)
+      .join(', ');
     
-    const whereColumns = Object.keys(whereConditions);
-    const whereValues = Object.values(whereConditions);
-    const whereStartIdx = values.length + 1;
+    // Replace placeholders in the where clause
+    let paramIndex = values.length;
+    const processedWhere = where.replace(/\$\d+/g, () => {
+      paramIndex++;
+      return `$${paramIndex}`;
+    });
     
-    const whereClauses = whereColumns.map(
-      (col, index) => `"${col}" = $${whereStartIdx + index}`
-    );
+    const text = `
+      UPDATE ${table}
+      SET ${setClause}
+      WHERE ${processedWhere}
+      ${returning ? `RETURNING ${returning}` : ''}
+    `;
     
-    const query = {
-      text: `
-        UPDATE "${table}"
-        SET ${setClauses.join(', ')}
-        WHERE ${whereClauses.join(' AND ')}
-        ${returning ? `RETURNING ${returning}` : ''}
-      `,
-      values: [...values, ...whereValues],
-    };
-    
-    return query;
+    return { text, values: [...values, ...whereParams] };
   }
 
   /**
@@ -450,12 +377,14 @@ class DatabaseManager {
   public async close(): Promise<void> {
     try {
       await this.pool.end();
-      logger.info('Database connection pool closed');
+      
+      if (this.drizzleDb) {
+        await this.drizzleDb.end();
+      }
+      
+      logger.info('Database connections closed');
     } catch (error) {
-      logger.error('Failed to close database connection pool', {
-        error: (error as Error).message,
-      });
-      throw error;
+      logger.error('Failed to close database connections', { error });
     }
   }
 
@@ -466,20 +395,19 @@ class DatabaseManager {
     this.pool.on('connect', (client) => {
       logger.debug('New database connection established');
     });
-    
+
     this.pool.on('acquire', (client) => {
-      logger.debug('Database connection acquired from pool');
+      logger.debug('Database client acquired from pool');
     });
-    
+
     this.pool.on('remove', (client) => {
-      logger.debug('Database connection removed from pool');
+      logger.debug('Database client removed from pool');
     });
-    
-    this.pool.on('error', (err) => {
-      logger.error('Database pool error', { error: err.message });
+
+    this.pool.on('error', (err, client) => {
+      logger.error('Unexpected error on idle database client', { error: err });
     });
   }
 }
 
 export const dbManager = DatabaseManager.getInstance();
-export default dbManager;

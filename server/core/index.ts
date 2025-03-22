@@ -1,54 +1,62 @@
 /**
- * Core Module Index
+ * Core Module
  * 
- * Central exports for core modules to simplify imports elsewhere in the application
+ * Initializes and exports all core components for the application:
+ * - Configuration Manager
+ * - Logger
+ * - Error Handler
+ * - Security Manager
+ * - Database Manager
  */
 
-// Configuration management
-export { default as configManager } from './config-manager';
+import { configManager } from './config-manager';
+import { logger, initializeLogger } from './logger';
+import { errorHandler } from './error-handler';
+import { securityManager } from './security-manager';
+import { dbManager } from './db-manager';
 
-// Logging system
-export { default as logger, LogLevel } from './logger';
-
-// Error handling
-export { 
-  default as errorHandler, 
-  AppError, 
-  ErrorType, 
-  globalErrorHandler, 
-  asyncHandler,
-  handleAsync,
-  zodErrorToAppError
-} from './error-handler';
-
-// Database management
-export { default as dbManager } from './db-manager';
-
-// Security utilities
-export { default as securityManager } from './security-manager';
-
-// Export a function to initialize all core modules
-export function initializeCore() {
-  // Initialize in order of dependencies
-  const config = configManager.getConfig();
-  logger.info('Core modules initialized', { 
-    environment: config.server.environment 
-  });
-  
-  return {
-    config: configManager,
-    logger,
-    error: errorHandler,
-    db: dbManager,
-    security: securityManager
-  };
-}
-
-export default {
+// Re-export all components
+export {
   configManager,
   logger,
   errorHandler,
-  dbManager,
   securityManager,
-  initializeCore
+  dbManager
 };
+
+// Export error handler components specifically for ease of use
+export const {
+  AppError,
+  globalErrorHandler,
+  asyncHandler,
+  handleAsync,
+  ErrorType,
+  zodErrorToAppError
+} = errorHandler;
+
+/**
+ * Initialize the core components in the correct order
+ * to handle dependencies between them
+ */
+export function initializeCore() {
+  // Initialize in correct order to handle dependencies
+  
+  // 1. Configuration should be initialized first
+  // (already initialized by import)
+  
+  // 2. Initialize logger
+  initializeLogger();
+  
+  // 3. Log initialization status
+  logger.info('Core components initialized successfully', {
+    components: ['configManager', 'logger', 'errorHandler', 'securityManager', 'dbManager']
+  });
+  
+  return {
+    configManager,
+    logger,
+    errorHandler,
+    securityManager,
+    dbManager
+  };
+}

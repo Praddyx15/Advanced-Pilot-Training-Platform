@@ -8,9 +8,9 @@
  * - Thread-safe error tracking
  */
 
-import { Request, Response, NextFunction } from 'express';
-import { ZodError } from 'zod';
-import { logger } from './logger';
+import { Request, Response, NextFunction } from "express";
+import { ZodError } from "zod";
+import { logger } from "./logger";
 
 /**
  * Enum of error types for categorizing different errors
@@ -31,7 +31,7 @@ export enum ErrorType {
 /**
  * Mapping error types to HTTP status codes
  */
-const HTTP_STATUS_MAP: Record<ErrorType, number> = {
+const errorTypeToStatusCode = {
   [ErrorType.VALIDATION]: 400,
   [ErrorType.AUTHENTICATION]: 401,
   [ErrorType.AUTHORIZATION]: 403,
@@ -57,25 +57,25 @@ export class AppError extends Error {
   constructor(
     message: string,
     type: ErrorType = ErrorType.INTERNAL,
-    code: string = '',
+    statusCode?: number,
+    code?: string,
     details: any = null,
     isOperational: boolean = true
   ) {
     super(message);
-    
     this.name = this.constructor.name;
     this.type = type;
-    this.statusCode = HTTP_STATUS_MAP[type];
+    this.statusCode = statusCode || errorTypeToStatusCode[type];
     this.code = code || type;
     this.details = details;
     this.isOperational = isOperational;
-    
+
+    // This is needed because Error breaks prototype chain in transpiled code
+    Object.setPrototypeOf(this, AppError.prototype);
+
     // Capture stack trace
-    Error.captureStackTrace(this, this.constructor);
-    
-    // Log error when created in development
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug('AppError created', this.toJSON());
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, this.constructor);
     }
   }
 
@@ -84,14 +84,12 @@ export class AppError extends Error {
    */
   public toJSON() {
     return {
-      name: this.name,
-      message: this.message,
-      type: this.type,
-      statusCode: this.statusCode,
-      code: this.code,
-      details: this.details,
-      isOperational: this.isOperational,
-      stack: this.stack,
+      error: {
+        type: this.type,
+        code: this.code,
+        message: this.message,
+        ...(this.details && { details: this.details }),
+      },
     };
   }
 
@@ -102,6 +100,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.VALIDATION,
+      400,
       'VALIDATION_ERROR',
       details,
       true
@@ -112,18 +111,15 @@ export class AppError extends Error {
    * Factory method for not found errors
    */
   public static notFound(
-    resource: string = 'Resource',
-    id?: string | number
+    message: string = 'Resource not found',
+    details: any = null
   ): AppError {
-    const message = id
-      ? `${resource} with ID ${id} not found`
-      : `${resource} not found`;
-    
     return new AppError(
       message,
       ErrorType.NOT_FOUND,
+      404,
       'NOT_FOUND_ERROR',
-      { resource, id },
+      details,
       true
     );
   }
@@ -135,6 +131,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.AUTHENTICATION,
+      401,
       'UNAUTHORIZED_ERROR',
       null,
       true
@@ -148,6 +145,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.AUTHORIZATION,
+      403,
       'FORBIDDEN_ERROR',
       null,
       true
@@ -164,6 +162,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.CONFLICT,
+      409,
       'CONFLICT_ERROR',
       details,
       true
@@ -177,6 +176,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.INTERNAL,
+      500,
       'INTERNAL_ERROR',
       null,
       true
@@ -193,6 +193,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.EXTERNAL_API,
+      502,
       'EXTERNAL_API_ERROR',
       details,
       true
@@ -206,6 +207,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.DATABASE,
+      503,
       'DATABASE_ERROR',
       details,
       true
@@ -222,6 +224,7 @@ export class AppError extends Error {
     return new AppError(
       message,
       ErrorType.RATE_LIMIT,
+      429,
       'RATE_LIMIT_ERROR',
       details,
       true
@@ -232,12 +235,13 @@ export class AppError extends Error {
    * Factory method for timeout errors
    */
   public static timeout(
-    message: string = 'Operation timed out',
+    message: string = 'Request timeout',
     details: any = null
   ): AppError {
     return new AppError(
       message,
       ErrorType.TIMEOUT,
+      504,
       'TIMEOUT_ERROR',
       details,
       true
@@ -266,69 +270,51 @@ export function globalErrorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  // Log all errors
-  logger.error(
-    err instanceof AppError ? `[${err.type}] ${err.message}` : err.message,
-    {
-      path: req.path,
-      method: req.method,
-      query: req.query,
-      body: req.body,
-      ip: req.ip,
-      userId: (req.user as any)?.id,
-    },
-    err
-  );
+  let error: AppError;
   
-  // Handle specific types of errors
-  if (err instanceof AppError) {
-    // If it's our custom AppError, use the status code and details from it
-    const { statusCode, message, code, details, type } = err;
-    
-    res.status(statusCode).json({
-      status: 'error',
-      code,
-      type,
-      message,
-      details: details || undefined,
-    });
-  } else if (err instanceof ZodError) {
-    // Convert Zod validation errors to a standardized format
-    const appError = zodErrorToAppError(err);
-    const { statusCode, message, code, details, type } = appError;
-    
-    res.status(statusCode).json({
-      status: 'error',
-      code,
-      type,
-      message,
-      details,
-    });
-  } else if (err.name === 'UnauthorizedError') {
-    // Handle JWT unauthorized errors
-    res.status(401).json({
-      status: 'error',
-      code: 'UNAUTHORIZED_ERROR',
-      type: ErrorType.AUTHENTICATION,
-      message: 'Invalid token',
-    });
+  // Convert non-AppError instances to AppError
+  if (!(err instanceof AppError)) {
+    // Check if it's a Zod error
+    if (err instanceof ZodError) {
+      error = zodErrorToAppError(err);
+    } else {
+      error = new AppError(
+        err.message || 'An unexpected error occurred',
+        ErrorType.INTERNAL,
+        500,
+        'INTERNAL_ERROR',
+        process.env.NODE_ENV === 'development' ? err.stack : null,
+        false
+      );
+    }
   } else {
-    // For unexpected errors, don't expose details in production
-    const isDevelopment = process.env.NODE_ENV === 'development';
-    
-    res.status(500).json({
-      status: 'error',
-      code: 'INTERNAL_ERROR',
-      type: ErrorType.INTERNAL,
-      message: 'Internal server error',
-      ...(isDevelopment && {
-        debug: {
-          message: err.message,
-          stack: err.stack,
-        },
-      }),
-    });
+    error = err;
   }
+
+  // Log the error
+  const logContext = {
+    errorType: error.type,
+    errorCode: error.code,
+    statusCode: error.statusCode,
+    isOperational: error.isOperational,
+    url: req.originalUrl,
+    method: req.method,
+    ip: req.ip,
+    requestId: req.headers['x-request-id'],
+  };
+
+  if (error.details) {
+    logContext['details'] = error.details;
+  }
+
+  if (error.statusCode >= 500) {
+    logger.error(`Error: ${error.message}`, logContext, error);
+  } else {
+    logger.warn(`Error: ${error.message}`, logContext);
+  }
+
+  // Send response to client
+  res.status(error.statusCode).json(error.toJSON());
 }
 
 /**
@@ -336,7 +322,7 @@ export function globalErrorHandler(
  */
 export function asyncHandler(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<any>
-) {
+): (req: Request, res: Response, next: NextFunction) => void {
   return (req: Request, res: Response, next: NextFunction) => {
     Promise.resolve(fn(req, res, next)).catch(next);
   };
@@ -346,12 +332,13 @@ export function asyncHandler(
  * Handle async operations and wrap errors
  */
 export async function handleAsync<T>(
-  operation: () => Promise<T>,
+  promise: Promise<T>,
   errorMessage: string = 'Operation failed',
   errorType: ErrorType = ErrorType.INTERNAL,
+  details: any = null
 ): Promise<T> {
   try {
-    return await operation();
+    return await promise;
   } catch (error) {
     if (error instanceof AppError) {
       throw error;
@@ -360,19 +347,20 @@ export async function handleAsync<T>(
     throw new AppError(
       errorMessage,
       errorType,
-      '',
-      { originalError: (error as Error).message },
+      undefined,
+      undefined,
+      details || (error instanceof Error ? { originalMessage: error.message } : null),
       true
     );
   }
 }
 
+// Exporting a single error handler object with all error handling utilities
 export const errorHandler = {
   AppError,
-  asyncHandler,
+  ErrorType,
   globalErrorHandler,
+  asyncHandler,
   handleAsync,
   zodErrorToAppError,
 };
-
-export default errorHandler;

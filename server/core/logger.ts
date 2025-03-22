@@ -11,6 +11,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import * as util from 'util';
 import { AsyncLocalStorage } from 'async_hooks';
 import { configManager } from './config-manager';
 
@@ -43,24 +44,21 @@ class Logger {
     [LogLevel.ERROR]: '\x1b[31m', // Red
     [LogLevel.WARN]: '\x1b[33m',  // Yellow
     [LogLevel.INFO]: '\x1b[36m',  // Cyan
-    [LogLevel.DEBUG]: '\x1b[35m', // Magenta
+    [LogLevel.DEBUG]: '\x1b[90m'  // Gray
   };
   private resetColor = '\x1b[0m';
 
   private constructor() {
-    // Initialize log file path
     this.currentDate = this.getCurrentDate();
     this.updateLogFilePath();
     
-    // Create log directory if it doesn't exist
-    this.ensureLogDirectoryExists();
-    
-    // Set up the rotation check interval
-    this.rotationCheckInterval = setInterval(() => {
-      this.checkLogRotation();
-    }, 60 * 60 * 1000); // Check every hour
-    
-    this.debug('Logger initialized');
+    // Set up file rotation check interval (every hour)
+    if (this._isFileLoggingEnabled()) {
+      this.ensureLogDirectoryExists();
+      this.rotationCheckInterval = setInterval(() => {
+        this.checkLogRotation();
+      }, 60 * 60 * 1000); // Check every hour
+    }
   }
 
   public static getInstance(): Logger {
@@ -74,21 +72,31 @@ class Logger {
    * Set the context for the current execution context
    */
   public setContext(context: LogContext): void {
-    const contextMap = new Map(Object.entries(context));
-    this.contextStorage.enterWith(contextMap);
+    const store = this.contextStorage.getStore();
+    if (store) {
+      for (const [key, value] of Object.entries(context)) {
+        store.set(key, value);
+      }
+    } else {
+      const newStore = new Map<string, any>();
+      for (const [key, value] of Object.entries(context)) {
+        newStore.set(key, value);
+      }
+      this.contextStorage.enterWith(newStore);
+    }
   }
 
   /**
    * Add a single value to the current context
    */
   public addToContext(key: string, value: any): void {
-    const contextMap = this.contextStorage.getStore();
-    if (contextMap) {
-      contextMap.set(key, value);
+    const store = this.contextStorage.getStore();
+    if (store) {
+      store.set(key, value);
     } else {
-      const newMap = new Map<string, any>();
-      newMap.set(key, value);
-      this.contextStorage.enterWith(newMap);
+      const newStore = new Map<string, any>();
+      newStore.set(key, value);
+      this.contextStorage.enterWith(newStore);
     }
   }
 
@@ -96,14 +104,13 @@ class Logger {
    * Get the current context
    */
   public getContext(): LogContext {
-    const contextMap = this.contextStorage.getStore();
-    if (!contextMap) {
-      return {};
-    }
-    
+    const store = this.contextStorage.getStore();
     const context: LogContext = {};
-    for (const [key, value] of contextMap.entries()) {
-      context[key] = value;
+    
+    if (store) {
+      for (const [key, value] of store.entries()) {
+        context[key] = value;
+      }
     }
     
     return context;
@@ -113,9 +120,9 @@ class Logger {
    * Remove a key from the current context
    */
   public removeFromContext(key: string): void {
-    const contextMap = this.contextStorage.getStore();
-    if (contextMap) {
-      contextMap.delete(key);
+    const store = this.contextStorage.getStore();
+    if (store) {
+      store.delete(key);
     }
   }
 
@@ -123,9 +130,9 @@ class Logger {
    * Clear the entire current context
    */
   public clearContext(): void {
-    const contextMap = this.contextStorage.getStore();
-    if (contextMap) {
-      contextMap.clear();
+    const store = this.contextStorage.getStore();
+    if (store) {
+      store.clear();
     }
   }
 
@@ -133,29 +140,29 @@ class Logger {
    * Execute a function with a specific context
    */
   public withContext<T>(context: LogContext, fn: () => T): T {
-    return this.contextStorage.run(new Map(Object.entries(context)), fn);
+    const previousContext = this.getContext();
+    const newContext = { ...previousContext, ...context };
+    
+    const store = new Map<string, any>();
+    for (const [key, value] of Object.entries(newContext)) {
+      store.set(key, value);
+    }
+    
+    return this.contextStorage.run(store, fn);
   }
 
   /**
    * Get a child logger with a specific context
    */
   public child(context: LogContext): Logger {
-    const childLogger = Object.create(this);
+    const childLogger = Object.create(this) as Logger;
+    const parentContext = this.getContext();
+    const combinedContext = { ...parentContext, ...context };
     
-    // Override the log method to include the child's context
     childLogger.log = function(level: LogLevel, message: string, context?: LogContext, error?: Error): void {
-      const parentContext = Logger.instance.getContext();
-      const combinedContext = {
-        ...parentContext,
-        ...childLogger.context,
-        ...context,
-      };
-      
-      Logger.instance.log(level, message, combinedContext, error);
+      const mergedContext = { ...combinedContext, ...(context || {}) };
+      Logger.getInstance().log(level, message, mergedContext, error);
     };
-    
-    // Set the child's context
-    childLogger.context = context;
     
     return childLogger;
   }
@@ -165,16 +172,16 @@ class Logger {
    */
   public error(message: string, contextOrError?: LogContext | Error, error?: Error): void {
     let context: LogContext | undefined;
-    let err: Error | undefined;
+    let errorObj: Error | undefined;
     
     if (contextOrError instanceof Error) {
-      err = contextOrError;
+      errorObj = contextOrError;
     } else {
       context = contextOrError;
-      err = error;
+      errorObj = error;
     }
     
-    this.log(LogLevel.ERROR, message, context, err);
+    this.log(LogLevel.ERROR, message, context, errorObj);
   }
 
   /**
@@ -202,49 +209,38 @@ class Logger {
    * Log a message with a specific level
    */
   public log(level: LogLevel, message: string, context?: LogContext, error?: Error): void {
-    // Get current logging configuration
-    const config = configManager.get('logging');
+    const minLevel = this._getMinLogLevel();
     
-    // Check if the log level is enabled
-    const levelPriority = {
-      [LogLevel.ERROR]: 3,
-      [LogLevel.WARN]: 2,
-      [LogLevel.INFO]: 1,
-      [LogLevel.DEBUG]: 0,
-    };
-    
-    const configLevel = config.level as LogLevel;
-    if (levelPriority[level] < levelPriority[configLevel]) {
+    if (!this._shouldLog(level, minLevel)) {
       return;
     }
     
-    // Merge provided context with the context from AsyncLocalStorage
+    const timestamp = new Date().toISOString();
     const storedContext = this.getContext();
-    const mergedContext = {
-      ...storedContext,
-      ...context,
-    };
     
-    // Create the log entry
     const logEntry: LogEntry = {
-      timestamp: new Date().toISOString(),
+      timestamp,
       level,
       message,
-      ...(Object.keys(mergedContext).length > 0 && { context: mergedContext }),
+      context: { ...storedContext, ...(context || {}) }
     };
     
-    // Add stack trace for errors
-    if (error && error.stack) {
+    if (error) {
       logEntry.stack = error.stack;
+      if (!logEntry.context) {
+        logEntry.context = {};
+      }
+      logEntry.context.error = {
+        name: error.name,
+        message: error.message,
+      };
     }
     
-    // Write to console if enabled
-    if (config.useConsole) {
-      this.writeToConsole(logEntry);
-    }
+    // Write to console
+    this.writeToConsole(logEntry);
     
     // Write to file if enabled
-    if (config.useFile) {
+    if (this._isFileLoggingEnabled()) {
       this.writeToFile(logEntry);
     }
   }
@@ -255,17 +251,13 @@ class Logger {
   private checkLogRotation(): void {
     const currentDate = this.getCurrentDate();
     
+    // If the date has changed, rotate the log file
     if (currentDate !== this.currentDate) {
       this.currentDate = currentDate;
       this.updateLogFilePath();
-      this.debug('Log file rotated based on date', { 
-        oldDate: this.currentDate, 
-        newDate: currentDate,
-        newLogFile: this.logFilePath
-      });
     }
     
-    // Check file size for rotation
+    // Check file size
     this.checkFileSize();
   }
 
@@ -273,43 +265,38 @@ class Logger {
    * Write a log entry to the console
    */
   private writeToConsole(logEntry: LogEntry): void {
-    const { level, message, context, stack } = logEntry;
+    const format = configManager.getValue('logging', 'format') || 'text';
+    const colorize = configManager.getValue('logging', 'colorize') !== false;
     
-    // Format timestamp for console
-    const timestamp = new Date().toLocaleTimeString();
+    if (format === 'json') {
+      console.log(JSON.stringify(logEntry));
+      return;
+    }
     
-    // Get colorized level
-    const colorizedLevel = `${this.levelColors[level]}${level.toUpperCase()}${this.resetColor}`;
+    let levelDisplay = `[${logEntry.level.toUpperCase()}]`;
     
-    // Format the message
-    let formattedMessage = `[${timestamp}] ${colorizedLevel}: ${message}`;
+    if (colorize) {
+      levelDisplay = `${this.levelColors[logEntry.level]}${levelDisplay}${this.resetColor}`;
+    }
+    
+    let output = `${logEntry.timestamp} ${levelDisplay} ${logEntry.message}`;
     
     // Add context if available
-    if (context && Object.keys(context).length > 0) {
-      formattedMessage += `\n${JSON.stringify(context, null, 2)}`;
+    if (logEntry.context && Object.keys(logEntry.context).length > 0) {
+      output += `\n  Context: ${util.inspect(logEntry.context, { depth: 4, colors: colorize })}`;
     }
     
     // Add stack trace if available
-    if (stack) {
-      formattedMessage += `\n${stack}`;
+    if (logEntry.stack) {
+      output += `\n  Stack: ${logEntry.stack}`;
     }
     
-    // Write to appropriate console method
-    switch (level) {
-      case LogLevel.ERROR:
-        console.error(formattedMessage);
-        break;
-      case LogLevel.WARN:
-        console.warn(formattedMessage);
-        break;
-      case LogLevel.INFO:
-        console.info(formattedMessage);
-        break;
-      case LogLevel.DEBUG:
-        console.debug(formattedMessage);
-        break;
-      default:
-        console.log(formattedMessage);
+    if (logEntry.level === LogLevel.ERROR) {
+      console.error(output);
+    } else if (logEntry.level === LogLevel.WARN) {
+      console.warn(output);
+    } else {
+      console.log(output);
     }
   }
 
@@ -318,17 +305,28 @@ class Logger {
    */
   private writeToFile(logEntry: LogEntry): void {
     try {
-      // Convert the log entry to JSON or formatted text based on configuration
-      const config = configManager.get('logging');
-      const logString = config.format === 'json' 
-        ? JSON.stringify(logEntry) + '\n'
-        : `[${logEntry.timestamp}] ${logEntry.level.toUpperCase()}: ${logEntry.message}` +
-          (logEntry.context ? ` ${JSON.stringify(logEntry.context)}` : '') +
-          (logEntry.stack ? `\n${logEntry.stack}` : '') +
-          '\n';
+      const format = configManager.getValue('logging', 'format') || 'text';
+      let content = '';
       
-      // Append to the log file
-      fs.appendFileSync(this.logFilePath, logString, 'utf8');
+      if (format === 'json') {
+        content = JSON.stringify(logEntry) + '\n';
+      } else {
+        content = `${logEntry.timestamp} [${logEntry.level.toUpperCase()}] ${logEntry.message}`;
+        
+        // Add context if available
+        if (logEntry.context && Object.keys(logEntry.context).length > 0) {
+          content += ` | Context: ${JSON.stringify(logEntry.context)}`;
+        }
+        
+        // Add stack trace if available
+        if (logEntry.stack) {
+          content += ` | Stack: ${logEntry.stack}`;
+        }
+        
+        content += '\n';
+      }
+      
+      fs.appendFileSync(this.logFilePath, content);
     } catch (error) {
       console.error(`Failed to write to log file: ${(error as Error).message}`);
     }
@@ -339,16 +337,15 @@ class Logger {
    */
   private checkFileSize(): void {
     try {
-      const config = configManager.get('logging');
-      const maxSize = config.maxSize;
-      
       if (!fs.existsSync(this.logFilePath)) {
         return;
       }
       
       const stats = fs.statSync(this.logFilePath);
+      const maxSize = configManager.getValue('logging', 'maxFileSize');
       
-      if (stats.size > maxSize) {
+      // If maxSize is a number and the file size exceeds it, rotate the log file
+      if (typeof maxSize === 'number' && stats.size >= maxSize * 1024 * 1024) {
         this.rotateLogFile();
       }
     } catch (error) {
@@ -365,22 +362,16 @@ class Logger {
         return;
       }
       
-      const config = configManager.get('logging');
       const dir = path.dirname(this.logFilePath);
       const ext = path.extname(this.logFilePath);
-      const base = path.basename(this.logFilePath, ext);
-      const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
-      const rotatedFilePath = path.join(dir, `${base}-${timestamp}${ext}`);
+      const baseName = path.basename(this.logFilePath, ext);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const newPath = path.join(dir, `${baseName}.${timestamp}${ext}`);
       
-      fs.renameSync(this.logFilePath, rotatedFilePath);
+      fs.renameSync(this.logFilePath, newPath);
       
-      this.debug('Log file rotated based on size', {
-        oldPath: this.logFilePath,
-        newPath: rotatedFilePath,
-      });
-      
-      // Clean up old log files if we exceed the max number
-      this.cleanupOldLogs(dir, base);
+      // Clean up old log files if there are too many
+      this.cleanupOldLogs(dir, baseName);
     } catch (error) {
       console.error(`Failed to rotate log file: ${(error as Error).message}`);
     }
@@ -391,27 +382,17 @@ class Logger {
    */
   private cleanupOldLogs(dir: string, baseFileName: string): void {
     try {
-      const config = configManager.get('logging');
-      const maxFiles = config.maxFiles;
-      
-      // Get all log files with the same base name
+      const maxFiles = configManager.getValue('logging', 'maxFiles') || 10;
       const files = fs.readdirSync(dir)
         .filter(file => file.startsWith(baseFileName) && file !== `${baseFileName}.log`)
-        .map(file => path.join(dir, file));
+        .map(file => path.join(dir, file))
+        .sort((a, b) => fs.statSync(b).mtime.getTime() - fs.statSync(a).mtime.getTime());
       
-      // Sort files by modification time (oldest first)
-      files.sort((a, b) => {
-        const aStat = fs.statSync(a);
-        const bStat = fs.statSync(b);
-        return aStat.mtime.getTime() - bStat.mtime.getTime();
-      });
-      
-      // Remove the oldest files if we exceed the maximum
-      const filesToRemove = files.slice(0, Math.max(0, files.length - maxFiles + 1));
-      
-      for (const file of filesToRemove) {
-        fs.unlinkSync(file);
-        this.debug('Removed old log file', { file });
+      // If we have more files than the maximum, delete the oldest ones
+      if (files.length > maxFiles) {
+        files.slice(maxFiles).forEach(file => {
+          fs.unlinkSync(file);
+        });
       }
     } catch (error) {
       console.error(`Failed to clean up old log files: ${(error as Error).message}`);
@@ -422,10 +403,14 @@ class Logger {
    * Ensure the log directory exists
    */
   private ensureLogDirectoryExists(): void {
-    const dir = path.dirname(this.logFilePath);
+    const logDir = path.dirname(this.logFilePath);
     
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+    try {
+      if (!fs.existsSync(logDir)) {
+        fs.mkdirSync(logDir, { recursive: true });
+      }
+    } catch (error) {
+      console.error(`Failed to create log directory: ${(error as Error).message}`);
     }
   }
 
@@ -433,19 +418,28 @@ class Logger {
    * Get the current date in YYYY-MM-DD format
    */
   private getCurrentDate(): string {
-    const now = new Date();
-    return now.toISOString().split('T')[0];
+    const date = new Date();
+    return date.toISOString().split('T')[0];
   }
 
   /**
    * Get the log file path based on configuration and current date
    */
   private getLogFilePath(): string {
-    const config = configManager.get('logging');
-    const baseDir = config.directory;
-    const fileName = `application-${this.currentDate}.log`;
+    const directory = configManager.getValue('logging', 'directory') || 'logs';
+    // Use server.environment to ensure it exists in our config schema
+    const appName = configManager.getValue('server', 'environment') ? 'aptp' : 'app';
+    const rotationFrequency = configManager.getValue('logging', 'rotationFrequency') || 'daily';
     
-    return path.join(baseDir, fileName);
+    let fileName = `${appName}`;
+    
+    if (rotationFrequency === 'daily') {
+      fileName += `.${this.currentDate}`;
+    }
+    
+    fileName += '.log';
+    
+    return path.join(directory, fileName);
   }
 
   /**
@@ -453,35 +447,61 @@ class Logger {
    */
   private updateLogFilePath(): void {
     this.logFilePath = this.getLogFilePath();
+    this.ensureLogDirectoryExists();
+  }
+
+  /**
+   * Get the minimum log level from configuration
+   */
+  private _getMinLogLevel(): LogLevel {
+    const configLevel = configManager.getValue('logging', 'level');
+    
+    if (configLevel && Object.values(LogLevel).includes(configLevel as LogLevel)) {
+      return configLevel as LogLevel;
+    }
+    
+    return LogLevel.INFO; // Default to INFO level
+  }
+
+  /**
+   * Check if a log level should be logged
+   */
+  private _shouldLog(level: LogLevel, minLevel: LogLevel): boolean {
+    const levels = Object.values(LogLevel);
+    return levels.indexOf(level) <= levels.indexOf(minLevel);
+  }
+
+  /**
+   * Check if file logging is enabled
+   */
+  private _isFileLoggingEnabled(): boolean {
+    return configManager.getValue('logging', 'file') === true;
   }
 }
 
-// Create a simple placeholder logger that will be replaced once config is loaded
-const createInitialLogger = () => {
-  const logger = {
+// Create a temporary logger before initialization
+function createInitialLogger() {
+  return {
     error: (message: string, context?: any, error?: Error) => console.error(message, context, error),
     warn: (message: string, context?: any) => console.warn(message, context),
     info: (message: string, context?: any) => console.info(message, context),
     debug: (message: string, context?: any) => console.debug(message, context),
     log: (level: string, message: string, context?: any, error?: Error) => console.log(level, message, context, error),
-    setContext: () => {},
+    setContext: (context: any) => {},
+    addToContext: (key: string, value: any) => {},
     getContext: () => ({}),
-    addToContext: () => {},
-    removeFromContext: () => {},
+    removeFromContext: (key: string) => {},
     clearContext: () => {},
-    withContext: (_: any, fn: () => any) => fn(),
-    child: () => logger,
+    withContext: (_: any, fn: Function) => fn(),
+    child: (context: any) => createInitialLogger(),
   };
-  return logger;
-};
+}
 
-// Export a placeholder logger that will be replaced with the real logger once config is loaded
+// Export a temporary logger that will be replaced during initialization
 export let logger = createInitialLogger();
 
-// This function is called by the core initialization to set the real logger
+// Initialize the logger (should be called from the core initialization)
 export function initializeLogger() {
   logger = Logger.getInstance();
   return logger;
 }
-
-export default logger;
