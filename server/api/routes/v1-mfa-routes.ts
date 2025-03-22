@@ -25,6 +25,10 @@ const ensureAuthenticated = (req: Request, res: Response, next: NextFunction) =>
   
   // TypeScript type guard to ensure req.user is defined throughout the rest of the route
   req.user = req.user as Express.User;
+  // This assertion helps TypeScript know that req.user is definitely defined
+  if (!req.user) {
+    return res.status(401).json({ message: 'User not found in session' });
+  }
   next();
 };
 
@@ -470,7 +474,7 @@ router.post('/mfa/recovery/generate', ensureAuthenticated, async (req, res) => {
       message: 'New recovery codes generated successfully'
     });
   } catch (error) {
-    logger.error('Error generating recovery codes', { userId: req.user?.id }, error);
+    logger.error('Error generating recovery codes', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to generate recovery codes' });
   }
 });
@@ -512,7 +516,7 @@ router.post('/mfa/disable', ensureAuthenticated, async (req, res) => {
       message: 'MFA disabled successfully'
     });
   } catch (error) {
-    logger.error('Error disabling MFA', { userId: req.user?.id }, error);
+    logger.error('Error disabling MFA', { userId: req.user?.id }, error as Error);
     res.status(500).json({ message: 'Failed to disable MFA' });
   }
 });

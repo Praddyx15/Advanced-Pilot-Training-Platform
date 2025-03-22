@@ -12,6 +12,7 @@
 import * as crypto from 'crypto';
 import QRCode from 'qrcode';
 import { User } from '@shared/schema';
+import { Express } from 'express';
 
 export enum MfaType {
   TOTP = 'totp',
@@ -50,7 +51,7 @@ const TOTP_ALGORITHM = 'sha1';
 /**
  * Generate a new TOTP secret for a user
  */
-export async function generateTotpSecret(user: User): Promise<MfaSecret> {
+export async function generateTotpSecret(user: Express.User): Promise<MfaSecret> {
   // Generate a random secret key (base32 encoded)
   const buffer = crypto.randomBytes(20);
   const secret = buffer.toString('base64').replace(/=/g, '');
@@ -208,7 +209,7 @@ export function verifyBiometricSample(sample: string, template: string): boolean
 /**
  * Check if MFA is required for a specific user
  */
-export function isMfaRequired(user: User): boolean {
+export function isMfaRequired(user: Express.User): boolean {
   // Admins always require MFA
   if (user.role === 'admin') {
     return true;
