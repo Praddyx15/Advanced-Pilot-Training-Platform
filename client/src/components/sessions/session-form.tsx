@@ -3,6 +3,7 @@ import { useApp } from "@/contexts/app-context";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
 import { X, PlusCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ export default function SessionForm() {
     refreshSessions 
   } = useApp();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   // Get trainees and resources
   const { data: trainees = [] } = useQuery<User[]>({
@@ -31,8 +33,12 @@ export default function SessionForm() {
     queryKey: ["/api/resources"],
   });
 
-  // Form validation schema
-  const sessionFormSchema = extendedSessionSchema;
+  // Form validation schema with more flexible validation
+  const sessionFormSchema = extendedSessionSchema.extend({
+    programId: z.coerce.number().min(1, "Please select a program"),
+    moduleId: z.coerce.number().min(1, "Please select a module"),
+    resourceId: z.number().optional().nullable(),
+  });
   type SessionFormValues = z.infer<typeof sessionFormSchema>;
 
   // Form initialization
@@ -44,8 +50,8 @@ export default function SessionForm() {
       status: "scheduled",
       startTime: new Date(),
       endTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours from now
-      resourceId: undefined,
-      instructorId: 0, // Will be set from current user
+      resourceId: null, // Using null instead of undefined to prevent type issues
+      instructorId: user?.id || 0, // Use current user ID if available
       trainees: [],
     },
   });
@@ -54,16 +60,19 @@ export default function SessionForm() {
   const [selectedProgramId, setSelectedProgramId] = useState<number | null>(null);
   const [availableModules, setAvailableModules] = useState<Module[]>([]);
 
+  // Fetch modules for selected program
+  const { data: modulesByProgram = [] } = useQuery<Module[]>({
+    queryKey: ["/api/modules", selectedProgramId],
+    enabled: !!selectedProgramId,
+  });
+
   useEffect(() => {
-    if (selectedProgramId && programs) {
-      const program = programs.find(p => p.id === selectedProgramId);
-      if (program?.modules) {
-        setAvailableModules(program.modules);
-      }
+    if (selectedProgramId && modulesByProgram.length > 0) {
+      setAvailableModules(modulesByProgram);
     } else {
       setAvailableModules([]);
     }
-  }, [selectedProgramId, programs]);
+  }, [selectedProgramId, modulesByProgram]);
 
   // Create session mutation
   const createSessionMutation = useMutation({
@@ -90,7 +99,22 @@ export default function SessionForm() {
 
   // Handle form submission
   const onSubmit = (data: SessionFormValues) => {
-    createSessionMutation.mutate(data);
+    // Make sure instructorId is set from current user if it's 0
+    if (data.instructorId === 0 && user) {
+      data.instructorId = user.id;
+    }
+    
+    // Ensure data is properly formatted
+    const formattedData = {
+      ...data,
+      programId: Number(data.programId),
+      moduleId: Number(data.moduleId),
+      resourceId: data.resourceId ? Number(data.resourceId) : null,
+      startTime: data.startTime instanceof Date ? data.startTime : new Date(data.startTime),
+      endTime: data.endTime instanceof Date ? data.endTime : new Date(data.endTime),
+    };
+    
+    createSessionMutation.mutate(formattedData);
   };
 
   // Handle program change
@@ -283,7 +307,7 @@ export default function SessionForm() {
                 render={({ field }) => (
                   <Select
                     value={field.value?.toString() || ""}
-                    onValueChange={(value) => field.onChange(value ? parseInt(value) : undefined)}
+                    onValueChange={(value) => field.onChange(value ? parseInt(value) : null)}
                   >
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select a resource" />
