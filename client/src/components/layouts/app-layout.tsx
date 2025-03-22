@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -45,6 +45,10 @@ import {
   AlertTriangle,
   Clipboard,
   FileCheck,
+  Users,
+  Plane,
+  Briefcase,
+  Activity,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -63,21 +67,130 @@ export function AppLayout({ children }: AppLayoutProps) {
     logoutMutation.mutate();
   };
 
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Programs', href: '/programs', icon: Layers },
-    { name: 'Syllabus Generator', href: '/syllabus-generator', icon: BookOpen },
-    { name: 'Knowledge Graph', href: '/knowledge-graph', icon: Network },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Documents', href: '/documents', icon: FileText },
-    { name: 'Sessions', href: '/sessions', icon: Calendar },
-    { name: 'Assessments', href: '/assessments', icon: CheckSquare },
-    { name: 'Achievements', href: '/achievements', icon: Medal },
-    { name: 'Compliance', href: '/compliance', icon: FileCheck },
-  ];
+  // Get user role and organization type
+  const userRole = user?.role || 'trainee';
+  const userOrgType = user?.organizationType || 'personal';
+  
+  // Define theme colors based on user role & organization
+  const getThemeColors = () => {
+    if (userRole === 'admin') {
+      return {
+        primary: '#0e7490', // Teal 600
+        secondary: '#0891b2', // Teal 500
+        sidebar: 'from-slate-800 to-slate-900',
+        header: 'bg-slate-800',
+        text: 'text-white',
+        logo: 'NextGen Flight Training Management'
+      };
+    } else if (userRole === 'instructor' && userOrgType === 'ATO') {
+      return {
+        primary: '#0f766e', // Teal 700
+        secondary: '#14b8a6', // Teal 400
+        sidebar: 'from-teal-800 to-teal-900',
+        header: 'bg-teal-800',
+        text: 'text-white',
+        logo: 'ATO Instructor Portal'
+      };
+    } else if (userRole === 'trainee') {
+      return {
+        primary: '#6d28d9', // Purple 700
+        secondary: '#8b5cf6', // Purple 500  
+        sidebar: 'from-purple-800 to-purple-900',
+        header: 'bg-purple-800',
+        text: 'text-white',
+        logo: 'Flight Training Portal'
+      };
+    } else if (userRole === 'examiner') {
+      return {
+        primary: '#7e22ce', // Purple 800
+        secondary: '#a855f7', // Purple 500
+        sidebar: 'from-purple-800 to-purple-900',
+        header: 'bg-purple-800',
+        text: 'text-white',
+        logo: 'ATO Examiner Portal'
+      };
+    } else {
+      return {
+        primary: '#2563eb', // Blue 600
+        secondary: '#3b82f6', // Blue 500
+        sidebar: 'from-blue-800 to-blue-900',
+        header: 'bg-blue-800',
+        text: 'text-white',
+        logo: 'ATO Training Management'
+      };
+    }
+  };
 
-  const userIsAdmin = user && user.role === 'admin';
-  const userIsInstructor = user && (user.role === 'instructor' || user.role === 'admin');
+  const theme = getThemeColors();
+
+  // Define navigation based on user role
+  const getNavigation = () => {
+    const baseNavigation = [
+      { name: 'Dashboard', href: '/', icon: Home },
+    ];
+
+    if (userRole === 'admin') {
+      return [
+        ...baseNavigation,
+        { name: 'Planning & Scheduling', href: '/planning', icon: Calendar },
+        { name: 'Student Management', href: '/students', icon: Users },
+        { name: 'Instructor Portal', href: '/instructors', icon: Briefcase },
+        { name: 'Resources', href: '/resources', icon: Plane },
+        { name: 'Compliance', href: '/compliance', icon: FileCheck },
+        { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+        { name: 'Maintenance', href: '/maintenance', icon: Cog },
+        { name: 'Inventory', href: '/inventory', icon: Layers },
+        { name: 'E-Learning', href: '/elearning', icon: BookOpen },
+        { name: 'VR/AR Training', href: '/vr-training', icon: Activity },
+      ];
+    } else if (userRole === 'instructor') {
+      return [
+        ...baseNavigation,
+        { name: 'My Schedule', href: '/my-schedule', icon: Calendar },
+        { name: 'My Trainees', href: '/my-trainees', icon: Users },
+        { name: 'FFS Sessions', href: '/ffs-sessions', icon: Plane },
+        { name: 'Assessments', href: '/assessments', icon: CheckSquare },
+        { name: 'Gradesheets', href: '/gradesheets', icon: FileCheck },
+        { name: 'Training Materials', href: '/materials', icon: FileText },
+        { name: 'Reporting', href: '/reporting', icon: BarChart3 },
+        { name: 'Syllabus', href: '/syllabus', icon: BookOpen },
+      ];
+    } else if (userRole === 'examiner') {
+      return [
+        ...baseNavigation,
+        { name: 'Examination Schedule', href: '/exam-schedule', icon: Calendar },
+        { name: 'Skill Tests', href: '/skill-tests', icon: CheckSquare },
+        { name: 'APC/OPC Sessions', href: '/apc-opc', icon: Plane },
+        { name: 'Line Checks', href: '/line-checks', icon: FileCheck },
+        { name: 'Results & Reports', href: '/results', icon: FileText },
+        { name: 'Regulatory Records', href: '/regulatory', icon: Briefcase },
+        { name: 'Examiner Authorizations', href: '/authorizations', icon: Medal },
+        { name: 'Quality Assurance', href: '/quality', icon: Activity },
+      ];
+    } else {
+      // Trainee navigation
+      return [
+        ...baseNavigation,
+        { name: 'My Schedule', href: '/my-schedule', icon: Calendar },
+        { name: 'Training Progress', href: '/progress', icon: Activity },
+        { name: 'E-Learning', href: '/elearning', icon: BookOpen },
+        { name: 'Flight Records', href: '/flight-records', icon: Plane },
+        { name: 'Theory Tests', href: '/theory-tests', icon: CheckSquare },
+        { name: 'Resources', href: '/resources', icon: FileText },
+        { name: 'Instructor Feedback', href: '/feedback', icon: FileCheck },
+        { name: 'Messaging', href: '/messaging', icon: Users },
+      ];
+    }
+  };
+
+  const navigation = getNavigation();
+  
+  // Update document root CSS variables for theming
+  useEffect(() => {
+    const root = document.documentElement;
+    root.style.setProperty('--theme-primary', theme.primary);
+    root.style.setProperty('--theme-secondary', theme.secondary);
+  }, [theme]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,21 +205,22 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Sidebar for desktop */}
       <div
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-72 bg-white shadow-lg dark:bg-gray-950 transform transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto",
+          "fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-200 lg:translate-x-0 lg:static lg:z-auto",
+          `bg-gradient-to-b ${theme.sidebar} text-white`,
           sidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex h-16 shrink-0 items-center border-b px-6">
+        <div className={`flex h-16 shrink-0 items-center border-b border-white/10 px-6 ${theme.text}`}>
           <Link to="/" className="flex items-center space-x-2" onClick={() => setSidebarOpen(false)}>
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <Layers className="h-5 w-5 text-primary" />
+            <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
+              <Layers className="h-5 w-5 text-white" />
             </div>
-            <span className="font-semibold">Aviation Training</span>
+            <span className="font-semibold">{theme.logo}</span>
           </Link>
           <Button
             variant="ghost"
             size="icon"
-            className="absolute right-4 top-4 lg:hidden"
+            className="absolute right-4 top-4 lg:hidden text-white hover:bg-white/10"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-5 w-5" />
@@ -114,62 +228,55 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
         <ScrollArea className="flex-1 py-2 px-4">
           <nav className="space-y-0.5">
-            {navigation.map((item) => {
-              // Skip items based on user role
-              if (item.href === '/assessments' && !userIsInstructor) return null;
-              if (item.href === '/analytics' && !userIsInstructor) return null;
-              if (item.href === '/compliance' && !userIsAdmin) return null;
-
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  onClick={() => setSidebarOpen(false)}
+            {navigation.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                onClick={() => setSidebarOpen(false)}
+              >
+                <div
+                  className={cn(
+                    "group flex items-center rounded-md px-3 py-2 text-sm font-medium",
+                    location === item.href
+                      ? "bg-white/20 text-white"
+                      : "text-white/70 hover:bg-white/10 hover:text-white"
+                  )}
                 >
-                  <div
+                  <item.icon
                     className={cn(
-                      "group flex items-center rounded-md px-3 py-2 text-sm font-medium",
-                      location === item.href
-                        ? "bg-primary/10 text-primary"
-                        : "text-muted-foreground hover:bg-muted"
+                      "mr-3 h-5 w-5 shrink-0",
+                      location === item.href ? "text-white" : "text-white/70"
                     )}
-                  >
-                    <item.icon
-                      className={cn(
-                        "mr-3 h-5 w-5 shrink-0",
-                        location === item.href ? "text-primary" : "text-muted-foreground"
-                      )}
-                    />
-                    {item.name}
-                    {location === item.href && (
-                      <ChevronRight className="ml-auto h-4 w-4 text-primary" />
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
+                  />
+                  {item.name}
+                  {location === item.href && (
+                    <ChevronRight className="ml-auto h-4 w-4 text-white" />
+                  )}
+                </div>
+              </Link>
+            ))}
           </nav>
 
-          <div className="mt-6 pt-6 border-t">
-            <div className="px-3 mb-2 text-xs font-semibold text-muted-foreground">
+          <div className="mt-6 pt-6 border-t border-white/10">
+            <div className="px-3 mb-2 text-xs font-semibold text-white/70">
               Quick Actions
             </div>
             <nav className="space-y-0.5">
               <Button
                 variant="ghost"
-                className="w-full justify-start px-3"
+                className="w-full justify-start px-3 text-white/70 hover:bg-white/10 hover:text-white"
                 onClick={() => setHelpDialogOpen(true)}
               >
-                <AlertTriangle className="mr-3 h-5 w-5 text-muted-foreground" />
+                <AlertTriangle className="mr-3 h-5 w-5" />
                 Help & Support
               </Button>
               <Button
                 variant="ghost"
-                className="w-full justify-start px-3"
+                className="w-full justify-start px-3 text-white/70 hover:bg-white/10 hover:text-white"
                 asChild
               >
                 <Link to="/settings">
-                  <Cog className="mr-3 h-5 w-5 text-muted-foreground" />
+                  <Cog className="mr-3 h-5 w-5" />
                   Settings
                 </Link>
               </Button>
@@ -178,23 +285,23 @@ export function AppLayout({ children }: AppLayoutProps) {
         </ScrollArea>
         
         {/* User menu at bottom of sidebar */}
-        <div className="flex items-center justify-between gap-2 border-t p-4">
+        <div className="flex items-center justify-between gap-2 border-t border-white/10 p-4">
           <div className="flex items-center gap-2">
-            <div className="size-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <User className="h-4 w-4 text-primary" />
+            <div className="size-8 rounded-full bg-white/10 flex items-center justify-center">
+              <User className="h-4 w-4 text-white" />
             </div>
             <div className="grid gap-0.5">
-              <p className="text-sm font-medium">
+              <p className="text-sm font-medium text-white">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-white/70">
                 {user?.role.charAt(0).toUpperCase() + user?.role.slice(1)}
               </p>
             </div>
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
                 <Cog className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -228,13 +335,13 @@ export function AppLayout({ children }: AppLayoutProps) {
       {/* Main content */}
       <div className="flex flex-col flex-1 lg:pl-72">
         {/* Top navigation bar */}
-        <header className="sticky top-0 z-10 border-b bg-background">
+        <header className={`sticky top-0 z-10 ${theme.header} text-white border-b border-white/10`}>
           <div className="flex h-16 items-center justify-between px-4 sm:px-6">
             <div className="flex items-center">
               <Button
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className="lg:hidden text-white hover:bg-white/10"
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu className="h-6 w-6" />
@@ -242,33 +349,25 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
 
             <div className="flex items-center gap-4">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setHelpDialogOpen(true)}
-                    >
-                      <AlertTriangle className="mr-2 h-4 w-4" />
-                      Help
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Get help and support</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-white hover:bg-white/10"
+                onClick={() => setHelpDialogOpen(true)}
+              >
+                <AlertTriangle className="mr-2 h-4 w-4" />
+                Help
+              </Button>
 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className="rounded-full size-9"
+                    className="rounded-full size-9 hover:bg-white/10"
                   >
                     <span className="sr-only">User menu</span>
-                    <User className="h-5 w-5" />
+                    <User className="h-5 w-5 text-white" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56">
@@ -309,7 +408,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Main content */}
-        <main className="flex-1">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900">
           {children}
         </main>
       </div>
@@ -350,7 +449,12 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setHelpDialogOpen(false)}>Close</Button>
+            <Button 
+              onClick={() => setHelpDialogOpen(false)}
+              style={{ backgroundColor: theme.primary }}
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
