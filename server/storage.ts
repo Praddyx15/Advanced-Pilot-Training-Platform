@@ -1270,13 +1270,34 @@ export class MemStorage implements IStorage {
 
   async createDocument(document: InsertDocument): Promise<Document> {
     const id = this.documentIdCounter++;
+    const now = new Date();
     const newDocument: Document = { 
       ...document, 
       id,
-      description: document.description || null 
+      description: document.description || null,
+      fileName: document.fileName || null,
+      fileSize: document.fileSize || null,
+      tags: document.tags || null,
+      currentVersionId: null,
+      createdAt: now,
+      updatedAt: now
     };
     this.documents.set(id, newDocument);
     return newDocument;
+  }
+  
+  async updateDocument(id: number, document: Partial<Document>): Promise<Document | undefined> {
+    const existingDocument = this.documents.get(id);
+    if (!existingDocument) return undefined;
+    
+    const updatedDocument: Document = {
+      ...existingDocument,
+      ...document,
+      updatedAt: new Date()
+    };
+    
+    this.documents.set(id, updatedDocument);
+    return updatedDocument;
   }
 
   async deleteDocument(id: number): Promise<boolean> {
@@ -1300,36 +1321,35 @@ export class MemStorage implements IStorage {
 
   async createDocumentVersion(version: InsertDocumentVersion): Promise<DocumentVersion> {
     const id = this.documentVersionIdCounter++;
-    const now = new Date();
     
     const newVersion: DocumentVersion = {
       ...version,
       id,
-      createdAt: now,
-      updatedAt: now
+      fileSize: version.fileSize || null,
+      changeDescription: version.changeDescription || null,
+      changeDate: version.changeDate || new Date()
     };
 
     this.documentVersions.set(id, newVersion);
     return newVersion;
   }
-
+  
   async updateDocumentCurrentVersion(documentId: number, versionId: number): Promise<Document | undefined> {
-    const document = await this.getDocument(documentId);
-    if (!document) {
-      return undefined;
-    }
-
-    const version = await this.getDocumentVersion(versionId);
-    if (!version) {
-      return undefined;
-    }
-
-    const updatedDocument = {
+    const document = this.documents.get(documentId);
+    if (!document) return undefined;
+    
+    const version = this.documentVersions.get(versionId);
+    if (!version) return undefined;
+    
+    // Ensure the version belongs to this document
+    if (version.documentId !== documentId) return undefined;
+    
+    const updatedDocument: Document = {
       ...document,
       currentVersionId: versionId,
       updatedAt: new Date()
     };
-
+    
     this.documents.set(documentId, updatedDocument);
     return updatedDocument;
   }
