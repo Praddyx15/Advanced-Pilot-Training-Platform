@@ -128,13 +128,13 @@ export function ATODashboard() {
   }
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="px-6 py-6">
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-2">
           <div>
             <h1 className="text-2xl font-bold">ATO Operations Dashboard</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Select value={selectedProgram} onValueChange={setSelectedProgram}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select Program" />
