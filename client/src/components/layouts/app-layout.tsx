@@ -75,30 +75,39 @@ export function AppLayout({ children }: AppLayoutProps) {
   const getThemeColors = () => {
     if (userRole === 'admin') {
       return {
-        primary: '#0f766e', // Teal 700
-        secondary: '#14b8a6', // Teal 400
-        sidebar: 'from-teal-800 to-teal-900',
-        header: 'bg-teal-800',
+        primary: '#0e7490', // Teal 600 (swapped from ATO)
+        secondary: '#0891b2', // Teal 500
+        sidebar: 'from-slate-800 to-slate-900',
+        header: 'bg-slate-800',
         text: 'text-white',
         logo: 'Admin Portal'
       };
     } else if (userRole === 'instructor' && userOrgType === 'ATO') {
       return {
-        primary: '#0e7490', // Teal 600
-        secondary: '#0891b2', // Teal 500
-        sidebar: 'from-slate-800 to-slate-900',
-        header: 'bg-slate-800',
+        primary: '#0f766e', // Teal 700 (swapped from Admin)
+        secondary: '#14b8a6', // Teal 400
+        sidebar: 'from-teal-800 to-teal-900',
+        header: 'bg-teal-800',
         text: 'text-white',
         logo: 'ATO Instructor Portal'
       };
-    } else if (userRole === 'trainee') {
+    } else if (userRole === 'trainee' && userOrgType === 'ATO') {
       return {
         primary: '#6d28d9', // Purple 700
         secondary: '#8b5cf6', // Purple 500  
         sidebar: 'from-purple-800 to-purple-900',
         header: 'bg-purple-800',
         text: 'text-white',
-        logo: 'Flight Training Portal'
+        logo: 'ATO Student Portal'
+      };
+    } else if (userRole === 'trainee' && userOrgType === 'Airline') {
+      return {
+        primary: '#6d28d9', // Purple 700
+        secondary: '#8b5cf6', // Purple 500  
+        sidebar: 'from-purple-800 to-purple-900',
+        header: 'bg-purple-800',
+        text: 'text-white',
+        logo: 'Airline Student Portal'
       };
     } else if (userRole === 'examiner') {
       return {
@@ -109,6 +118,15 @@ export function AppLayout({ children }: AppLayoutProps) {
         text: 'text-white',
         logo: 'ATO Examiner Portal'
       };
+    } else if (userRole === 'instructor' && userOrgType === 'Airline') {
+      return {
+        primary: '#2563eb', // Blue 600
+        secondary: '#3b82f6', // Blue 500
+        sidebar: 'from-blue-800 to-blue-900',
+        header: 'bg-blue-800',
+        text: 'text-white',
+        logo: 'Airline Instructor Portal'
+      };
     } else {
       return {
         primary: '#2563eb', // Blue 600
@@ -116,7 +134,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         sidebar: 'from-blue-800 to-blue-900',
         header: 'bg-blue-800',
         text: 'text-white',
-        logo: 'ATO Training Management'
+        logo: 'Training Management'
       };
     }
   };

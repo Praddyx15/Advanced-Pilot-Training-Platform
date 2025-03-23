@@ -102,12 +102,16 @@ export default function AuthPage() {
     
     if (lowerEmail.includes('admin@')) {
       return { role: 'admin', organizationType: 'Admin' };
+    } else if (lowerEmail.includes('examiner@ato')) {
+      return { role: 'examiner', organizationType: 'ATO' };
     } else if (lowerEmail.includes('ato@')) {
       return { role: 'instructor', organizationType: 'ATO' };
     } else if (lowerEmail.includes('airline@')) {
       return { role: 'instructor', organizationType: 'Airline' };
+    } else if (lowerEmail.includes('student@ato')) {
+      return { role: 'trainee', organizationType: 'ATO' };
     } else if (lowerEmail.includes('student@')) {
-      return { role: 'trainee', organizationType: 'Personal' };
+      return { role: 'trainee', organizationType: 'Airline' };
     } else {
       // Default
       return { role: 'trainee', organizationType: 'Personal' };
