@@ -11,6 +11,7 @@ import AnalyticsDashboardPage from "@/pages/analytics-dashboard";
 import SessionReplayPage from "@/pages/session-replay-page";
 import AchievementsPage from "@/pages/achievements-page";
 import DocumentsPage from "@/pages/documents-page";
+import DocumentProcessorPage from "@/pages/document-processor-page";
 import CompliancePage from "@/pages/compliance-page";
 import TestNotificationPage from "@/pages/test-notification-page";
 import { ProtectedRoute } from "./lib/protected-route";
@@ -29,6 +30,7 @@ function Router() {
       <ProtectedRoute path="/session-replay" component={SessionReplayPage} />
       <ProtectedRoute path="/achievements" component={AchievementsPage} />
       <ProtectedRoute path="/documents" component={DocumentsPage} />
+      <ProtectedRoute path="/document-processor" component={DocumentProcessorPage} />
       <ProtectedRoute path="/compliance" component={CompliancePage} />
       <ProtectedRoute path="/test-notification" component={TestNotificationPage} />
       <Route path="/auth" component={AuthPage} />
