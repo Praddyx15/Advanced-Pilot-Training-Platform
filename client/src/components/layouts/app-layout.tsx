@@ -270,7 +270,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         // Resources & Support
         { name: 'Resources', href: '/resources', icon: FileText },
         { name: 'Instructor Feedback', href: '/feedback', icon: FileCheck },
-        { name: 'Messaging', href: '/messaging', icon: MessagesSquare },
+        { name: 'Messaging', href: '/messaging', icon: MessageSquare },
         
         // Knowledge Management
         { name: 'Study Materials', href: '/study', icon: BookOpen },
