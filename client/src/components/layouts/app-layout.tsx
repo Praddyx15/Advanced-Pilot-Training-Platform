@@ -26,6 +26,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { NotificationBell } from '@/components/notification/notification-bell';
 import {
   Activity,
   AlertTriangle,

@@ -16,6 +16,7 @@ import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
 import { ThemeProvider } from "./contexts/theme-context";
+import { NotificationProvider } from "./components/notification/notification-provider";
 
 function Router() {
   return (
@@ -40,8 +41,10 @@ function App() {
       <ThemeProvider>
         <AuthProvider>
           <AppProvider>
-            <Router />
-            <Toaster />
+            <NotificationProvider>
+              <Router />
+              <Toaster />
+            </NotificationProvider>
           </AppProvider>
         </AuthProvider>
       </ThemeProvider>
