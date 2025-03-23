@@ -27,28 +27,46 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Home,
-  BookOpen,
-  Network,
+  Activity,
+  AlertTriangle,
+  Award,
+  BarChart,
+  BarChart2,
   BarChart3,
-  FileText,
-  Layers,
+  Book,
+  BookOpen,
+  Briefcase,
   Calendar,
+  CheckCircle2,
   CheckSquare,
-  Medal,
+  ChevronRight,
+  Clipboard,
+  Clock,
+  Code,
   Cog,
+  File,
+  FileCheck,
+  FileCode,
+  FileText,
+  Gauge,
+  GraduationCap,
+  Home,
+  Layers,
+  LineChart,
   LogOut,
   Menu,
-  X,
-  User,
-  ChevronRight,
-  AlertTriangle,
-  Clipboard,
-  FileCheck,
-  Users,
+  MessageSquare,
+  PanelTop,
   Plane,
-  Briefcase,
-  Activity,
+  Search,
+  Settings,
+  Shield,
+  Star,
+  Trophy,
+  User,
+  UserCog,
+  Users,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -158,20 +176,20 @@ export function AppLayout({ children }: AppLayoutProps) {
         { name: 'Planning & Scheduling', href: '/planning', icon: Calendar },
         
         // Organization Management
-        { name: 'Student Management', href: '/students', icon: Users2 },
+        { name: 'Student Management', href: '/students', icon: UserCog },
         { name: 'Instructor Portal', href: '/instructors', icon: Briefcase },
         
         // Document & Knowledge Management
-        { name: 'Document Management', href: '/document-management', icon: Files },
-        { name: 'Syllabus Generator', href: '/syllabus-generator', icon: BookCheck },
+        { name: 'Document Management', href: '/document-management', icon: File },
+        { name: 'Syllabus Generator', href: '/syllabus-generator', icon: Book },
         
         // Compliance & Analytics
         { name: 'Compliance', href: '/compliance', icon: FileCheck },
         { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-        { name: 'Audit Logs', href: '/audit-logs', icon: ShieldCheck },
+        { name: 'Audit Logs', href: '/audit-logs', icon: Shield },
         
         // Platform Management
-        { name: 'API Management', href: '/api-docs', icon: Code2 },
+        { name: 'API Management', href: '/api-docs', icon: Code },
         { name: 'System Config', href: '/configuration', icon: Settings },
         
         // Resources & E-Learning
@@ -204,7 +222,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         { name: 'Reporting', href: '/reporting', icon: BarChart3 },
         
         // Communication
-        { name: 'Messaging', href: '/messaging', icon: MessagesSquare },
+        { name: 'Messaging', href: '/messaging', icon: MessageSquare },
       ];
     } else if (userRole === 'examiner') {
       return [
@@ -221,15 +239,15 @@ export function AppLayout({ children }: AppLayoutProps) {
         
         // Regulatory & Compliance
         { name: 'Regulatory Records', href: '/regulatory', icon: Briefcase },
-        { name: 'Compliance Verification', href: '/verification', icon: ShieldCheck },
-        { name: 'Examiner Authorizations', href: '/authorizations', icon: Medal },
+        { name: 'Compliance Verification', href: '/verification', icon: Shield },
+        { name: 'Examiner Authorizations', href: '/authorizations', icon: Award },
         
         // Quality Management
         { name: 'Quality Assurance', href: '/quality', icon: Activity },
-        { name: 'Standards Monitoring', href: '/standards', icon: BarChart4 },
+        { name: 'Standards Monitoring', href: '/standards', icon: BarChart },
         
         // Documents & Knowledge
-        { name: 'Document Analysis', href: '/document-analysis', icon: FileSearch },
+        { name: 'Document Analysis', href: '/document-analysis', icon: Search },
       ];
     } else {
       // Trainee navigation
