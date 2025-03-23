@@ -12,6 +12,7 @@ import SessionReplayPage from "@/pages/session-replay-page";
 import AchievementsPage from "@/pages/achievements-page";
 import DocumentsPage from "@/pages/documents-page";
 import CompliancePage from "@/pages/compliance-page";
+import TestNotificationPage from "@/pages/test-notification-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -29,6 +30,7 @@ function Router() {
       <ProtectedRoute path="/achievements" component={AchievementsPage} />
       <ProtectedRoute path="/documents" component={DocumentsPage} />
       <ProtectedRoute path="/compliance" component={CompliancePage} />
+      <ProtectedRoute path="/test-notification" component={TestNotificationPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
