@@ -143,60 +143,119 @@ export function AppLayout({ children }: AppLayoutProps) {
 
   // Define navigation based on user role
   const getNavigation = () => {
+    // Common menus available to all users
     const baseNavigation = [
       { name: 'Dashboard', href: '/', icon: Home },
+      { name: 'Document Repository', href: '/documents', icon: FileText },
+      { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
     ];
 
     if (userRole === 'admin') {
       return [
         ...baseNavigation,
+        // Core Admin Features
+        { name: 'User Management', href: '/users', icon: Users },
         { name: 'Planning & Scheduling', href: '/planning', icon: Calendar },
-        { name: 'Student Management', href: '/students', icon: Users },
+        
+        // Organization Management
+        { name: 'Student Management', href: '/students', icon: Users2 },
         { name: 'Instructor Portal', href: '/instructors', icon: Briefcase },
-        { name: 'Resources', href: '/resources', icon: Plane },
+        
+        // Document & Knowledge Management
+        { name: 'Document Management', href: '/document-management', icon: Files },
+        { name: 'Syllabus Generator', href: '/syllabus-generator', icon: BookCheck },
+        
+        // Compliance & Analytics
         { name: 'Compliance', href: '/compliance', icon: FileCheck },
         { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-        { name: 'Maintenance', href: '/maintenance', icon: Cog },
-        { name: 'Inventory', href: '/inventory', icon: Layers },
-        { name: 'E-Learning', href: '/elearning', icon: BookOpen },
+        { name: 'Audit Logs', href: '/audit-logs', icon: ShieldCheck },
+        
+        // Platform Management
+        { name: 'API Management', href: '/api-docs', icon: Code2 },
+        { name: 'System Config', href: '/configuration', icon: Settings },
+        
+        // Resources & E-Learning
+        { name: 'Resources', href: '/resources', icon: Plane },
+        { name: 'E-Learning', href: '/elearning', icon: GraduationCap },
         { name: 'VR/AR Training', href: '/vr-training', icon: Activity },
       ];
     } else if (userRole === 'instructor') {
       return [
         ...baseNavigation,
+        // Schedule & Sessions
         { name: 'My Schedule', href: '/my-schedule', icon: Calendar },
-        { name: 'My Trainees', href: '/my-trainees', icon: Users },
+        { name: 'Session Management', href: '/sessions', icon: Clock },
         { name: 'FFS Sessions', href: '/ffs-sessions', icon: Plane },
+        
+        // Trainee Management
+        { name: 'My Trainees', href: '/my-trainees', icon: Users },
+        { name: 'Progress Tracking', href: '/trainee-progress', icon: LineChart },
+        
+        // Assessment Tools
         { name: 'Assessments', href: '/assessments', icon: CheckSquare },
         { name: 'Gradesheets', href: '/gradesheets', icon: FileCheck },
+        
+        // Learning Materials
         { name: 'Training Materials', href: '/materials', icon: FileText },
+        { name: 'Syllabus Manager', href: '/syllabus', icon: BookOpen },
+        
+        // Analytics & Reporting
+        { name: 'Performance Metrics', href: '/metrics', icon: BarChart2 },
         { name: 'Reporting', href: '/reporting', icon: BarChart3 },
-        { name: 'Syllabus', href: '/syllabus', icon: BookOpen },
+        
+        // Communication
+        { name: 'Messaging', href: '/messaging', icon: MessagesSquare },
       ];
     } else if (userRole === 'examiner') {
       return [
         ...baseNavigation,
+        // Examination Management
         { name: 'Examination Schedule', href: '/exam-schedule', icon: Calendar },
         { name: 'Skill Tests', href: '/skill-tests', icon: CheckSquare },
         { name: 'APC/OPC Sessions', href: '/apc-opc', icon: Plane },
         { name: 'Line Checks', href: '/line-checks', icon: FileCheck },
+        
+        // Results & Analytics
         { name: 'Results & Reports', href: '/results', icon: FileText },
+        { name: 'Performance Analytics', href: '/performance', icon: LineChart },
+        
+        // Regulatory & Compliance
         { name: 'Regulatory Records', href: '/regulatory', icon: Briefcase },
+        { name: 'Compliance Verification', href: '/verification', icon: ShieldCheck },
         { name: 'Examiner Authorizations', href: '/authorizations', icon: Medal },
+        
+        // Quality Management
         { name: 'Quality Assurance', href: '/quality', icon: Activity },
+        { name: 'Standards Monitoring', href: '/standards', icon: BarChart4 },
+        
+        // Documents & Knowledge
+        { name: 'Document Analysis', href: '/document-analysis', icon: FileSearch },
       ];
     } else {
       // Trainee navigation
       return [
         ...baseNavigation,
+        // Schedule & Learning
         { name: 'My Schedule', href: '/my-schedule', icon: Calendar },
+        { name: 'E-Learning', href: '/elearning', icon: GraduationCap },
+        
+        // Progress & Records
         { name: 'Training Progress', href: '/progress', icon: Activity },
-        { name: 'E-Learning', href: '/elearning', icon: BookOpen },
         { name: 'Flight Records', href: '/flight-records', icon: Plane },
         { name: 'Theory Tests', href: '/theory-tests', icon: CheckSquare },
+        
+        // Performance & Achievements
+        { name: 'Performance Dashboard', href: '/performance', icon: BarChart2 },
+        { name: 'Achievements', href: '/achievements', icon: Award },
+        { name: 'Leaderboards', href: '/leaderboards', icon: Trophy },
+        
+        // Resources & Support
         { name: 'Resources', href: '/resources', icon: FileText },
         { name: 'Instructor Feedback', href: '/feedback', icon: FileCheck },
-        { name: 'Messaging', href: '/messaging', icon: Users },
+        { name: 'Messaging', href: '/messaging', icon: MessagesSquare },
+        
+        // Knowledge Management
+        { name: 'Study Materials', href: '/study', icon: BookOpen },
       ];
     }
   };
