@@ -48,8 +48,9 @@ import {
   Cog,
   File,
   FileCheck,
-  FileCog,
+
   FileCode,
+  FileSearch,
   FileText,
   Gauge,
   GraduationCap,
@@ -168,7 +169,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     const baseNavigation = [
       { name: 'Dashboard', href: '/', icon: Home },
       { name: 'Document Repository', href: '/documents', icon: FileText },
-      { name: 'Document Processor', href: '/document-processor', icon: FileCog },
+      { name: 'Document Processor', href: '/document-processor', icon: FileSearch },
       { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
     ];
 
