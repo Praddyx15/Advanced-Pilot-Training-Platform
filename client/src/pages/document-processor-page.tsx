@@ -9,7 +9,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Upload, FileText, Search, CompareIcon, Languages, Check, X, ArrowRight, BookOpen, FileCog, Download, ExternalLink, FileSearch, Sparkles, ArrowUp, PieChart, ListChecks, Scroll } from "lucide-react";
+import { Loader2, Upload, FileText, Search, GitCompare, Languages, Check, X, ArrowRight, BookOpen, FileCog, Download, ExternalLink, FileSearch, Sparkles, ArrowUp, PieChart, ListChecks, Scroll } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,7 +19,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "../lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import AppLayout from '@/components/layouts/app-layout';
+import { AppLayout } from '@/components/layouts/app-layout';
 
 // Import document related types if needed
 // import { DocumentCategory, SubjectArea, PriorityLevel } from '@shared/document-types';
@@ -93,15 +93,7 @@ function DocumentUploadTab() {
   
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const res = await apiRequest("POST", "/api/documents/upload", undefined, {
-        body: formData,
-        onUploadProgress: (progressEvent) => {
-          if (progressEvent.total) {
-            const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-            setUploadProgress(progress);
-          }
-        },
-      });
+      const res = await apiRequest("POST", "/api/documents/upload", formData);
       return await res.json();
     },
     onSuccess: () => {
@@ -889,11 +881,405 @@ function ComparisonTab() {
             ) : (
               <div className="flex items-center justify-center h-[300px] border rounded-md">
                 <div className="text-center text-muted-foreground">
-                  <CompareIcon className="h-10 w-10 mx-auto mb-2" />
+                  <GitCompare className="h-10 w-10 mx-auto mb-2" />
                   <p>Select two documents and click "Compare Documents"</p>
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Syllabus Generation Interface
+ * 
+ * Provides an interface for generating training syllabi from regulatory documents
+ * and other materials using AI-powered extraction of lessons, modules, and competencies.
+ */
+function SyllabusGenerationTab() {
+  const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const [selectedDocument, setSelectedDocument] = useState<string>("");
+  const [generationProgress, setGenerationProgress] = useState<number | null>(null);
+  const [generationOptions, setGenerationOptions] = useState({
+    extractModules: true,
+    extractLessons: true, 
+    extractCompetencies: true,
+    extractRegulatoryReferences: true,
+    detectAircraftType: true,
+    programType: "type_rating", // default to type rating
+    minimumConfidenceThreshold: 70 // 0-100
+  });
+  
+  // For selecting templates
+  const [useTemplate, setUseTemplate] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>("");
+  
+  const { data: documents, isLoading: isLoadingDocuments } = useQuery({
+    queryKey: ['/api/documents'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/documents');
+      return await res.json();
+    }
+  });
+  
+  const { data: templates, isLoading: isLoadingTemplates } = useQuery({
+    queryKey: ['/api/syllabus/templates'],
+    queryFn: async () => {
+      const res = await apiRequest('GET', '/api/syllabus/templates');
+      return await res.json();
+    }
+  });
+  
+  const syllabusGenerationMutation = useMutation({
+    mutationFn: async () => {
+      // Start the generation process
+      const payload = {
+        documentId: parseInt(selectedDocument),
+        options: {
+          ...generationOptions,
+          templateId: useTemplate && selectedTemplate ? parseInt(selectedTemplate) : undefined
+        }
+      };
+      
+      const res = await apiRequest('POST', '/api/syllabus/generate', payload);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Syllabus generation started",
+        description: `Generation ID: ${data.generationId}. This may take a few minutes to complete.`,
+      });
+      
+      // Start polling for progress
+      pollGenerationProgress(data.generationId);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Generation failed to start",
+        description: error.message,
+        variant: "destructive",
+      });
+      setGenerationProgress(null);
+    }
+  });
+  
+  // Function to poll for generation progress
+  const pollGenerationProgress = (generationId: string) => {
+    let pollInterval: NodeJS.Timeout;
+    
+    const checkProgress = async () => {
+      try {
+        const res = await apiRequest('GET', `/api/syllabus/generation/${generationId}/progress`);
+        const data = await res.json();
+        
+        setGenerationProgress(data.progress);
+        
+        if (data.status === 'completed') {
+          clearInterval(pollInterval);
+          toast({
+            title: "Syllabus generation complete",
+            description: `Your syllabus has been generated successfully.`,
+          });
+          
+          // Navigate to the syllabus viewer
+          setLocation(`/syllabus/${data.syllabusId}`);
+        } else if (data.status === 'failed') {
+          clearInterval(pollInterval);
+          toast({
+            title: "Syllabus generation failed",
+            description: data.error || "An error occurred during generation.",
+            variant: "destructive",
+          });
+          setGenerationProgress(null);
+        }
+      } catch (error) {
+        console.error("Error polling for progress:", error);
+      }
+    };
+    
+    // Poll every 3 seconds
+    pollInterval = setInterval(checkProgress, 3000);
+    
+    // Start the first check immediately
+    checkProgress();
+  };
+  
+  const handleGenerateSyllabus = () => {
+    if (!selectedDocument) {
+      toast({
+        title: "No document selected",
+        description: "Please select a document first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    syllabusGenerationMutation.mutate();
+  };
+  
+  const programTypes = [
+    { value: "type_rating", label: "Type Rating" },
+    { value: "recurrent", label: "Recurrent Training" },
+    { value: "initial", label: "Initial Training" },
+    { value: "joc_mcc", label: "JOC/MCC" },
+    { value: "conversion", label: "Conversion Training" },
+    { value: "instructor", label: "Instructor Training" },
+    { value: "examiner", label: "Examiner Training" },
+    { value: "custom", label: "Custom Program" }
+  ];
+  
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Generate Training Syllabus</CardTitle>
+        <CardDescription>
+          Extract training modules, lessons, and competencies from regulatory documents
+          and other materials to generate comprehensive training syllabi
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="document-select">Source Document</Label>
+              <Select 
+                value={selectedDocument} 
+                onValueChange={setSelectedDocument}
+              >
+                <SelectTrigger id="document-select">
+                  <SelectValue placeholder="Select a document" />
+                </SelectTrigger>
+                <SelectContent>
+                  {isLoadingDocuments ? (
+                    <div className="flex items-center justify-center p-4">
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      Loading documents...
+                    </div>
+                  ) : (
+                    documents?.map((doc: any) => (
+                      <SelectItem key={doc.id} value={doc.id.toString()}>
+                        {doc.fileName || doc.title}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Select a regulatory or training document as the source for syllabus generation
+              </p>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="program-type">Program Type</Label>
+              <Select 
+                value={generationOptions.programType} 
+                onValueChange={(value) => setGenerationOptions({
+                  ...generationOptions,
+                  programType: value
+                })}
+              >
+                <SelectTrigger id="program-type">
+                  <SelectValue placeholder="Select program type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {programTypes.map((type) => (
+                    <SelectItem key={type.value} value={type.value}>
+                      {type.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2 pt-2">
+              <Switch
+                id="use-template"
+                checked={useTemplate}
+                onCheckedChange={setUseTemplate}
+              />
+              <Label htmlFor="use-template">Use syllabus template</Label>
+            </div>
+            
+            {useTemplate && (
+              <div className="space-y-2">
+                <Label htmlFor="template-select">Template</Label>
+                <Select 
+                  value={selectedTemplate} 
+                  onValueChange={setSelectedTemplate}
+                  disabled={!useTemplate}
+                >
+                  <SelectTrigger id="template-select">
+                    <SelectValue placeholder="Select a template" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isLoadingTemplates ? (
+                      <div className="flex items-center justify-center p-4">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Loading templates...
+                      </div>
+                    ) : (
+                      templates?.map((template: any) => (
+                        <SelectItem key={template.id} value={template.id.toString()}>
+                          {template.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <h3 className="text-sm font-medium mb-2">Generation Options</h3>
+            <div className="space-y-3 bg-muted/50 p-4 rounded-lg">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="extract-modules"
+                  checked={generationOptions.extractModules}
+                  onCheckedChange={(checked) => setGenerationOptions({
+                    ...generationOptions,
+                    extractModules: checked === true
+                  })}
+                />
+                <Label htmlFor="extract-modules" className="text-sm font-normal">
+                  Extract training modules
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="extract-lessons"
+                  checked={generationOptions.extractLessons}
+                  onCheckedChange={(checked) => setGenerationOptions({
+                    ...generationOptions,
+                    extractLessons: checked === true
+                  })}
+                />
+                <Label htmlFor="extract-lessons" className="text-sm font-normal">
+                  Extract lessons and learning objectives
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="extract-competencies"
+                  checked={generationOptions.extractCompetencies}
+                  onCheckedChange={(checked) => setGenerationOptions({
+                    ...generationOptions,
+                    extractCompetencies: checked === true
+                  })}
+                />
+                <Label htmlFor="extract-competencies" className="text-sm font-normal">
+                  Extract competencies and assessment criteria
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="extract-regulations"
+                  checked={generationOptions.extractRegulatoryReferences}
+                  onCheckedChange={(checked) => setGenerationOptions({
+                    ...generationOptions,
+                    extractRegulatoryReferences: checked === true
+                  })}
+                />
+                <Label htmlFor="extract-regulations" className="text-sm font-normal">
+                  Extract regulatory references
+                </Label>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="detect-aircraft"
+                  checked={generationOptions.detectAircraftType}
+                  onCheckedChange={(checked) => setGenerationOptions({
+                    ...generationOptions,
+                    detectAircraftType: checked === true
+                  })}
+                />
+                <Label htmlFor="detect-aircraft" className="text-sm font-normal">
+                  Auto-detect aircraft type
+                </Label>
+              </div>
+              
+              <div className="space-y-2 pt-2">
+                <div className="flex justify-between">
+                  <Label htmlFor="confidence" className="text-sm">Confidence Threshold</Label>
+                  <span className="text-xs text-muted-foreground">{generationOptions.minimumConfidenceThreshold}%</span>
+                </div>
+                <input
+                  id="confidence"
+                  type="range"
+                  min="50"
+                  max="95"
+                  step="5"
+                  value={generationOptions.minimumConfidenceThreshold}
+                  onChange={(e) => setGenerationOptions({
+                    ...generationOptions,
+                    minimumConfidenceThreshold: parseInt(e.target.value)
+                  })}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>More content</span>
+                  <span>Higher accuracy</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <Button 
+          onClick={handleGenerateSyllabus}
+          disabled={!selectedDocument || syllabusGenerationMutation.isPending || generationProgress !== null}
+          className="w-full"
+        >
+          {syllabusGenerationMutation.isPending || generationProgress !== null ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              {generationProgress !== null 
+                ? `Processing: ${Math.round(generationProgress)}%` 
+                : "Starting Generation..."
+              }
+            </>
+          ) : (
+            <>
+              <Sparkles className="mr-2 h-4 w-4" />
+              Generate Syllabus
+            </>
+          )}
+        </Button>
+        
+        {generationProgress !== null && (
+          <div className="space-y-2">
+            <div className="flex justify-between">
+              <Label className="text-sm">Generation Progress</Label>
+              <span className="text-sm text-muted-foreground">{Math.round(generationProgress)}%</span>
+            </div>
+            <Progress value={generationProgress} className="h-2" />
+            <p className="text-xs text-muted-foreground text-center">
+              This process may take several minutes depending on document complexity
+            </p>
+          </div>
+        )}
+        
+        <div className="bg-muted/30 p-4 rounded-lg">
+          <div className="flex items-start gap-3">
+            <BookOpen className="h-10 w-10 text-muted-foreground flex-shrink-0" />
+            <div>
+              <h3 className="text-sm font-medium mb-1">About Syllabus Generation</h3>
+              <p className="text-xs text-muted-foreground">
+                Our AI-powered syllabus generator extracts structured training content from your documents,
+                creating comprehensive training programs that comply with regulatory requirements. The system 
+                identifies modules, lessons, competencies, and learning objectives, organizing them into a 
+                coherent training structure.
+              </p>
+            </div>
           </div>
         </div>
       </CardContent>
