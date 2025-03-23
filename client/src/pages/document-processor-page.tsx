@@ -5,6 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FileText, FileSearch, PenTool, BrainCircuit, Book, FileUp } from 'lucide-react';
 import { AppLayout } from '@/components/layouts/app-layout';
 import KnowledgeGraphTab from '@/components/document-processor/KnowledgeGraphTab';
+import OCRProcessingTab from '@/components/document-processor/OCRProcessingTab';
+import DocumentAnalysisTab from '@/components/document-processor/DocumentAnalysisTab';
+import SyllabusGenerationTab from '@/components/document-processor/SyllabusGenerationTab';
 
 export default function DocumentProcessorPage() {
   const [activeTab, setActiveTab] = useState('knowledge');
@@ -51,29 +54,13 @@ export default function DocumentProcessorPage() {
               
               <TabsContent value="ocr" className="mt-0">
                 <div className="p-1">
-                  <div className="text-center py-10">
-                    <div className="bg-blue-100 dark:bg-blue-900 p-4 rounded-full inline-flex mb-4">
-                      <FileSearch className="h-6 w-6 text-blue-600 dark:text-blue-300" />
-                    </div>
-                    <h3 className="text-lg font-medium">OCR Processing</h3>
-                    <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-                      OCR module is being implemented. You'll soon be able to extract text from images and scanned documents.
-                    </p>
-                  </div>
+                  <OCRProcessingTab />
                 </div>
               </TabsContent>
               
               <TabsContent value="analysis" className="mt-0">
                 <div className="p-1">
-                  <div className="text-center py-10">
-                    <div className="bg-amber-100 dark:bg-amber-900 p-4 rounded-full inline-flex mb-4">
-                      <PenTool className="h-6 w-6 text-amber-600 dark:text-amber-300" />
-                    </div>
-                    <h3 className="text-lg font-medium">Document Analysis</h3>
-                    <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-                      Document Analysis module is being implemented. You'll soon be able to analyze documents for key concepts and entities.
-                    </p>
-                  </div>
+                  <DocumentAnalysisTab />
                 </div>
               </TabsContent>
               
@@ -85,15 +72,7 @@ export default function DocumentProcessorPage() {
               
               <TabsContent value="syllabus" className="mt-0">
                 <div className="p-1">
-                  <div className="text-center py-10">
-                    <div className="bg-purple-100 dark:bg-purple-900 p-4 rounded-full inline-flex mb-4">
-                      <Book className="h-6 w-6 text-purple-600 dark:text-purple-300" />
-                    </div>
-                    <h3 className="text-lg font-medium">Syllabus Generation</h3>
-                    <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-                      Syllabus Generation module is being implemented. You'll soon be able to automatically generate training syllabi.
-                    </p>
-                  </div>
+                  <SyllabusGenerationTab />
                 </div>
               </TabsContent>
             </Tabs>
