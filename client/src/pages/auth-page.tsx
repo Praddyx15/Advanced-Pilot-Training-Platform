@@ -439,7 +439,7 @@ export default function AuthPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>User Role</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select a role" />
@@ -490,7 +490,7 @@ export default function AuthPage() {
                             <FormItem>
                               <FormLabel>Organization Name</FormLabel>
                               <FormControl>
-                                <Input placeholder="Organization name" {...field} />
+                                <Input placeholder="Organization name" value={field.value || ''} onChange={field.onChange} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
