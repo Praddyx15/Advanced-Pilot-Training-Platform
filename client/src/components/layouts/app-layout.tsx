@@ -310,10 +310,10 @@ export function AppLayout({ children }: AppLayoutProps) {
             </div>
             <div className="grid gap-0.5">
               <p className="text-sm font-medium text-white">
-                {user?.firstName} {user?.lastName}
+                {user?.firstName || ''} {user?.lastName || ''}
               </p>
               <p className="text-xs text-white/70">
-                {user?.role.charAt(0).toUpperCase() + user?.role.slice(1)}
+                {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'User'}
               </p>
             </div>
           </div>
@@ -392,10 +392,10 @@ export function AppLayout({ children }: AppLayoutProps) {
                   <DropdownMenuLabel>
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">
-                        {user?.firstName} {user?.lastName}
+                        {user?.firstName || ''} {user?.lastName || ''}
                       </p>
                       <p className="text-xs leading-none text-muted-foreground">
-                        {user?.email}
+                        {user?.email || ''}
                       </p>
                     </div>
                   </DropdownMenuLabel>

@@ -213,11 +213,33 @@ export default function AuthPage() {
                       />
                       <div className="text-sm p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
                         <p className="font-medium text-gray-800 dark:text-gray-200">Pre-configured Test Accounts:</p>
-                        <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
-                          <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
-                          <li><strong>Username:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
-                          <li><strong>Username:</strong> student | <strong>Password:</strong> Student@123</li>
-                        </ul>
+                        
+                        <div className="space-y-2 mt-1">
+                          <div>
+                            <p className="font-medium text-gray-700 dark:text-gray-300">Admin:</p>
+                            <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                              <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
+                            </ul>
+                          </div>
+                          
+                          <div>
+                            <p className="font-medium text-gray-700 dark:text-gray-300">ATO Users:</p>
+                            <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                              <li><strong>Instructor:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
+                              <li><strong>Examiner:</strong> examiner | <strong>Password:</strong> Examiner@123</li>
+                              <li><strong>Student:</strong> atostudent | <strong>Password:</strong> Student@123</li>
+                            </ul>
+                          </div>
+                          
+                          <div>
+                            <p className="font-medium text-gray-700 dark:text-gray-300">Airline Users:</p>
+                            <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                              <li><strong>Instructor:</strong> airline | <strong>Password:</strong> Airline@123</li>
+                              <li><strong>Student:</strong> student | <strong>Password:</strong> Student@123</li>
+                              <li><strong>Student (alt):</strong> student2 | <strong>Password:</strong> Student@123</li>
+                            </ul>
+                          </div>
+                        </div>
                       </div>
                       <Button
                         type="submit"
@@ -371,17 +393,42 @@ export default function AuthPage() {
                         <FormMessage className="text-center">
                           <div className="text-sm p-2 mb-2 bg-slate-100 dark:bg-slate-800 rounded-md">
                             <p className="font-medium text-gray-800 dark:text-gray-200">Pre-configured Test Accounts:</p>
-                            <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
-                              <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
-                              <li><strong>Username:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
-                              <li><strong>Username:</strong> student | <strong>Password:</strong> Student@123</li>
-                            </ul>
-                            <p className="font-medium text-gray-800 dark:text-gray-200 mt-2">User Role Based on Email:</p>
+                            
+                            <div className="space-y-2 mt-1">
+                              <div>
+                                <p className="font-medium text-gray-700 dark:text-gray-300">Admin:</p>
+                                <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                                  <li><strong>Username:</strong> admin | <strong>Password:</strong> Admin@123</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-medium text-gray-700 dark:text-gray-300">ATO Users:</p>
+                                <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                                  <li><strong>Instructor:</strong> ato_airline | <strong>Password:</strong> ATO@airline123</li>
+                                  <li><strong>Examiner:</strong> examiner | <strong>Password:</strong> Examiner@123</li>
+                                  <li><strong>Student:</strong> atostudent | <strong>Password:</strong> Student@123</li>
+                                </ul>
+                              </div>
+                              
+                              <div>
+                                <p className="font-medium text-gray-700 dark:text-gray-300">Airline Users:</p>
+                                <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside ml-2">
+                                  <li><strong>Instructor:</strong> airline | <strong>Password:</strong> Airline@123</li>
+                                  <li><strong>Student:</strong> student | <strong>Password:</strong> Student@123</li>
+                                  <li><strong>Student (alt):</strong> student2 | <strong>Password:</strong> Student@123</li>
+                                </ul>
+                              </div>
+                            </div>
+                            
+                            <p className="font-medium text-gray-800 dark:text-gray-200 mt-3">User Role Based on Email:</p>
                             <ul className="text-sm text-gray-500 dark:text-gray-400 list-disc list-inside">
                               <li><strong>admin@example.com</strong> - Administrator access</li>
+                              <li><strong>examiner@ato.com</strong> - ATO Examiner access</li>
                               <li><strong>ato@example.com</strong> - ATO Instructor access</li>
                               <li><strong>airline@example.com</strong> - Airline Instructor access</li>
-                              <li><strong>student@example.com</strong> - Trainee access</li>
+                              <li><strong>student@ato.com</strong> - ATO Student access</li>
+                              <li><strong>student@example.com</strong> - Airline Student access</li>
                             </ul>
                           </div>
                         </FormMessage>
@@ -418,7 +465,7 @@ export default function AuthPage() {
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel>Organization Type</FormLabel>
-                              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <Select onValueChange={field.onChange} defaultValue={field.value || undefined}>
                                 <FormControl>
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select organization type" />
