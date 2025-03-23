@@ -43,6 +43,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   };
 
   seedDatabase();
+  
+  // Register document-related routes
+  registerDocumentRoutes(app);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {

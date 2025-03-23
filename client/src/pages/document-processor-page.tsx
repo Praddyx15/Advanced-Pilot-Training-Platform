@@ -1,11 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation } from 'wouter';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Loader2, Upload, FileText, Search, CompareIcon, Languages, Check, X } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Upload, FileText, Search, CompareIcon, Languages, Check, X, ArrowRight, BookOpen, FileCog, Download, ExternalLink, FileSearch, Sparkles, ArrowUp, PieChart, ListChecks, Scroll } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -46,11 +50,12 @@ export default function DocumentProcessorPage() {
         </div>
         
         <Tabs defaultValue="upload" value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="grid grid-cols-4 w-full md:w-2/3 lg:w-1/2">
+          <TabsList className="grid grid-cols-5 w-full md:w-4/5 lg:w-3/4">
             <TabsTrigger value="upload">Upload</TabsTrigger>
             <TabsTrigger value="extract">Extract</TabsTrigger>
             <TabsTrigger value="classify">Classify</TabsTrigger>
             <TabsTrigger value="compare">Compare</TabsTrigger>
+            <TabsTrigger value="syllabus">Syllabus</TabsTrigger>
           </TabsList>
           
           <TabsContent value="upload" className="space-y-4">
@@ -67,6 +72,10 @@ export default function DocumentProcessorPage() {
           
           <TabsContent value="compare" className="space-y-4">
             <ComparisonTab />
+          </TabsContent>
+
+          <TabsContent value="syllabus" className="space-y-4">
+            <SyllabusGenerationTab />
           </TabsContent>
         </Tabs>
       </div>
