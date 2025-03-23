@@ -139,20 +139,20 @@ export default function AuthPage() {
   return (
     <div className="flex min-h-screen">
       {/* Form Column */}
-      <div className="flex flex-col justify-center w-full lg:w-1/2 p-6 md:p-12">
-        <div className="space-y-6 max-w-md mx-auto">
-          <div className="space-y-4 text-center">
+      <div className="flex flex-col justify-center w-full lg:w-1/2 p-6 md:p-8 lg:p-12">
+        <div className="space-y-6 w-full max-w-md mx-auto">
+          <div className="space-y-3 text-center">
             <div className="flex justify-center mb-2">
               <img 
                 src="/images/logo.png" 
                 alt="60 Minutes Aviation Logo" 
-                className="h-20"
+                className="h-16 sm:h-20"
               />
             </div>
-            <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl">
-              Welcome to Advanced Pilot Training Platform
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tighter md:text-4xl">
+              Advanced Pilot Training Platform
             </h1>
-            <p className="text-gray-500 md:text-xl/relaxed dark:text-gray-400">
+            <p className="text-gray-500 md:text-lg dark:text-gray-400">
               Sign in to your account or create a new one
             </p>
           </div>
@@ -529,19 +529,19 @@ export default function AuthPage() {
 
       {/* Hero Column */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-50 to-indigo-100 dark:from-gray-900 dark:to-gray-800">
-        <div className="flex flex-col justify-center items-center p-12 space-y-8 text-center w-full">
-          <div className="mb-6">
+        <div className="flex flex-col justify-center items-center p-8 lg:p-12 space-y-6 text-center w-full">
+          <div className="mb-4">
             <img 
               src="/images/logo.png" 
               alt="60 Minutes Aviation Logo" 
-              className="h-24" 
+              className="h-20 lg:h-24" 
             />
           </div>
-          <div className="space-y-4 max-w-xl">
-            <h2 className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+          <div className="space-y-3 max-w-md">
+            <h2 className="text-3xl lg:text-4xl font-bold tracking-tighter bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
               Advanced Pilot Training Platform
             </h2>
-            <p className="text-gray-600 dark:text-gray-300 md:text-xl/relaxed">
+            <p className="text-gray-600 dark:text-gray-300 text-lg">
               The next generation training platform for aviation professionals
             </p>
           </div>
