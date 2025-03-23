@@ -447,6 +447,9 @@ export function AppLayout({ children }: AppLayoutProps) {
 
             <div className="flex items-center gap-4">
               <NotificationBell />
+              <div className="text-white">
+                <ThemeToggle />
+              </div>
               <Button
                 variant="ghost"
                 size="sm"
@@ -506,8 +509,8 @@ export function AppLayout({ children }: AppLayoutProps) {
         </header>
 
         {/* Main content */}
-        <main className="flex-1 bg-gray-50 dark:bg-gray-900 min-h-screen overflow-hidden">
-          <div className="container mx-auto py-6">
+        <main className="flex-1 bg-gray-50 dark:bg-gray-900 min-h-screen overflow-x-hidden">
+          <div className="container max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             {children}
           </div>
         </main>
