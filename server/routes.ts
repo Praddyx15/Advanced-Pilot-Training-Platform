@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer } from 'ws';
 import { storage } from "./storage";
 import { setupAuth } from "./auth";
 import { extendedSessionSchema, insertProgramSchema, insertModuleSchema, insertLessonSchema, insertAssessmentSchema, insertGradeSchema, insertDocumentSchema, insertResourceSchema, insertNotificationSchema } from "@shared/schema";
@@ -8,6 +9,14 @@ import { z } from "zod";
 import * as syllabusGenerator from "./services/syllabus-generator";
 import * as templateManager from "./services/syllabus-template-manager";
 import { registerDocumentRoutes } from "./routes/document-routes";
+import { registerSyllabusRoutes } from "./routes/syllabus-routes";
+import { registerKnowledgeGraphRoutes } from "./routes/knowledge-graph-routes";
+import { registerTrainingRoutes } from "./routes/training-routes";
+import { registerAssessmentRoutes } from "./routes/assessment-routes";
+import { registerResourceRoutes } from "./routes/resource-routes";
+import { registerNotificationRoutes } from "./routes/notification-routes";
+import { registerFlightRecordRoutes } from "./routes/flight-record-routes";
+import { registerAchievementRoutes } from "./routes/achievement-routes";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
 import v1Router from "./api/v1-router";
@@ -44,8 +53,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   seedDatabase();
   
-  // Register document-related routes
+  // Register all routes from dedicated route files
   registerDocumentRoutes(app);
+  registerSyllabusRoutes(app);
+  registerKnowledgeGraphRoutes(app);
+  registerTrainingRoutes(app);
+  registerAssessmentRoutes(app);
+  registerResourceRoutes(app);
+  registerNotificationRoutes(app);
+  registerFlightRecordRoutes(app);
+  registerAchievementRoutes(app);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {
@@ -1505,6 +1522,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register document processing routes
   registerDocumentRoutes(app);
 
+  // Create HTTP server
   const httpServer = createServer(app);
+  
+  // Create WebSocket server
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+  
+  // Handle WebSocket connections
+  wss.on('connection', (ws) => {
+    logger.info('WebSocket client connected');
+    
+    // Send a welcome message
+    ws.send(JSON.stringify({
+      type: 'connection',
+      message: 'Connected to APTP WebSocket Server',
+      timestamp: new Date().toISOString()
+    }));
+    
+    // Handle incoming messages
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message.toString());
+        
+        // Handle different message types
+        switch (data.type) {
+          case 'ping':
+            ws.send(JSON.stringify({
+              type: 'pong',
+              timestamp: new Date().toISOString()
+            }));
+            break;
+            
+          case 'subscribe':
+            // Handle subscription requests
+            logger.info(`WebSocket client subscribed to: ${data.channel}`);
+            ws.send(JSON.stringify({
+              type: 'subscription_confirm',
+              channel: data.channel,
+              timestamp: new Date().toISOString()
+            }));
+            break;
+            
+          default:
+            logger.warn(`Received unknown WebSocket message type: ${data.type}`);
+        }
+      } catch (error) {
+        logger.error('Error processing WebSocket message', { context: { error } });
+      }
+    });
+    
+    // Handle disconnect
+    ws.on('close', () => {
+      logger.info('WebSocket client disconnected');
+    });
+  });
+  
   return httpServer;
 }
