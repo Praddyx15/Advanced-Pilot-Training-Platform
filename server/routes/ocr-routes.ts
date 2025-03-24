@@ -43,7 +43,8 @@ const ocrUpload = multer({
     if (allowedExtensions.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error(`File type ${ext} is not supported for OCR`), false);
+      cb(null, false);
+      // We'll handle the error response in the route handler
     }
   }
 });

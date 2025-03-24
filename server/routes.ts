@@ -64,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerNotificationRoutes(app);
   registerFlightRecordRoutes(app);
   registerAchievementRoutes(app);
+  registerOcrRoutes(app);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {
