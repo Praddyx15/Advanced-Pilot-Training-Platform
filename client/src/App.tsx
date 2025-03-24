@@ -21,6 +21,7 @@ import AssessmentGradingPage from "@/pages/assessment-grading-page";
 import TraineePerformancePage from "@/pages/trainee-performance-page";
 import SchedulePage from "@/pages/schedule-page";
 import MessagingPage from "@/pages/messaging-page";
+import ResourcesPage from "@/pages/resources-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -47,6 +48,8 @@ function AppRouter() {
       <ProtectedRoute path="/trainee-performance" component={TraineePerformancePage} />
       <ProtectedRoute path="/trainee-performance/:id" component={TraineePerformancePage} />
       <ProtectedRoute path="/schedule" component={SchedulePage} />
+      <ProtectedRoute path="/messaging" component={MessagingPage} />
+      <ProtectedRoute path="/resources" component={ResourcesPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
