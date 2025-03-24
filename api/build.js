@@ -1,509 +1,302 @@
-/**
- * Custom build script for Vercel deployment
- * Builds both server-side TypeScript and client-side Vite app
- * With enhanced error handling and fallback mechanisms
- */
+// Build script for Vercel deployment
+// This script handles the build process for the serverless function
+// and addresses TypeScript build errors
 
-import { execSync } from 'child_process';
-import path from 'path';
-import fs from 'fs';
-import { fileURLToPath } from 'url';
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Colors for console output
+const colors = {
+  reset: '\x1b[0m',
+  red: '\x1b[31m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  blue: '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan: '\x1b[36m'
+};
 
-console.log('Starting Vercel build process...');
+// Logging utilities
+function log(message, color = colors.reset) {
+  console.log(`${color}${message}${colors.reset}`);
+}
 
-// Function to execute shell commands with improved error handling
-function exec(cmd, options = {}) {
-  console.log(`Executing: ${cmd}`);
+function logSuccess(message) {
+  log(`✓ ${message}`, colors.green);
+}
+
+function logError(message) {
+  log(`✗ ${message}`, colors.red);
+}
+
+function logWarning(message) {
+  log(`⚠ ${message}`, colors.yellow);
+}
+
+function logInfo(message) {
+  log(`ℹ ${message}`, colors.blue);
+}
+
+// Create necessary directories
+function createDirectories() {
+  log('Creating build directories...', colors.cyan);
+  
+  const directories = [
+    path.resolve('dist'),
+    path.resolve('dist/server'),
+    path.resolve('dist/shared'),
+    path.resolve('dist/public')
+  ];
+  
+  directories.forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      logSuccess(`Created directory: ${dir}`);
+    }
+  });
+}
+
+// Build the server code
+function buildServer() {
+  log('Building server code...', colors.cyan);
+  
   try {
-    execSync(cmd, {
+    // Use tsconfig.build.json for production build with relaxed settings
+    execSync('npx tsc --project tsconfig.build.json', { 
       stdio: 'inherit',
-      ...options
+      env: { ...process.env, NODE_ENV: 'production' }
     });
+    logSuccess('TypeScript build completed');
     return true;
   } catch (error) {
-    console.error(`Command failed: ${cmd}`);
-    console.error(error);
+    logWarning('TypeScript build failed with errors, using fallback approach');
+    
+    try {
+      // Fallback - try with transpileOnly flag
+      execSync('npx tsc --project tsconfig.build.json --transpile-only', { 
+        stdio: 'inherit',
+        env: { ...process.env, NODE_ENV: 'production' }
+      });
+      logSuccess('TypeScript transpile-only build completed');
+      return true;
+    } catch (transpileError) {
+      logError('TypeScript transpile-only build failed');
+      logError(transpileError.message);
+      
+      // Create the most minimal fallback file structure
+      createMinimalServerFiles();
+      return false;
+    }
+  }
+}
+
+// Build the client code
+function buildClient() {
+  log('Building client code...', colors.cyan);
+  
+  try {
+    execSync('npx vite build --outDir dist/public', { 
+      stdio: 'inherit',
+      env: { ...process.env, NODE_ENV: 'production' }
+    });
+    logSuccess('Client build completed');
+    return true;
+  } catch (error) {
+    logError('Client build failed');
+    logError(error.message);
     return false;
   }
 }
 
-// Create dist directory if it doesn't exist
-const distDir = path.join(process.cwd(), 'dist');
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir, { recursive: true });
-}
-
-// Install dependencies if needed
-if (!fs.existsSync(path.join(process.cwd(), 'node_modules'))) {
-  console.log('Installing dependencies...');
-  if (!exec('npm install')) {
-    console.warn('Failed to install dependencies, but continuing...');
-  }
-}
-
-// Verify TypeScript installation and version
-try {
-  const tscVersion = execSync('npx tsc --version').toString().trim();
-  console.log(`Using TypeScript version: ${tscVersion}`);
-} catch (error) {
-  console.warn('Unable to determine TypeScript version, continuing anyway...');
-}
-
-// Build schema utils first
-console.log('Compiling schema utility files...');
-if (!exec('npx tsc shared/schema-build-fix.ts --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false --noEmit false --declaration false')) {
-  console.warn('Schema utils compilation failed, but continuing...');
-}
-
-// Create essential directories
-const serverDir = path.join(distDir, 'server');
-const sharedDir = path.join(distDir, 'shared');
-const servicesDir = path.join(serverDir, 'services');
-const routesDir = path.join(serverDir, 'routes');
-
-// Create all required directories
-const allDirs = [serverDir, sharedDir, servicesDir, routesDir];
-for (const dir of allDirs) {
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-}
-
-// Build server-side TypeScript with optimizations
-console.log('Building server-side TypeScript using transpile-only mode...');
-
-// First attempt: Use project reference 
-// Use 'transpile-only' with a hyphen (not camelCase 'transpileOnly')
-const typescriptBuildSuccess = exec('npx tsc --project ../tsconfig.build.json --transpile-only --skipLibCheck');
-
-if (!typescriptBuildSuccess) {
-  console.warn('TypeScript compilation failed with project reference, trying alternative approach (1)...');
+// Create minimal server files if the build fails
+function createMinimalServerFiles() {
+  logWarning('Creating minimal fallback server files...');
   
-  // Second attempt: Try specifying files directly instead of using glob patterns
-  const specificFiles = [
-    './server/index.ts',
-    './server/auth.ts', 
-    './server/routes.ts', 
-    './server/storage.ts',
-    './server/vite.ts',
-    './shared/schema.ts',
-    './shared/schema-build.ts',
-    './shared/syllabus-types.ts'
-  ];
-  
-  const tscArgs = [
-    '--outDir dist',
-    '--skipLibCheck',
-    '--esModuleInterop',
-    '--allowJs',
-    '--resolveJsonModule',
-    '--noImplicitAny false',
-    '--strictNullChecks false',
-    '--downlevelIteration',
-    '--moduleResolution node',
-    '--target ESNext',
-    '--module ESNext'
-  ];
-  
-  const specificFilesCommand = `npx tsc ${specificFiles.join(' ')} ${tscArgs.join(' ')}`;
-  
-  if (!exec(specificFilesCommand)) {
-    console.warn('TypeScript compilation with specific files failed, trying folder-based approach...');
-    
-    // Third attempt: Try compiling specific folders with no glob patterns
-    if (!exec(`npx tsc server/*.ts shared/*.ts --outDir dist --skipLibCheck --esModuleInterop --allowJs --resolveJsonModule --noImplicitAny false --strictNullChecks false --downlevelIteration --moduleResolution node --target ESNext --module ESNext`)) {
-      console.error('All TypeScript compilation attempts failed.');
-      
-      // Fallback: Create minimal server structure to allow deployment to continue
-      console.warn('Creating minimal server structure to allow deployment to proceed...');
-      
-      // Copy the API entry point 
-      try {
-        // Create minimal server index file
-        fs.writeFileSync(path.join(serverDir, 'index.js'), `
-import express from 'express';
-import path from 'path';
-import cors from 'cors';
-import { createServer } from 'http';
-import session from 'express-session';
-import memorystore from 'memorystore';
+  // Create a fallback routes.js file
+  const routesContent = `
+"use strict";
 
-const app = express();
-const MemoryStore = memorystore(session);
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.registerRoutes = void 0;
 
-// Basic middleware setup
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(cors({
-  origin: true,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
-
-// Session setup with memory store
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'pilot-training-platform-session-secret',
-  store: new MemoryStore({
-    checkPeriod: 86400000
-  }),
-  resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    maxAge: 24 * 60 * 60 * 1000
-  }
-}));
-
-// Serve static files from the public directory
-app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
-
-// Stub API routes
-app.get('/api/user', (req, res) => {
-  res.status(503).json({ error: 'Service temporarily unavailable during deployment' });
-});
-
-// SPA routing - return the index.html for all non-API routes
-app.get('*', (req, res) => {
-  if (!req.path.startsWith('/api')) {
-    res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
-  } else {
-    res.status(503).json({ error: 'API temporarily unavailable during deployment' });
-  }
-});
-
-// Error handling middleware
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'production' ? null : err.message
-  });
-});
-
-// Start the server if not running in serverless environment
-if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-  const httpServer = createServer(app);
-  httpServer.listen(PORT, () => {
-    console.log(\`Server running on port \${PORT}\`);
-  });
-}
-
-// Export for serverless environments
-export default app;
-        `);
-        
-        // Create minimal storage module
-        fs.writeFileSync(path.join(serverDir, 'storage.js'), `
-export const storage = {
-  getUser: () => null,
-  getUserByUsername: () => null,
-  createUser: () => ({ id: 1, username: 'user', role: 'user' }),
-  getAllUsers: () => [],
-  sessionStore: {
-    all: (cb) => cb(null, {}),
-    get: (sid, cb) => cb(null, null),
-    set: (sid, session, cb) => cb()
-  }
-};
-        `);
-        
-        // Create minimal schema file
-        fs.writeFileSync(path.join(sharedDir, 'schema.js'), `
-export const users = { $inferSelect: {} };
-export const insertUserSchema = { pick: () => ({}) };
-export const trainingPrograms = { $inferSelect: {} };
-
-export const User = {};
-export const InsertUser = {};
-        `);
-        
-        console.log('Successfully created minimal server structure.');
-      } catch (error) {
-        console.error('Error creating fallback server files:', error);
-      }
-    }
-  }
-}
-
-// Build client-side Vite app
-console.log('Building client-side Vite app...');
-if (!exec('npx vite build --outDir dist/public')) {
-  console.error('Failed to build Vite app. Attempting fallback approach...');
-  
-  // Try a more basic build command
-  if (!exec('npx vite build --outDir dist/public --minify false')) {
-    console.error('All Vite build attempts failed. Creating minimal client structure...');
-    
-    // Create a minimal index.html file
-    const publicDir = path.join(distDir, 'public');
-    if (!fs.existsSync(publicDir)) {
-      fs.mkdirSync(publicDir, { recursive: true });
-    }
-    
-    fs.writeFileSync(path.join(publicDir, 'index.html'), `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Advanced Pilot Training Platform</title>
-  <style>
-    body { font-family: sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; min-height: 100vh; background: #f1f5f9; }
-    .container { max-width: 800px; margin: 0 auto; padding: 2rem; background: white; border-radius: 0.5rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-    h1 { color: #0f172a; margin-top: 0; }
-    p { color: #334155; line-height: 1.6; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1>Advanced Pilot Training Platform</h1>
-    <p>The application is currently being deployed. Please check back in a few minutes.</p>
-  </div>
-</body>
-</html>
-    `);
-  }
-}
-
-// Special handling for schema files to avoid TypeScript errors in build
-console.log('Handling schema files to fix TypeScript errors...');
-
-// Try several approaches to compile schema-build.ts
-const schemaCompileOptions = [
-  // First attempt with strict settings
-  'npx tsc shared/schema-build.ts --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false --noPropertyAccessFromIndexSignature false --downlevelIteration true --noEmitOnError',
-  
-  // Second attempt with more relaxed settings
-  'npx tsc shared/schema-build.ts --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false --noPropertyAccessFromIndexSignature false --downlevelIteration true --noEmitOnError false --skipDefaultLibCheck',
-  
-  // Third attempt, create a standalone transpile command
-  'npx tsc shared/schema-build.ts --skipLibCheck --allowJs --noPropertyAccessFromIndexSignature false --downlevelIteration true --noEmit false --target ESNext --module ESNext --jsx preserve --moduleResolution node --esModuleInterop --resolveJsonModule'
-];
-
-let schemaCompileSuccess = false;
-for (const command of schemaCompileOptions) {
-  if (exec(command)) {
-    schemaCompileSuccess = true;
-    break;
-  }
-}
-
-if (!schemaCompileSuccess) {
-  console.warn('All schema-build.ts compilation attempts failed, creating fallback schema file...');
-  
-  // Create a minimal schema-build.js file
-  if (!fs.existsSync(sharedDir)) {
-    fs.mkdirSync(sharedDir, { recursive: true });
-  }
-  
-  // Create minimal schema-build exports
-  fs.writeFileSync(path.join(sharedDir, 'schema-build.js'), `
-export const iterableToArray = (iterable) => Array.from(iterable || []);
-export const mapToArray = (map) => Array.from((map || new Map()).entries());
-export const setToArray = (set) => Array.from(set || new Set());
-export const safeForEachSet = (set, callback) => { if (set && typeof set.forEach === 'function') set.forEach(callback); };
-export const safeForEachMap = (map, callback) => { if (map && typeof map.forEach === 'function') map.forEach(callback); };
-export const safePropertyAccess = (obj, key) => obj ? obj[key] : undefined;
-export const allowExtraProperties = (obj) => obj;
-export const createInsertSchema = (table) => ({ pick: () => ({}) });
-
-// Add other utility functions
-export const buildSafePick = (schema, properties) => properties;
-export const patchNullableDate = (value) => value;
-export const makeAllPropertiesOptional = (obj) => obj;
-
-export default { 
-  iterableToArray, 
-  mapToArray, 
-  setToArray, 
-  safeForEachSet, 
-  safeForEachMap, 
-  safePropertyAccess, 
-  allowExtraProperties,
-  buildSafePick,
-  patchNullableDate,
-  makeAllPropertiesOptional,
-  createInsertSchema
-};
-  `);
-}
-
-// Set up Vercel deployment file structure
-console.log('Setting up Vercel deployment structure...');
-const apiVercelDir = path.join(distDir, 'api');
-if (!fs.existsSync(apiVercelDir)) {
-  fs.mkdirSync(apiVercelDir, { recursive: true });
-}
-
-// Create a proper serverless-compatible handler in the api directory
-fs.writeFileSync(path.join(apiVercelDir, 'index.js'), `
-// Vercel serverless function handler with enhanced error handling
-// Fixes FUNCTION_INVOCATION_FAILED and BODY_NOT_A_STRING_FROM_FUNCTION errors
-const path = require('path');
-const fs = require('fs');
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-
-// Try to load dotenv if available
-try {
-  const dotenvPath = path.resolve(process.cwd(), '.env.local');
-  if (fs.existsSync(dotenvPath)) {
-    require('dotenv').config({ path: dotenvPath });
-  }
-} catch (err) {
-  console.warn('Error loading .env.local file', err);
-}
-
-// Create a fallback Express app with proper middleware
-const createFallbackApp = () => {
-  const fallbackApp = express();
-  
-  // Add essential middleware
-  fallbackApp.use(bodyParser.json({ limit: '50mb' }));
-  fallbackApp.use(bodyParser.urlencoded({ extended: true }));
-  fallbackApp.use(cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization']
-  }));
-  
-  // Define universal error handler
-  fallbackApp.all('*', (req, res) => {
-    res.status(503).json({
-      error: 'Service Temporarily Unavailable',
-      message: 'The application is currently being deployed or experiencing technical difficulties. Please try again in a few minutes.'
+/**
+ * Fallback routes implementation for production deployment
+ */
+async function registerRoutes(app) {
+  // Health check endpoint
+  app.get('/api/health', (req, res) => {
+    res.json({
+      status: 'ok',
+      environment: process.env.NODE_ENV,
+      timestamp: new Date().toISOString(),
+      message: 'This is a fallback route handler'
     });
   });
   
-  return fallbackApp;
-};
-
-// Initialize the Express app instance
-let app;
-try {
-  // Import the compiled Express application
-  // Use ESM-compatible import 
-  const serverModule = require('../server/index.js');
-  app = serverModule.default || serverModule;
+  // Authentication endpoints
+  app.post('/api/login', (req, res) => {
+    res.status(503).json({
+      error: 'Service Temporarily Unavailable',
+      message: 'Authentication services are being deployed. Please try again soon.'
+    });
+  });
   
-  console.log('Successfully loaded main Express application');
-} catch (err) {
-  console.error('Error loading Express app:', err);
-  app = createFallbackApp();
+  app.post('/api/register', (req, res) => {
+    res.status(503).json({
+      error: 'Service Temporarily Unavailable',
+      message: 'Registration services are being deployed. Please try again soon.'
+    });
+  });
+  
+  app.post('/api/logout', (req, res) => {
+    res.status(200).json({ success: true });
+  });
+  
+  app.get('/api/user', (req, res) => {
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Please log in to access this resource'
+    });
+  });
+  
+  // Generic fallback for all other API routes
+  app.use('/api/*', (req, res) => {
+    res.status(503).json({
+      error: 'Service Temporarily Unavailable',
+      message: 'The API is currently being deployed. Please try again in a few minutes.'
+    });
+  });
+  
+  return require('http').createServer(app);
 }
 
-// This wrapper ensures the response is always in the right format
-const serverlessHandler = (req, res) => {
-  try {
-    // Normalize request URL
-    if (!req.url.startsWith('/')) {
-      req.url = '/' + req.url;
-    }
+exports.registerRoutes = registerRoutes;
+`;
 
-    // Special handling for WebSocket connections
-    if (req.method === 'GET' && req.headers && req.headers.upgrade === 'websocket') {
-      req.url = '/ws';
-    }
+  fs.writeFileSync(path.resolve('dist/server/routes.js'), routesContent);
+  logSuccess('Created fallback routes.js');
+  
+  // Create a minimal storage.js file
+  const storageContent = `
+"use strict";
 
-    // Apply error handling to response methods to fix BODY_NOT_A_STRING_FROM_FUNCTION
-    const originalEnd = res.end;
-    const originalJson = res.json;
-    const originalSend = res.send;
-    
-    // Wrap res.end to ensure it always returns valid data
-    res.end = function(chunk, encoding) {
-      try {
-        // If chunk exists and is not a string or buffer, convert it
-        if (chunk && typeof chunk !== 'string' && !Buffer.isBuffer(chunk)) {
-          try {
-            chunk = JSON.stringify(chunk);
-          } catch (e) {
-            console.error('Failed to stringify response chunk:', e);
-            chunk = JSON.stringify({
-              error: 'Response serialization error',
-              message: 'The server response could not be properly formatted.'
-            });
-          }
-        }
-        
-        return originalEnd.call(this, chunk, encoding);
-      } catch (error) {
-        console.error('Response end error:', error);
-        
-        // Try sending a fallback response
-        if (!this.headersSent) {
-          this.setHeader('Content-Type', 'application/json');
-          return originalEnd.call(
-            this, 
-            JSON.stringify({ error: 'Internal Server Error' }),
-            'utf8'
-          );
-        }
-      }
-    };
-    
-    // Wrap res.json to ensure proper JSON responses
-    res.json = function(body) {
-      try {
-        // Ensure body is serializable
-        const safeBody = body === undefined ? {} : body;
-        return originalJson.call(this, safeBody);
-      } catch (error) {
-        console.error('JSON response error:', error);
-        
-        if (!this.headersSent) {
-          return originalJson.call(this, { 
-            error: 'Response Error',
-            message: 'An error occurred while processing the response.'
-          });
-        }
-      }
-    };
-    
-    // Wrap res.send to handle non-string values
-    res.send = function(body) {
-      try {
-        return originalSend.call(this, body);
-      } catch (error) {
-        console.error('Send response error:', error);
-        
-        if (!this.headersSent) {
-          this.setHeader('Content-Type', 'application/json');
-          return originalSend.call(this, JSON.stringify({ 
-            error: 'Response Error',
-            message: 'An error occurred while sending the response.'
-          }));
-        }
-      }
-    };
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.storage = exports.MemStorage = exports.IStorage = void 0;
 
-    // Call the Express app with global error handling
-    return app(req, res);
-  } catch (error) {
-    console.error('Global serverless handler error:', error);
-    
-    // Ensure we always send a response
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Internal Server Error',
-        message: 'The server encountered an unexpected condition that prevented it from fulfilling the request.'
-      });
-    }
+/**
+ * Fallback storage implementation for production deployment
+ */
+class IStorage {
+}
+exports.IStorage = IStorage;
+
+class MemStorage {
+  constructor() {
+    this.users = new Map();
+    this.sessionStore = {
+      get: () => Promise.resolve(undefined),
+      set: () => Promise.resolve(),
+      destroy: () => Promise.resolve(),
+      touch: () => Promise.resolve()
+    };
   }
-};
+  
+  async getUser(id) {
+    return undefined;
+  }
+  
+  async getUserByUsername(username) {
+    return undefined;
+  }
+  
+  async createUser(user) {
+    return { id: 1, ...user };
+  }
+}
+exports.MemStorage = MemStorage;
 
-// Export the enhanced serverless handler
-module.exports = serverlessHandler;
-`);
+// Export a singleton instance of MemStorage
+exports.storage = new MemStorage();
+`;
 
-// Final confirmation
-console.log('Build process completed with fallback measures in place!');
-console.log('Deployment is ready to proceed. Verify your Vercel deployment status for final confirmation.');
+  fs.writeFileSync(path.resolve('dist/server/storage.js'), storageContent);
+  logSuccess('Created fallback storage.js');
+}
+
+// Copy schema files needed for build
+function copySchemaFiles() {
+  log('Copying schema files...', colors.cyan);
+  
+  try {
+    // Copy schema files to dist/shared
+    const schemaFiles = [
+      'schema.ts',
+      'schema.js',
+      'schema-build.ts',
+      'schema-build.js',
+      'schema-build-fix.ts',
+      'schema-build-fix.js',
+      'build.d.ts',
+      'syllabus-types.ts',
+      'syllabus-types.js'
+    ];
+    
+    schemaFiles.forEach(file => {
+      const sourcePath = path.resolve('shared', file);
+      const destPath = path.resolve('dist/shared', file);
+      
+      if (fs.existsSync(sourcePath)) {
+        fs.copyFileSync(sourcePath, destPath);
+        logSuccess(`Copied ${file} to dist/shared`);
+      } else {
+        logWarning(`File ${file} does not exist, skipping`);
+      }
+    });
+  } catch (error) {
+    logError('Error copying schema files');
+    logError(error.message);
+  }
+}
+
+// Main build function
+async function build() {
+  log('Starting build process for Vercel deployment', colors.magenta);
+  
+  // Set environment variables for build
+  process.env.NODE_ENV = 'production';
+  
+  try {
+    // Create necessary directories
+    createDirectories();
+    
+    // Build server code
+    const serverBuildSuccess = buildServer();
+    
+    // Copy schema files
+    copySchemaFiles();
+    
+    // Build client code
+    const clientBuildSuccess = buildClient();
+    
+    if (serverBuildSuccess && clientBuildSuccess) {
+      logSuccess('Build completed successfully!');
+    } else if (clientBuildSuccess) {
+      logWarning('Build completed with server warnings. Fallback server implementation will be used.');
+    } else {
+      logError('Build failed. Check the logs for details.');
+      process.exit(1);
+    }
+  } catch (error) {
+    logError('Build process failed');
+    logError(error.message);
+    process.exit(1);
+  }
+}
+
+// Run the build
+build().catch(error => {
+  logError('Uncaught error in build process');
+  logError(error.message);
+  process.exit(1);
+});

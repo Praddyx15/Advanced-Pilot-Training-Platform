@@ -1,13 +1,18 @@
-# Server files (except for the api folder which is our serverless functions)
-server
-drizzle.config.ts
-
-# Development files
+# Prevent unnecessary files from being deployed
+node_modules
 .github
-.gitignore
-.env.example
-README.md
-
-# Tests
-test-*.js
-test-*.sh
+.git
+client/src
+.env
+.env.local
+*.log
+logs
+uploads
+attached_assets
+.vscode
+*.md
+*.sh
+LICENSE
+*/tsconfig.json
+*.test.ts
+*.test.tsx
