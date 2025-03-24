@@ -5,7 +5,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
 import { useWebSocket } from "@/hooks/use-websocket";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import DashboardContainer from "@/components/dashboard-container";
+import DashboardContainer from "../components/dashboard-container";
 import {
   Card,
   CardContent,
@@ -72,6 +72,7 @@ import {
   Clock,
   Check,
   Pin,
+  Download,
 } from "lucide-react";
 
 // Interface definitions
@@ -787,65 +788,69 @@ const MessagingPage = () => {
 
   // Handle WebSocket connection
   useEffect(() => {
-    if (!connected) {
-      connect();
+    if (!webSocket.connected) {
+      webSocket.connect();
     }
     
-    // Handle incoming messages in a real implementation
-    if (socket) {
-      socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          if (data.type === 'message') {
-            // Update messages and conversation
-            const newMessage = data.payload;
-            
-            // Add message to the cache if conversation is selected
-            if (selectedConversation?.id === newMessage.conversationId) {
-              queryClient.setQueryData<Message[]>(
-                ["messages", newMessage.conversationId],
-                (oldMessages = []) => [...oldMessages, newMessage]
-              );
-              
-              // Mark as read
-              markAsReadMutation.mutate(newMessage.conversationId);
-            }
-            
-            // Update conversation's last message
-            queryClient.setQueryData<Conversation[]>(
-              ["conversations"],
-              (oldConversations = []) => {
-                return oldConversations.map(conv => {
-                  if (conv.id === newMessage.conversationId) {
-                    return {
-                      ...conv,
-                      lastMessage: {
-                        content: newMessage.content,
-                        timestamp: newMessage.timestamp,
-                        senderId: newMessage.senderId
-                      },
-                      unreadCount: selectedConversation?.id === newMessage.conversationId 
-                        ? 0 
-                        : (conv.unreadCount || 0) + 1
-                    };
-                  }
-                  return conv;
-                });
-              }
+    // Set up message handler
+    const handleMessage = (data: any) => {
+      try {
+        if (data.type === 'message') {
+          // Update messages and conversation
+          const newMessage = data.payload;
+          
+          // Add message to the cache if conversation is selected
+          if (selectedConversation?.id === newMessage.conversationId) {
+            queryClient.setQueryData<Message[]>(
+              ["messages", newMessage.conversationId],
+              (oldMessages = []) => [...oldMessages, newMessage]
             );
+            
+            // Mark as read
+            markAsReadMutation.mutate(newMessage.conversationId);
           }
-        } catch (error) {
-          console.error("Error parsing WebSocket message:", error);
+          
+          // Update conversation's last message
+          queryClient.setQueryData<Conversation[]>(
+            ["conversations"],
+            (oldConversations = []) => {
+              return oldConversations.map(conv => {
+                if (conv.id === newMessage.conversationId) {
+                  return {
+                    ...conv,
+                    lastMessage: {
+                      content: newMessage.content,
+                      timestamp: newMessage.timestamp,
+                      senderId: newMessage.senderId
+                    },
+                    unreadCount: selectedConversation?.id === newMessage.conversationId 
+                      ? 0 
+                      : (conv.unreadCount || 0) + 1
+                  };
+                }
+                return conv;
+              });
+            }
+          );
         }
-      };
+      } catch (error) {
+        console.error("Error handling WebSocket message:", error);
+      }
+    };
+    
+    // Subscribe to the 'messages' channel
+    webSocket.subscribe('messages');
+    
+    // Set up message event handler
+    if (webSocket.lastMessage) {
+      handleMessage(webSocket.lastMessage);
     }
     
     return () => {
-      if (socket) {
-        socket.onmessage = null;
-      }
+      // Clean up on unmount
+      webSocket.unsubscribe('messages');
     };
-  }, [socket, connected, selectedConversation, connect, queryClient, markAsReadMutation]);
+  }, [webSocket, selectedConversation, queryClient, markAsReadMutation]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
