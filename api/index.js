@@ -1,275 +1,232 @@
-// Vercel API handler with enhanced error handling
-// Specifically addressing FUNCTION_INVOCATION_FAILED and BODY_NOT_A_STRING_FROM_FUNCTION issues
+/**
+ * API entry point for serverless function handling
+ * This file serves as the main entry point for all API requests in the serverless environment
+ */
 
 const express = require('express');
-const cors = require('cors');
-const compression = require('compression');
-const { parse: parseUrl } = require('url');
-const { createServer } = require('http');
-const { WebSocketServer } = require('ws');
-const session = require('express-session');
-const memorystore = require('memorystore');
 const path = require('path');
-const fs = require('fs');
+const compression = require('compression');
+const session = require('express-session');
+const MemoryStore = require('memorystore')(session);
+const cors = require('cors');
+const passport = require('passport');
+const { Strategy: LocalStrategy } = require('passport-local');
+const { scrypt, randomBytes, timingSafeEqual } = require('crypto');
+const { promisify } = require('util');
 
-// Global error variable to track initialization
-let initializationError = null;
+// Initialize express app
+const app = express();
 
-// Create memory store for sessions
-const MemoryStore = memorystore(session);
+// Middleware
+app.use(compression());
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true }));
 
-// Create a properly configured Express app
-function createExpressApp() {
-  const app = express();
-  
-  // Add middleware
-  app.use(compression());
-  app.use(express.json({ limit: '50mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
-  app.use(cors({
-    origin: true,
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-  }));
+// Session configuration
+const sessionStore = new MemoryStore({
+  checkPeriod: 86400000 // prune expired entries every 24h
+});
 
-  // Configure session middleware
-  const sessionSecret = process.env.SESSION_SECRET || 'pilot-training-platform-session-secret';
-  app.use(session({
-    secret: sessionSecret,
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-      secure: process.env.NODE_ENV === 'production',
-      httpOnly: true,
-      maxAge: 24 * 60 * 60 * 1000 // 24 hours
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'aptp-default-secret',
+  resave: false,
+  saveUninitialized: false,
+  store: sessionStore,
+  cookie: {
+    maxAge: 86400000, // 24 hours
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production'
+  }
+}));
+
+// Initialize passport
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Authentication helpers
+const scryptAsync = promisify(scrypt);
+const sampleUsers = [
+  {
+    id: 1,
+    username: 'instructor',
+    // hashed version of 'password'
+    password: '45255805f089632673b11e0c6ddcd80f9402e2de52c17a56c95bc8a45e36cb3be2c84819ca83cf49ae18a0c08d3bb6214db5d68b0125acfee896d0cb7f272b93.e7436df7bda05845a372ebb3d17cedeb',
+    firstName: 'John',
+    lastName: 'Smith',
+    email: 'instructor@example.com',
+    role: 'instructor',
+    organizationType: 'ATO',
+    organizationName: 'Flight School 1',
+    mfaEnabled: false,
+    profilePicture: null,
+    lastLoginAt: null
+  },
+  {
+    id: 2,
+    username: 'trainee',
+    // hashed version of 'password'
+    password: '45255805f089632673b11e0c6ddcd80f9402e2de52c17a56c95bc8a45e36cb3be2c84819ca83cf49ae18a0c08d3bb6214db5d68b0125acfee896d0cb7f272b93.e7436df7bda05845a372ebb3d17cedeb',
+    firstName: 'Jane',
+    lastName: 'Doe',
+    email: 'trainee@example.com',
+    role: 'trainee',
+    organizationType: 'ATO',
+    organizationName: 'Flight School 1',
+    mfaEnabled: false,
+    profilePicture: null,
+    lastLoginAt: null
+  },
+  {
+    id: 3,
+    username: 'admin',
+    // hashed version of 'password'
+    password: '45255805f089632673b11e0c6ddcd80f9402e2de52c17a56c95bc8a45e36cb3be2c84819ca83cf49ae18a0c08d3bb6214db5d68b0125acfee896d0cb7f272b93.e7436df7bda05845a372ebb3d17cedeb',
+    firstName: 'Admin',
+    lastName: 'User',
+    email: 'admin@example.com',
+    role: 'admin',
+    organizationType: 'ATO',
+    organizationName: 'Flight School 1',
+    mfaEnabled: false,
+    profilePicture: null,
+    lastLoginAt: null
+  }
+];
+
+async function comparePasswords(supplied, stored) {
+  const [hashed, salt] = stored.split('.');
+  const hashedBuf = Buffer.from(hashed, 'hex');
+  const suppliedBuf = await scryptAsync(supplied, salt, 64);
+  return timingSafeEqual(hashedBuf, suppliedBuf);
+}
+
+passport.use(
+  new LocalStrategy(async (username, password, done) => {
+    try {
+      const user = sampleUsers.find(u => u.username === username);
+      if (!user || !(await comparePasswords(password, user.password))) {
+        return done(null, false, { message: 'Invalid username or password' });
+      } else {
+        return done(null, user);
+      }
+    } catch (error) {
+      return done(error);
+    }
+  })
+);
+
+passport.serializeUser((user, done) => done(null, user.id));
+passport.deserializeUser((id, done) => {
+  const user = sampleUsers.find(u => u.id === id);
+  done(null, user || null);
+});
+
+// Routes
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'API is running properly' });
+});
+
+// Auth routes
+app.post('/api/login', passport.authenticate('local'), (req, res) => {
+  // Update last login timestamp
+  req.user.lastLoginAt = new Date();
+  res.status(200).json(req.user);
+});
+
+app.post('/api/register', (req, res) => {
+  // In a production environment, this would create a new user
+  res.status(503).json({ message: 'Registration is temporarily unavailable in this deployment' });
+});
+
+app.post('/api/logout', (req, res) => {
+  req.logout((err) => {
+    if (err) return res.status(500).json({ error: err.message });
+    res.status(200).json({ message: 'Logged out successfully' });
+  });
+});
+
+app.get('/api/user', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json(req.user);
+});
+
+// Training program related routes
+app.get('/api/programs', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([
+    {
+      id: 1,
+      name: 'Commercial Pilot License',
+      status: 'active',
+      programType: 'type_rating',
+      aircraftType: 'B737',
+      description: 'Complete Boeing 737 type rating program',
+      regulatoryAuthority: 'FAA',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      durationDays: 90,
+      createdById: 1
     },
-    store: new MemoryStore({
-      checkPeriod: 86400000 // 24 hours
-    })
-  }));
-
-  // Add global error handling middleware
-  app.use((err, req, res, next) => {
-    console.error('Express error handler:', err);
-    
-    // Don't expose stack traces in production
-    const errorMessage = process.env.NODE_ENV === 'production' 
-      ? 'Internal Server Error' 
-      : err.message;
-    
-    res.status(500).json({
-      error: 'Server Error',
-      message: errorMessage
-    });
-  });
-
-  return app;
-}
-
-// Initialize Express app
-let app = createExpressApp();
-
-// Create HTTP server
-const server = createServer(app);
-
-// Initialize WebSocket server if not in serverless environment
-if (!process.env.VERCEL) {
-  try {
-    const wss = new WebSocketServer({ 
-      server,
-      path: '/ws'
-    });
-    
-    // Handle WebSocket connections
-    wss.on('connection', (ws) => {
-      console.log('WebSocket client connected');
-      
-      // Handle messages
-      ws.on('message', (message) => {
-        try {
-          const data = JSON.parse(message);
-          
-          // Handle subscribe action
-          if (data.action === 'subscribe' && data.channel) {
-            ws.channels = ws.channels || new Set();
-            ws.channels.add(data.channel);
-            console.log(`WebSocket client subscribed to: ${data.channel}`);
-          }
-          
-          // Handle unsubscribe action
-          if (data.action === 'unsubscribe' && data.channel) {
-            if (ws.channels) {
-              ws.channels.delete(data.channel);
-              console.log(`WebSocket client unsubscribed from: ${data.channel}`);
-            }
-          }
-        } catch (err) {
-          console.error('Error processing WebSocket message:', err);
-        }
-      });
-      
-      // Handle disconnections
-      ws.on('close', () => {
-        console.log('WebSocket client disconnected');
-      });
-      
-      // Handle errors
-      ws.on('error', (error) => {
-        console.error('WebSocket error:', error);
-      });
-      
-      // Send heartbeat to keep connection alive
-      const heartbeat = setInterval(() => {
-        if (ws.readyState === ws.OPEN) {
-          ws.ping();
-        } else {
-          clearInterval(heartbeat);
-        }
-      }, 30000);
-    });
-  } catch (err) {
-    console.error('Failed to initialize WebSocket server:', err);
-    initializationError = err;
-  }
-}
-
-// Try to load the actual application routes
-try {
-  // Import server-side routes (with modules potentially compiled from TypeScript)
-  const serverDir = path.join(process.cwd(), 'dist', 'server');
-  
-  // First attempt: Try to use the routes.js file if it exists
-  if (fs.existsSync(path.join(serverDir, 'routes.js'))) {
-    const { registerRoutes } = require(path.join(serverDir, 'routes.js'));
-    
-    // Register routes with the Express app
-    registerRoutes(app);
-    console.log('Successfully registered application routes');
-  } else {
-    console.warn('Could not find routes.js file. Using fallback routes.');
-    
-    // Add fallback routes
-    app.get('/api/health', (req, res) => {
-      res.json({ status: 'ok', timestamp: new Date().toISOString() });
-    });
-    
-    app.all('/api/*', (req, res) => {
-      res.status(503).json({
-        error: 'Service Temporarily Unavailable',
-        message: 'The API is currently being deployed or experiencing technical difficulties.'
-      });
-    });
-  }
-} catch (err) {
-  console.error('Failed to register routes:', err);
-  initializationError = err;
-  
-  // Add fallback error route
-  app.all('*', (req, res) => {
-    if (req.path.startsWith('/api')) {
-      res.status(500).json({
-        error: 'Server Initialization Failed',
-        message: 'The server encountered an error during initialization. Please try again later.'
-      });
-    } else {
-      // For non-API routes, serve the SPA
-      res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
+    {
+      id: 2,
+      name: 'Private Pilot License',
+      status: 'active',
+      programType: 'initial',
+      aircraftType: 'C172',
+      description: 'Private pilot certification program',
+      regulatoryAuthority: 'EASA',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      durationDays: 60,
+      createdById: 1
     }
+  ]);
+});
+
+// Add all other API routes
+// These are placeholder routes for the deployment version
+app.get('/api/modules', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+app.get('/api/sessions', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+app.get('/api/assessments', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+app.get('/api/documents', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+app.get('/api/resources', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+app.get('/api/achievements', (req, res) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
+  res.json([]);
+});
+
+// Catch-all handler for all other routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Not Found', 
+    message: 'The requested API endpoint does not exist or is not yet implemented in this deployment',
+    status: 404
   });
-}
+});
 
-// Serve static files for single-page application
-if (!process.env.VERCEL) {
-  app.use(express.static(path.join(process.cwd(), 'dist', 'public')));
-  
-  // SPA fallback
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/ws')) {
-      res.sendFile(path.join(process.cwd(), 'dist', 'public', 'index.html'));
-    }
-  });
-}
-
-// Start server if not in serverless environment
-if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000;
-  try {
-    server.listen(PORT, '0.0.0.0', () => {
-      console.log(`Server running on port ${PORT}`);
-    });
-  } catch (err) {
-    console.error('Failed to start server:', err);
-    initializationError = err;
-  }
-}
-
-// Serverless function handler with proper error handling
-const serverlessHandler = (req, res) => {
-  try {
-    // Wrap response object methods to prevent common serverless errors
-    const originalJson = res.json;
-    const originalSend = res.send;
-    const originalEnd = res.end;
-    
-    // Fix for BODY_NOT_A_STRING_FROM_FUNCTION errors
-    res.json = function(body) {
-      try {
-        // Ensure body exists and is serializable
-        const safeBody = body === undefined ? {} : body;
-        return originalJson.call(this, safeBody);
-      } catch (err) {
-        console.error('Error in res.json:', err);
-        if (!this.headersSent) {
-          return originalJson.call(this, { error: 'Response Error' });
-        }
-      }
-    };
-    
-    res.send = function(body) {
-      try {
-        // Convert non-string, non-Buffer responses to strings
-        if (body && typeof body !== 'string' && !Buffer.isBuffer(body)) {
-          try {
-            body = JSON.stringify(body);
-          } catch (e) {
-            console.error('Failed to stringify response:', e);
-            body = JSON.stringify({ error: 'Response conversion error' });
-          }
-        }
-        return originalSend.call(this, body);
-      } catch (err) {
-        console.error('Error in res.send:', err);
-        if (!this.headersSent) {
-          return originalSend.call(this, '{"error": "Internal Server Error"}');
-        }
-      }
-    };
-    
-    res.end = function(chunk, encoding) {
-      try {
-        return originalEnd.call(this, chunk, encoding);
-      } catch (err) {
-        console.error('Error in res.end:', err);
-        if (!this.headersSent) {
-          this.setHeader('Content-Type', 'application/json');
-          return originalEnd.call(this, '{"error": "Internal Server Error"}', 'utf8');
-        }
-      }
-    };
-    
-    // Pass the request to Express
-    return app(req, res);
-  } catch (err) {
-    console.error('Global serverless handler error:', err);
-    if (!res.headersSent) {
-      res.status(500).json({
-        error: 'Unhandled Runtime Error',
-        message: 'The application encountered an unexpected error.'
-      });
-    }
-  }
+// Export for serverless function handling
+module.exports = (req, res) => {
+  // Handle the request with the Express app
+  return app(req, res);
 };
-
-// Export the handler for serverless use
-module.exports = serverlessHandler;

@@ -1,18 +1,45 @@
-# Prevent unnecessary files from being deployed
-node_modules
-.github
-.git
-client/src
-.env
-.env.local
+# Exclude development files
+**/node_modules
+**/.git
+.DS_Store
 *.log
-logs
-uploads
-attached_assets
-.vscode
-*.md
-*.sh
-LICENSE
-*/tsconfig.json
-*.test.ts
-*.test.tsx
+
+# Exclude test files
+**/*.test.*
+**/*.spec.*
+**/__tests__/
+**/__mocks__/
+/test/
+/coverage/
+
+# Exclude unnecessary server files in client build
+/server/**/*.ts
+!/server/routes.ts
+!/server/auth.ts
+!/server/index.ts
+!/server/storage.ts
+
+# Exclude TypeScript source files except core files
+/client/src/**/*.ts
+/client/src/**/*.tsx
+!/client/src/hooks/use-auth.tsx
+!/client/src/hooks/use-toast.tsx
+!/client/src/lib/protected-route.tsx
+
+# Exclude build artifacts and development configs
+/.github/
+/.vscode/
+/.idea/
+.env
+.env.*
+!.env.production
+!.env.local
+
+# Keep necessary config files
+!tsconfig.json
+!tsconfig.build.json
+!drizzle.config.ts
+!vite.config.ts
+!postcss.config.js
+!tailwind.config.ts
+!theme.json

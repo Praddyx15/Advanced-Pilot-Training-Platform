@@ -1,54 +1,36 @@
 {
-  "include": ["server/**/*", "shared/**/*"],
-  "exclude": ["client/src/**/*", "node_modules", "build", "dist", "**/*.test.ts"],
-  "files": ["shared/build.d.ts"],
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "incremental": false,
-    "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
-    "target": "ESNext",
-    "module": "ESNext",
-    "lib": ["esnext", "dom", "dom.iterable"],
-    "jsx": "preserve",
-    "esModuleInterop": true,
+    "noEmit": false,
+    "outDir": "dist",
+    "sourceMap": false,
+    "declaration": false,
+    "declarationMap": false,
     "skipLibCheck": true,
-    "moduleResolution": "node",
-    "baseUrl": ".",
-    "types": ["node"],
-    "paths": {
-      "@shared/*": ["./shared/*"]
-    },
+    "downlevelIteration": true,
+    "allowJs": true,
+    "checkJs": false,
+    "target": "es2018",
+    "module": "commonjs",
+    "strict": false,
     "noImplicitAny": false,
-    "noImplicitThis": false,
     "strictNullChecks": false,
     "strictFunctionTypes": false,
-    "strict": false,
-    "downlevelIteration": true,
-    "allowSyntheticDefaultImports": true,
-    "resolveJsonModule": true,
-    "isolatedModules": false,
-    "outDir": "dist",
-    "declaration": false,
-    "sourceMap": false,
-    "experimentalDecorators": true,
-    "emitDecoratorMetadata": true,
-    "suppressImplicitAnyIndexErrors": true,
-    "noStrictGenericChecks": true,
-    "ignoreDeprecations": "5.0",
-    "suppressExcessPropertyErrors": true,
-    "noErrorTruncation": true,
-    "allowJs": true,
-    "noPropertyAccessFromIndexSignature": false,
-    "useUnknownInCatchVariables": false,
-    "exactOptionalPropertyTypes": false,
-    "noEmitOnError": false,
-    "emitDeclarationOnly": false,
-    "noResolve": false,
-    "maxNodeModuleJsDepth": 10
+    "strictBindCallApply": false,
+    "strictPropertyInitialization": false,
+    "noImplicitThis": false,
+    "alwaysStrict": false,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "ts-node": {
-    "transpileOnly": true,
-    "compilerOptions": {
-      "module": "CommonJS"
-    }
-  }
+  "include": [
+    "server/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "client",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }
