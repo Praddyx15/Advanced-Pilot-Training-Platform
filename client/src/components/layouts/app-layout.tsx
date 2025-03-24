@@ -1,15 +1,23 @@
 import { useState, useEffect, ReactNode } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Layers, X, Menu } from 'lucide-react';
+import { Layers, X, Menu, LogOut, HelpCircle, User, Settings } from 'lucide-react';
 import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../hooks/use-auth";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { user } = useAuth();
-  const [location] = useLocation();
+  const { user, logoutMutation } = useAuth();
+  const [location, navigate] = useLocation();
   
   // Get user role for theming
   const userRole = user?.role || 'trainee';
@@ -139,19 +147,63 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Header for mobile */}
-        <header className={`lg:hidden flex h-16 items-center gap-4 border-b px-6 ${theme.header}`}>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="lg:hidden text-white hover:bg-white/10"
-            onClick={() => setSidebarOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
+        {/* Header for mobile and desktop with user menu */}
+        <header className={`flex h-16 items-center justify-between border-b px-6 ${theme.header}`}>
           <div className="flex items-center gap-2">
-            <Layers className="h-5 w-5 text-white" />
-            <span className="font-semibold text-white">{theme.logo}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden text-white hover:bg-white/10"
+              onClick={() => setSidebarOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <Layers className="h-5 w-5 text-white" />
+              <span className="font-semibold text-white">{theme.logo}</span>
+            </div>
+          </div>
+          
+          {/* User menu */}
+          <div className="flex items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full text-white">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10">
+                    <User className="h-5 w-5" />
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user?.firstName} {user?.lastName}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
+                  <span>Profile</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <HelpCircle className="mr-2 h-4 w-4" />
+                  <span>Help</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => {
+                  logoutMutation.mutate();
+                  navigate('/auth');
+                }}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
         

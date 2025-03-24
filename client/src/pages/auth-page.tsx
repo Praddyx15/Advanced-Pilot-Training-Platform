@@ -361,6 +361,10 @@ export default function AuthPage() {
                                   </button>
                                 </div>
                               </FormControl>
+                              <FormDescription className="text-xs">
+                                Strong password should include uppercase and lowercase letters, 
+                                numbers, and special characters.
+                              </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
