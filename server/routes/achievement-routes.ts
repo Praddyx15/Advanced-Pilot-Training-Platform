@@ -487,6 +487,53 @@ export function registerAchievementRoutes(app: Express) {
   /**
    * Delete leaderboard entry (admin only)
    */
+  /**
+   * Manual trigger for checking achievements (can be used from any component)
+   */
+  app.post('/api/protected/achievement-triggers', async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      // Validate trigger data
+      const triggerSchema = z.object({
+        userId: z.number(),
+        type: z.string(),
+        value: z.number(),
+        metadata: z.record(z.any()).optional(),
+      });
+      
+      const triggerData = triggerSchema.parse(req.body);
+      
+      // Check if the user has permission to trigger achievements for this user
+      if (triggerData.userId !== req.user.id && 
+          req.user.role !== 'admin' && 
+          req.user.role !== 'instructor' && 
+          req.user.role !== 'examiner') {
+        return res.status(403).json({ 
+          error: 'Permission denied. You can only trigger achievements for your own user or as an admin/instructor/examiner.' 
+        });
+      }
+      
+      // Check achievement triggers
+      const achievements = await storage.checkAchievementTriggers(triggerData);
+      
+      res.json({
+        triggered: achievements.length > 0,
+        achievements,
+      });
+    } catch (error) {
+      logger.error('Error checking achievement triggers', { context: { error } });
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid trigger data', details: error.errors });
+      }
+      
+      res.status(500).json({ error: 'Failed to check achievement triggers' });
+    }
+  });
+
   app.delete('/api/protected/leaderboard-entries/:id', async (req: Request, res: Response) => {
     try {
       if (!req.user) {

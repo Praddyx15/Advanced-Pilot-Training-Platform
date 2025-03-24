@@ -268,6 +268,52 @@ export function registerScheduleRoutes(app: Express) {
         }
       }
       
+      // Check if status was updated to completed
+      if (updateData.status === 'completed' && session.status !== 'completed') {
+        try {
+          // Get trainees for achievement triggers
+          const sessionTrainees = await storage.getSessionTrainees(sessionId);
+          
+          // Process achievement triggers for each trainee
+          for (const traineeId of sessionTrainees) {
+            // Trigger session completion achievement
+            await storage.checkAchievementTriggers({
+              userId: traineeId,
+              type: 'session_completion',
+              value: 1,
+              metadata: {
+                sessionId: sessionId,
+                moduleId: session.moduleId,
+                programId: session.programId,
+                instructorId: session.instructorId
+              }
+            });
+            
+            // Trigger flight hours achievement if applicable
+            if (updatedSession.endTime && updatedSession.startTime) {
+              const sessionDurationHours = 
+                (updatedSession.endTime.getTime() - updatedSession.startTime.getTime()) / (1000 * 60 * 60);
+              
+              await storage.checkAchievementTriggers({
+                userId: traineeId,
+                type: 'flight_hours',
+                value: sessionDurationHours,
+                metadata: {
+                  sessionId: sessionId,
+                  moduleId: session.moduleId,
+                  programId: session.programId
+                }
+              });
+            }
+            
+            console.log(`Processed achievement triggers for trainee ${traineeId} after session completion`);
+          }
+        } catch (achievementError) {
+          console.error("Error processing achievement triggers:", achievementError);
+          // Don't fail the request if achievement processing fails
+        }
+      }
+      
       // Get the updated list of trainees
       const updatedTrainees = await storage.getSessionTrainees(sessionId);
       

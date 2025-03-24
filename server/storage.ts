@@ -2561,30 +2561,38 @@ export class MemStorage implements IStorage {
   }
   
   async checkAchievementTriggers(
-    userId: number, 
-    triggerType: string, 
-    context: Record<string, any>
+    triggerData: {
+      userId: number;
+      type: string;
+      value: number;
+      metadata?: Record<string, any>;
+    }
   ): Promise<UserAchievement[]> {
     // Get user
-    const user = await this.getUser(userId);
+    const user = await this.getUser(triggerData.userId);
     if (!user) {
-      throw new Error(`User with ID ${userId} not found`);
+      throw new Error(`User with ID ${triggerData.userId} not found`);
     }
     
     // Get all achievements that might be triggered by this action
     const achievementsToCheck = Array.from(this.achievements.values())
-      .filter(achievement => 
-        achievement.triggerType === triggerType &&
-        achievement.active
-      );
+      .filter(achievement => {
+        // Access criteria.triggerType
+        const criteriaObj = achievement.criteria as Record<string, any>;
+        return criteriaObj?.triggerType === triggerData.type && achievement.active === true;
+      });
     
     const grantedAchievements: UserAchievement[] = [];
     
     // Check each relevant achievement
     for (const achievement of achievementsToCheck) {
+      // Access criteria properties
+      const criteriaObj = achievement.criteria as Record<string, any>;
+      const threshold = criteriaObj?.threshold || 0;
+      
       // Skip if user already has this achievement fully unlocked
       const existingUserAchievement = Array.from(this.userAchievements.values()).find(
-        ua => ua.userId === userId && ua.achievementId === achievement.id && ua.awardedAt !== null
+        ua => ua.userId === triggerData.userId && ua.achievementId === achievement.id && ua.awardedAt !== null
       );
       
       if (existingUserAchievement) continue;
@@ -2592,40 +2600,83 @@ export class MemStorage implements IStorage {
       let shouldGrant = false;
       let progress = 0;
       
-      // Evaluate achievement criteria based on the trigger type and context
-      switch (triggerType) {
+      // Evaluate achievement criteria based on the trigger type
+      switch (triggerData.type) {
         case 'session_completion':
-          if (context.sessionCount) {
-            progress = Math.min(100, Math.floor((context.sessionCount / achievement.threshold) * 100));
-            shouldGrant = context.sessionCount >= achievement.threshold;
+          if (threshold > 0) {
+            // Get current completion count
+            let completionCount = 1; // Start with the current completion
+            
+            // Add any existing progress from an in-progress achievement
+            if (existingUserAchievement && existingUserAchievement.progress !== null) {
+              const existingProgress = existingUserAchievement.progress || 0;
+              completionCount += existingProgress;
+            }
+            
+            progress = Math.min(100, Math.floor((completionCount / threshold) * 100));
+            shouldGrant = completionCount >= threshold;
           }
           break;
           
         case 'assessment_score':
-          if (context.score !== undefined) {
-            progress = Math.min(100, Math.floor((context.score / achievement.threshold) * 100));
-            shouldGrant = context.score >= achievement.threshold;
+          if (threshold > 0) {
+            progress = Math.min(100, Math.floor((triggerData.value / threshold) * 100));
+            shouldGrant = triggerData.value >= threshold;
           }
           break;
           
         case 'module_completion':
-          if (context.moduleCount) {
-            progress = Math.min(100, Math.floor((context.moduleCount / achievement.threshold) * 100));
-            shouldGrant = context.moduleCount >= achievement.threshold;
+          if (threshold > 0) {
+            // Get current completion count
+            let completionCount = 1; // Start with the current completion
+            
+            // Add any existing progress from an in-progress achievement
+            if (existingUserAchievement && existingUserAchievement.progress !== null) {
+              const existingProgress = existingUserAchievement.progress || 0;
+              completionCount += existingProgress;
+            }
+            
+            progress = Math.min(100, Math.floor((completionCount / threshold) * 100));
+            shouldGrant = completionCount >= threshold;
+          }
+          break;
+          
+        case 'flight_hours':
+          if (threshold > 0) {
+            // Get current hours
+            let totalHours = triggerData.value; // Start with current session hours
+            
+            // Add any existing progress from an in-progress achievement
+            if (existingUserAchievement && existingUserAchievement.progress !== null) {
+              const existingProgress = existingUserAchievement.progress || 0;
+              totalHours += existingProgress;
+            }
+            
+            progress = Math.min(100, Math.floor((totalHours / threshold) * 100));
+            shouldGrant = totalHours >= threshold;
           }
           break;
           
         case 'login_streak':
-          if (context.loginDays) {
-            progress = Math.min(100, Math.floor((context.loginDays / achievement.threshold) * 100));
-            shouldGrant = context.loginDays >= achievement.threshold;
+          if (threshold > 0) {
+            progress = Math.min(100, Math.floor((triggerData.value / threshold) * 100));
+            shouldGrant = triggerData.value >= threshold;
           }
           break;
           
         case 'resource_contribution':
-          if (context.resourceCount) {
-            progress = Math.min(100, Math.floor((context.resourceCount / achievement.threshold) * 100));
-            shouldGrant = context.resourceCount >= achievement.threshold;
+          if (threshold > 0) {
+            // Get current count
+            let resourceCount = 1; // Start with the current contribution
+            
+            // Add any existing progress from an in-progress achievement
+            if (existingUserAchievement && existingUserAchievement.progress !== null) {
+              const existingProgress = existingUserAchievement.progress || 0;
+              resourceCount += existingProgress;
+            }
+            
+            progress = Math.min(100, Math.floor((resourceCount / threshold) * 100));
+            shouldGrant = resourceCount >= threshold;
           }
           break;
           
@@ -2634,19 +2685,37 @@ export class MemStorage implements IStorage {
       
       // Update or create user achievement based on progress
       if (progress > 0) {
+        // Prepare metadata
+        const metadata = {
+          lastChecked: new Date(),
+          triggerData: triggerData
+        };
+        
+        // Grant or update achievement
         const userAchievement = await this.grantAchievementToUser(
-          userId,
+          triggerData.userId,
           achievement.id,
           {
-            progress: progress,
-            metadata: { lastChecked: new Date(), context },
-            grantedById: 1, // System ID
-            notes: shouldGrant ? 'Automatically awarded' : 'Progress updated'
+            progress: shouldGrant ? 100 : progress,
+            metadata: metadata,
+            awardedAt: shouldGrant ? new Date() : undefined
           }
         );
         
-        if (shouldGrant && userAchievement.awardedAt) {
+        if (shouldGrant) {
           grantedAchievements.push(userAchievement);
+          
+          // Create notification for the user
+          try {
+            await this.createNotification({
+              recipientId: triggerData.userId,
+              type: 'achievement',
+              content: `You've earned the "${achievement.name}" achievement! ${achievement.description}`,
+              status: 'unread'
+            });
+          } catch (notificationError) {
+            console.error("Failed to create achievement notification:", notificationError);
+          }
         }
       }
     }
