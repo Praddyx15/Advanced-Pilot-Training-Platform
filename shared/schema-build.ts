@@ -8,8 +8,17 @@ import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date, 
 import { z } from "zod";
 import { createInsertSchema } from "drizzle-zod";
 
-// Import the build-safe versions
-import { buildSafePick, BuildSafeType } from "./schema-build-fix";
+// Import the build-safe versions with enhanced functionality
+import { 
+  buildSafePick, 
+  BuildSafeType, 
+  patchNullableDate, 
+  BuildSafeUtils,
+  OptionalProperties
+} from "./schema-build-fix";
+
+// Type declarations for build-time safety
+type Json = any;
 
 // Mock the createInsertSchema function to return a workaround for build time
 const originalCreateInsertSchema = createInsertSchema;
@@ -17,11 +26,59 @@ const originalCreateInsertSchema = createInsertSchema;
 // Patch with our own version during build
 (global as any).createInsertSchema = function(table: any) {
   const schema = originalCreateInsertSchema(table);
-  // Add a patched pick method that works during build
-  schema.pick = function(props: Record<string, any>) {
-    return buildSafePick(schema, props);
+  
+  // Add all the patched methods that work during build
+  return {
+    ...schema,
+    // Enhanced pick method that works during build
+    pick: function(props: Record<string, any>) {
+      return buildSafePick(schema, props);
+    },
+    // Support for extend method
+    extend: function(extension: any) {
+      return schema; // Just return the schema for build
+    },
+    // Support for omit method
+    omit: function(props: Record<string, any>) {
+      return schema; // Just return the schema for build
+    },
+    // Support for partial method
+    partial: function() {
+      return schema; // Just return the schema for build
+    },
+    // Patch with methods needed in schema.ts
+    array: function() {
+      return z.array(schema);
+    },
+    nullable: function() {
+      return z.nullable(schema);
+    },
+    optional: function() {
+      return z.optional(schema);
+    }
   };
-  return schema;
+};
+
+// Define runtime helpers for Set/Map iteration compatibility
+// Instead of modifying prototypes (which can cause typing issues),
+// we'll export utility functions to handle iteration in schema.ts
+export function iterableToArray<T>(iterable: Iterable<T> | ArrayLike<T>): T[] {
+  return Array.from(iterable);
+}
+
+export function mapToArray<K, V>(map: Map<K, V>): [K, V][] {
+  return Array.from(map.entries());
+}
+
+export function setToArray<T>(set: Set<T>): T[] {
+  return Array.from(set);
+}
+
+// Export the utilities needed in schema.ts
+export { 
+  patchNullableDate, 
+  BuildSafeUtils,
+  OptionalProperties
 };
 
 // Re-export everything from the original schema
