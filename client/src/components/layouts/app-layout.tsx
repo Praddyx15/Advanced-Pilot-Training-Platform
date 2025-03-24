@@ -17,7 +17,7 @@ import {
 export function AppLayout({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logoutMutation } = useAuth();
-  const [location, navigate] = useLocation();
+  const [location, setLocation] = useLocation();
   
   // Get user role for theming
   const userRole = user?.role || 'trainee';
@@ -190,14 +190,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => navigate('/help')}>
+                <DropdownMenuItem onClick={() => setLocation('/help')}>
                   <HelpCircle className="mr-2 h-4 w-4" />
                   <span>Help</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={() => {
                   logoutMutation.mutate();
-                  navigate('/auth');
+                  setLocation('/auth');
                 }}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Logout</span>

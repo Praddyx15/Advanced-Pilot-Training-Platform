@@ -290,7 +290,7 @@ const TraineePerformancePage: React.FC = () => {
                     {recentAssessments.map((assessment: any) => (
                       <div key={assessment.id} 
                         className="p-4 border rounded-md hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => navigate(`/assessments/${assessment.id}`)}
+                        onClick={() => setLocation(`/assessments/${assessment.id}`)}
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div>
