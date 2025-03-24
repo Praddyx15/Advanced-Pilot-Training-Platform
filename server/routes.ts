@@ -1527,6 +1527,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Register document processing routes
   registerDocumentRoutes(app);
+  
+  // Register syllabus routes
+  registerSyllabusRoutes(app);
+  
+  // Register knowledge graph routes
+  registerKnowledgeGraphRoutes(app);
+  
+  // Register training routes
+  registerTrainingRoutes(app);
+  
+  // Register assessment routes
+  registerAssessmentRoutes(app);
+  
+  // Register resource routes
+  registerResourceRoutes(app);
+  
+  // Register notification routes
+  registerNotificationRoutes(app);
+  
+  // Register flight record routes
+  registerFlightRecordRoutes(app);
+  
+  // Register achievement routes
+  registerAchievementRoutes(app);
+  
+  // Register OCR routes
+  registerOcrRoutes(app);
+  
+  // Register document analysis routes
+  registerDocumentAnalysisRoutes(app);
+  
+  // Register schedule routes
+  registerScheduleRoutes(app);
 
   // Create HTTP server
   const httpServer = createServer(app);
