@@ -128,7 +128,7 @@ export function ATODashboard() {
   }
 
   return (
-    <div className="container mx-auto">
+    <div>
       <div className="space-y-6">
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-2">
           <div>
