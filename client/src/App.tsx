@@ -16,6 +16,9 @@ import CompliancePage from "@/pages/compliance-page";
 import TestNotificationPage from "@/pages/test-notification-page";
 import TrainingProgramsPage from "@/pages/training-programs-page";
 import HelpPage from "@/pages/help-page";
+import AssessmentsPage from "@/pages/assessments-page";
+import AssessmentGradingPage from "@/pages/assessment-grading-page";
+import TraineePerformancePage from "@/pages/trainee-performance-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -37,6 +40,10 @@ function AppRouter() {
       <ProtectedRoute path="/training-programs" component={TrainingProgramsPage} />
       <ProtectedRoute path="/test-notification" component={TestNotificationPage} />
       <ProtectedRoute path="/help" component={HelpPage} />
+      <ProtectedRoute path="/assessments" component={AssessmentsPage} />
+      <ProtectedRoute path="/assessments/:id/grade" component={AssessmentGradingPage} />
+      <ProtectedRoute path="/trainee-performance" component={TraineePerformancePage} />
+      <ProtectedRoute path="/trainee-performance/:id" component={TraineePerformancePage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
