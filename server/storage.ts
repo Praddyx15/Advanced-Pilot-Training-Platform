@@ -144,15 +144,25 @@ export interface IStorage {
 
   // Assessment methods
   getAssessment(id: number): Promise<Assessment | undefined>;
+  getAllAssessments(): Promise<Assessment[]>;
   getAssessmentsByTrainee(traineeId: number): Promise<Assessment[]>;
   getAssessmentsByInstructor(instructorId: number): Promise<Assessment[]>;
   createAssessment(assessment: InsertAssessment): Promise<Assessment>;
   updateAssessment(id: number, assessment: Partial<Assessment>): Promise<Assessment | undefined>;
+  deleteAssessment(id: number): Promise<boolean>;
+  getTraineePerformanceMetrics(traineeId: number): Promise<any>;
+  getInstructorAssessmentRatings(instructorId: number): Promise<any>;
+  getInstructorTraineesPerformance(instructorId: number): Promise<any>;
+  getInstructorPendingGradesheets(instructorId: number): Promise<any>;
+  getInstructorWeeklySchedule(instructorId: number): Promise<any>;
+  getInstructorTodaySessions(instructorId: number): Promise<any>;
 
   // Grade methods
+  getGrade(id: number): Promise<Grade | undefined>;
   getGradesByAssessment(assessmentId: number): Promise<Grade[]>;
   createGrade(grade: InsertGrade): Promise<Grade>;
   updateGrade(id: number, grade: Partial<Grade>): Promise<Grade | undefined>;
+  deleteGrade(id: number): Promise<boolean>;
   
   // Document methods
   getDocument(id: number): Promise<Document | undefined>;
@@ -301,6 +311,15 @@ export interface IStorage {
   
   // Initialize sample user data for testing (only for development)
   initializeSampleUser(): void;
+}
+
+// Helper function to determine competency level based on score percentage
+function getCompetencyLevel(scorePercentage: number): string {
+  if (scorePercentage >= 90) return 'Expert';
+  if (scorePercentage >= 80) return 'Proficient';
+  if (scorePercentage >= 70) return 'Competent';
+  if (scorePercentage >= 60) return 'Basic';
+  return 'Novice';
 }
 
 export class MemStorage implements IStorage {
@@ -1346,6 +1365,10 @@ export class MemStorage implements IStorage {
     return this.assessments.get(id);
   }
 
+  async getAllAssessments(): Promise<Assessment[]> {
+    return Array.from(this.assessments.values());
+  }
+
   async getAssessmentsByTrainee(traineeId: number): Promise<Assessment[]> {
     return Array.from(this.assessments.values()).filter(
       assessment => assessment.traineeId === traineeId
@@ -1354,13 +1377,20 @@ export class MemStorage implements IStorage {
 
   async getAssessmentsByInstructor(instructorId: number): Promise<Assessment[]> {
     return Array.from(this.assessments.values()).filter(
-      assessment => assessment.instructorId === instructorId
+      assessment => assessment.assessorId === instructorId
     );
   }
 
   async createAssessment(assessment: InsertAssessment): Promise<Assessment> {
     const id = this.assessmentIdCounter++;
-    const newAssessment: Assessment = { ...assessment, id };
+    const now = new Date();
+    const newAssessment: Assessment = { 
+      ...assessment, 
+      id,
+      createdAt: now,
+      updatedAt: now,
+      status: assessment.status || 'pending'
+    };
     this.assessments.set(id, newAssessment);
     return newAssessment;
   }
@@ -1369,12 +1399,407 @@ export class MemStorage implements IStorage {
     const existingAssessment = this.assessments.get(id);
     if (!existingAssessment) return undefined;
 
-    const updatedAssessment = { ...existingAssessment, ...assessment };
+    const updatedAssessment = { 
+      ...existingAssessment, 
+      ...assessment,
+      updatedAt: new Date()
+    };
     this.assessments.set(id, updatedAssessment);
     return updatedAssessment;
   }
 
+  async deleteAssessment(id: number): Promise<boolean> {
+    // First delete all related grades
+    const gradesToDelete = await this.getGradesByAssessment(id);
+    for (const grade of gradesToDelete) {
+      await this.deleteGrade(grade.id);
+    }
+    
+    return this.assessments.delete(id);
+  }
+
+  async getTraineePerformanceMetrics(traineeId: number): Promise<any> {
+    // Get all assessments for the trainee
+    const assessments = await this.getAssessmentsByTrainee(traineeId);
+    
+    // Get all grades for these assessments
+    const allGrades: Grade[] = [];
+    for (const assessment of assessments) {
+      const grades = await this.getGradesByAssessment(assessment.id);
+      allGrades.push(...grades);
+    }
+    
+    // Calculate metrics
+    const totalAssessments = assessments.length;
+    const completedAssessments = assessments.filter(a => a.status === 'completed').length;
+    const pendingAssessments = assessments.filter(a => a.status === 'pending').length;
+    const failedAssessments = assessments.filter(a => a.status === 'failed').length;
+    
+    // Calculate average scores
+    let totalScore = 0;
+    let totalMaximumScore = 0;
+    
+    allGrades.forEach(grade => {
+      totalScore += grade.score;
+      totalMaximumScore += grade.maximumScore;
+    });
+    
+    const averageScore = totalMaximumScore > 0 ? (totalScore / totalMaximumScore) * 100 : 0;
+    
+    // Group assessments by competency area
+    const competencyAreas = assessments.reduce((acc, assessment) => {
+      const area = assessment.competencyArea || 'Unknown';
+      if (!acc[area]) {
+        acc[area] = [];
+      }
+      acc[area].push(assessment);
+      return acc;
+    }, {} as Record<string, Assessment[]>);
+    
+    // Calculate competency area metrics
+    const competencyMetrics = Object.entries(competencyAreas).map(([area, areaAssessments]) => {
+      // Get grades for this area
+      const areaGrades: Grade[] = [];
+      areaAssessments.forEach(assessment => {
+        const grades = allGrades.filter(g => g.assessmentId === assessment.id);
+        areaGrades.push(...grades);
+      });
+      
+      // Calculate average score for this area
+      let areaTotalScore = 0;
+      let areaTotalMaximumScore = 0;
+      
+      areaGrades.forEach(grade => {
+        areaTotalScore += grade.score;
+        areaTotalMaximumScore += grade.maximumScore;
+      });
+      
+      const areaAverageScore = areaTotalMaximumScore > 0 ? (areaTotalScore / areaTotalMaximumScore) * 100 : 0;
+      
+      return {
+        area,
+        assessmentCount: areaAssessments.length,
+        averageScore: areaAverageScore,
+        competencyLevel: getCompetencyLevel(areaAverageScore)
+      };
+    });
+    
+    // Progress over time calculation
+    const timeBasedProgress = assessments
+      .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      .map(assessment => {
+        const assessmentGrades = allGrades.filter(g => g.assessmentId === assessment.id);
+        let assessmentScore = 0;
+        let assessmentMaxScore = 0;
+        
+        assessmentGrades.forEach(grade => {
+          assessmentScore += grade.score;
+          assessmentMaxScore += grade.maximumScore;
+        });
+        
+        const scorePercentage = assessmentMaxScore > 0 ? (assessmentScore / assessmentMaxScore) * 100 : 0;
+        
+        return {
+          date: assessment.date,
+          score: scorePercentage,
+          competencyArea: assessment.competencyArea || 'Unknown',
+          status: assessment.status
+        };
+      });
+    
+    // Return comprehensive performance metrics
+    return {
+      traineeId,
+      totalAssessments,
+      completedAssessments,
+      pendingAssessments,
+      failedAssessments,
+      overallScore: averageScore,
+      competencyLevel: getCompetencyLevel(averageScore),
+      competencyBreakdown: competencyMetrics,
+      progressOverTime: timeBasedProgress,
+      lastAssessmentDate: assessments.length > 0 ? 
+        assessments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0].date : 
+        null
+    };
+  }
+
+  async getInstructorAssessmentRatings(instructorId: number): Promise<any> {
+    // Get all assessments conducted by this instructor
+    const assessments = await this.getAssessmentsByInstructor(instructorId);
+    
+    // Get all trainees from these assessments
+    const traineeIds = [...new Set(assessments.map(a => a.traineeId))];
+    
+    // Get average ratings for this instructor
+    const ratings: any[] = [];
+    for (const assessment of assessments) {
+      if (assessment.instructorRating) {
+        ratings.push(assessment.instructorRating);
+      }
+    }
+    
+    const averageRating = ratings.length > 0 ? 
+      ratings.reduce((sum, rating) => sum + rating, 0) / ratings.length : 
+      0;
+    
+    // Return ratings summary
+    return {
+      instructorId,
+      assessmentsCount: assessments.length,
+      uniqueTraineesCount: traineeIds.length,
+      averageRating,
+      ratingsCount: ratings.length,
+      recentAssessments: assessments
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 5)
+        .map(a => ({
+          id: a.id,
+          traineeId: a.traineeId,
+          date: a.date,
+          competencyArea: a.competencyArea,
+          status: a.status,
+          rating: a.instructorRating
+        }))
+    };
+  }
+
+  async getInstructorTraineesPerformance(instructorId: number): Promise<any> {
+    // Get all assessments conducted by this instructor
+    const assessments = await this.getAssessmentsByInstructor(instructorId);
+    
+    // Get all trainees from these assessments
+    const traineeIds = [...new Set(assessments.map(a => a.traineeId))];
+    
+    // Get performance metrics for each trainee
+    const traineesPerformance = await Promise.all(
+      traineeIds.map(async traineeId => {
+        const metrics = await this.getTraineePerformanceMetrics(traineeId);
+        const trainee = await this.getUser(traineeId);
+        
+        return {
+          traineeId,
+          traineeName: trainee ? `${trainee.firstName} ${trainee.lastName}` : `Unknown (${traineeId})`,
+          metrics
+        };
+      })
+    );
+    
+    return {
+      instructorId,
+      traineesCount: traineeIds.length,
+      assessmentsCount: assessments.length,
+      traineesPerformance
+    };
+  }
+
+  async getInstructorPendingGradesheets(instructorId: number): Promise<any> {
+    // Get all assessments for this instructor
+    const assessments = await this.getAssessmentsByInstructor(instructorId);
+    
+    // Filter to get only pending gradesheets
+    const pendingAssessments = assessments.filter(a => 
+      a.status === 'pending' || a.status === 'in_progress'
+    );
+    
+    // Enhance with trainee information
+    const pendingGradesheets = await Promise.all(
+      pendingAssessments.map(async assessment => {
+        const trainee = await this.getUser(assessment.traineeId);
+        const grades = await this.getGradesByAssessment(assessment.id);
+        
+        return {
+          assessmentId: assessment.id,
+          traineeId: assessment.traineeId,
+          traineeName: trainee ? `${trainee.firstName} ${trainee.lastName}` : `Unknown (${assessment.traineeId})`,
+          date: assessment.date,
+          dueDate: assessment.dueDate,
+          competencyArea: assessment.competencyArea,
+          status: assessment.status,
+          gradesCount: grades.length,
+          isOverdue: assessment.dueDate ? new Date(assessment.dueDate) < new Date() : false
+        };
+      })
+    );
+    
+    return {
+      instructorId,
+      pendingCount: pendingGradesheets.length,
+      overdueCount: pendingGradesheets.filter(g => g.isOverdue).length,
+      pendingGradesheets: pendingGradesheets.sort((a, b) => {
+        // Sort by overdue first, then by due date
+        if (a.isOverdue && !b.isOverdue) return -1;
+        if (!a.isOverdue && b.isOverdue) return 1;
+        if (a.dueDate && b.dueDate) {
+          return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        }
+        return 0;
+      })
+    };
+  }
+
+  async getInstructorWeeklySchedule(instructorId: number): Promise<any> {
+    // Get all sessions for this instructor in the next 7 days
+    const today = new Date();
+    const oneWeekLater = new Date(today);
+    oneWeekLater.setDate(oneWeekLater.getDate() + 7);
+    
+    const sessions = await this.getSessionsByInstructor(instructorId);
+    const upcomingSessions = sessions.filter(session => {
+      const sessionDate = new Date(session.startTime);
+      return sessionDate >= today && sessionDate <= oneWeekLater;
+    });
+    
+    // Group sessions by day
+    const sessionsByDay: Record<string, any[]> = {};
+    for (const session of upcomingSessions) {
+      const date = new Date(session.startTime).toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      if (!sessionsByDay[date]) {
+        sessionsByDay[date] = [];
+      }
+      
+      // Get trainees for this session
+      const traineeIds = await this.getSessionTrainees(session.id);
+      const trainees = await Promise.all(
+        traineeIds.map(async traineeId => {
+          const trainee = await this.getUser(traineeId);
+          return {
+            id: traineeId,
+            name: trainee ? `${trainee.firstName} ${trainee.lastName}` : `Unknown (${traineeId})`
+          };
+        })
+      );
+      
+      sessionsByDay[date].push({
+        sessionId: session.id,
+        title: session.title,
+        moduleId: session.moduleId,
+        lessonId: session.lessonId,
+        startTime: session.startTime,
+        endTime: session.endTime,
+        location: session.location,
+        trainees
+      });
+    }
+    
+    // Format days for the week
+    const formattedSchedule = [];
+    const currentDate = new Date(today);
+    
+    for (let i = 0; i < 7; i++) {
+      const dateString = currentDate.toISOString().split('T')[0];
+      formattedSchedule.push({
+        date: dateString,
+        dayName: new Date(dateString).toLocaleDateString('en-US', { weekday: 'long' }),
+        sessions: sessionsByDay[dateString] || []
+      });
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    return {
+      instructorId,
+      totalUpcomingSessions: upcomingSessions.length,
+      weeklySchedule: formattedSchedule
+    };
+  }
+
+  async getInstructorTodaySessions(instructorId: number): Promise<any> {
+    // Get all sessions for this instructor today
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0);
+    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+    
+    const sessions = await this.getSessionsByInstructor(instructorId);
+    const todaySessions = sessions.filter(session => {
+      const sessionDate = new Date(session.startTime);
+      return sessionDate >= todayStart && sessionDate <= todayEnd;
+    });
+    
+    // Get detailed information for each session
+    const detailedSessions = await Promise.all(
+      todaySessions.map(async session => {
+        // Get trainees for this session
+        const traineeIds = await this.getSessionTrainees(session.id);
+        const trainees = await Promise.all(
+          traineeIds.map(async traineeId => {
+            const trainee = await this.getUser(traineeId);
+            return {
+              id: traineeId,
+              name: trainee ? `${trainee.firstName} ${trainee.lastName}` : `Unknown (${traineeId})`
+            };
+          })
+        );
+        
+        // Get module and lesson information
+        let moduleInfo = null;
+        let lessonInfo = null;
+        
+        if (session.moduleId) {
+          const module = await this.getModule(session.moduleId);
+          if (module) {
+            moduleInfo = {
+              id: module.id,
+              name: module.name,
+              type: module.type
+            };
+          }
+        }
+        
+        if (session.lessonId) {
+          const lesson = await this.getLesson(session.lessonId);
+          if (lesson) {
+            lessonInfo = {
+              id: lesson.id,
+              name: lesson.name,
+              type: lesson.type
+            };
+          }
+        }
+        
+        return {
+          sessionId: session.id,
+          title: session.title,
+          startTime: session.startTime,
+          endTime: session.endTime,
+          location: session.location,
+          status: session.status,
+          module: moduleInfo,
+          lesson: lessonInfo,
+          trainees,
+          traineesCount: trainees.length,
+          notes: session.notes || '',
+          resources: session.resources || []
+        };
+      })
+    );
+    
+    return {
+      instructorId,
+      today: today.toISOString().split('T')[0],
+      sessionsCount: todaySessions.length,
+      upcomingSessions: detailedSessions
+        .filter(s => new Date(s.startTime) > new Date())
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()),
+      completedSessions: detailedSessions
+        .filter(s => new Date(s.endTime) < new Date())
+        .sort((a, b) => new Date(b.endTime).getTime() - new Date(a.endTime).getTime()),
+      currentSessions: detailedSessions.filter(s => {
+        const now = new Date();
+        return new Date(s.startTime) <= now && new Date(s.endTime) >= now;
+      })
+    };
+  }
+
   // Grade methods
+  async getGrade(id: number): Promise<Grade | undefined> {
+    return this.grades.get(id);
+  }
+
   async getGradesByAssessment(assessmentId: number): Promise<Grade[]> {
     return Array.from(this.grades.values()).filter(
       grade => grade.assessmentId === assessmentId
@@ -1383,10 +1808,13 @@ export class MemStorage implements IStorage {
 
   async createGrade(grade: InsertGrade): Promise<Grade> {
     const id = this.gradeIdCounter++;
+    const now = new Date();
     const newGrade: Grade = { 
       ...grade, 
       id,
-      comments: grade.comments || null 
+      comments: grade.comments || null,
+      createdAt: now,
+      updatedAt: now
     };
     this.grades.set(id, newGrade);
     return newGrade;
@@ -1396,9 +1824,17 @@ export class MemStorage implements IStorage {
     const existingGrade = this.grades.get(id);
     if (!existingGrade) return undefined;
 
-    const updatedGrade = { ...existingGrade, ...grade };
+    const updatedGrade = { 
+      ...existingGrade, 
+      ...grade,
+      updatedAt: new Date()
+    };
     this.grades.set(id, updatedGrade);
     return updatedGrade;
+  }
+  
+  async deleteGrade(id: number): Promise<boolean> {
+    return this.grades.delete(id);
   }
 
   // Document methods
