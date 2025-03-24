@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { format, addDays, startOfWeek, isSameDay, parse, isValid } from 'date-fns';
 import { Calendar } from '@/components/ui/calendar';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,6 +15,17 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Form,
   FormControl,
@@ -38,7 +49,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, Calendar as CalendarIcon, User, Users, Clock, MapPin } from 'lucide-react';
+import { Loader2, Calendar as CalendarIcon, User, Users, Clock, MapPin, Pencil, Trash2 } from 'lucide-react';
 import { AppLayout } from '@/components/layouts/app-layout';
 
 // Define the form schema using zod
@@ -63,6 +74,7 @@ const sessionFormSchema = z.object({
   trainees: z.array(z.coerce.number()).optional(),
   resourceId: z.coerce.number().optional(),
   notes: z.string().optional(),
+  location: z.string().optional(),
 });
 
 type SessionFormValues = z.infer<typeof sessionFormSchema>;
