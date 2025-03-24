@@ -35,9 +35,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
   // Create connection string
   const getWebSocketUrl = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use the current hostname and a fixed port for WebSocket connection
-    // Instead of relying on window.location.host which might include an undefined port
-    return `${protocol}//${window.location.hostname}/ws`;
+    // Use the full host (hostname:port) to ensure correct port handling in all environments
+    // Our vite-hmr-fix.ts will handle any WebSocket connection issues
+    return `${protocol}//${window.location.host}/ws`;
   }, []);
 
   // Connect to WebSocket server

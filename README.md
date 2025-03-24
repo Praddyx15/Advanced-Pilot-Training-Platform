@@ -75,6 +75,40 @@ npm run dev
 http://localhost:5000
 ```
 
+### Deployment
+
+#### Vercel Deployment
+
+1. Create a Vercel account and install the Vercel CLI:
+```bash
+npm install -g vercel
+```
+
+2. Log in to Vercel:
+```bash
+vercel login
+```
+
+3. Deploy to Vercel:
+```bash
+vercel
+```
+
+4. For production deployment:
+```bash
+vercel --prod
+```
+
+5. Set up environment variables in the Vercel dashboard:
+   - `SESSION_SECRET`: A secure random string for session management
+   - `NODE_ENV`: Set to "production"
+
+The project includes the following deployment optimizations:
+- Custom build script that handles both client and server compilation
+- WebSocket configuration for Vercel deployment
+- Optimized memory store for session management
+- Enhanced API route handling in serverless environment
+
 ## User Accounts for Testing
 
 ### Admin
