@@ -92,25 +92,34 @@ export default function OCRProcessingTab() {
   // Mutation for OCR processing
   const ocrMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      // Update progress steps
-      setProcessingStep('Uploading document...');
-      await simulateProgress(0, 15);
-      
-      setProcessingStep('Preprocessing image...');
-      await simulateProgress(15, 30);
-      
-      setProcessingStep('Applying OCR...');
-      await simulateProgress(30, 60);
-      
-      setProcessingStep('Detecting layout and structure...');
-      await simulateProgress(60, 80);
-      
-      setProcessingStep('Post-processing and analyzing results...');
-      await simulateProgress(80, 100);
-      
-      // Call OCR API endpoint
-      const response = await apiRequest('POST', '/api/ocr/process', formData);
-      return await response.json();
+      try {
+        // Update progress steps
+        setProcessingStep('Uploading document...');
+        await simulateProgress(0, 15);
+        
+        setProcessingStep('Preprocessing image...');
+        await simulateProgress(15, 30);
+        
+        setProcessingStep('Applying OCR...');
+        await simulateProgress(30, 60);
+        
+        setProcessingStep('Detecting layout and structure...');
+        await simulateProgress(60, 80);
+        
+        setProcessingStep('Post-processing and analyzing results...');
+        await simulateProgress(80, 100);
+        
+        // Call OCR API endpoint
+        const response = await apiRequest('POST', '/api/ocr/process', formData);
+        return await response.json();
+      } catch (error) {
+        // Convert the error to a standard format
+        if (error instanceof Error) {
+          throw error;
+        } else {
+          throw new Error('An unexpected error occurred during OCR processing');
+        }
+      }
     },
     onSuccess: (data) => {
       setOcrResult(data);
