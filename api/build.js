@@ -42,7 +42,7 @@ if (!fs.existsSync(path.join(process.cwd(), 'node_modules'))) {
 
 // Build server-side TypeScript
 console.log('Building server-side TypeScript...');
-exec('npx tsc --project tsconfig.json');
+exec('npx tsc --project tsconfig.build.json');
 
 // Build client-side Vite app
 console.log('Building client-side Vite app...');
