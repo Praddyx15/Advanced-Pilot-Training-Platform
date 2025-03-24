@@ -343,9 +343,13 @@ if (!fs.existsSync(apiVercelDir)) {
 
 // Create a proper serverless-compatible handler in the api directory
 fs.writeFileSync(path.join(apiVercelDir, 'index.js'), `
-// Vercel serverless function handler
+// Vercel serverless function handler with enhanced error handling
+// Fixes FUNCTION_INVOCATION_FAILED and BODY_NOT_A_STRING_FROM_FUNCTION errors
 const path = require('path');
 const fs = require('fs');
+const express = require('express');
+const bodyParser = require('body-parser');
+const cors = require('cors');
 
 // Try to load dotenv if available
 try {
@@ -357,44 +361,147 @@ try {
   console.warn('Error loading .env.local file', err);
 }
 
+// Create a fallback Express app with proper middleware
+const createFallbackApp = () => {
+  const fallbackApp = express();
+  
+  // Add essential middleware
+  fallbackApp.use(bodyParser.json({ limit: '50mb' }));
+  fallbackApp.use(bodyParser.urlencoded({ extended: true }));
+  fallbackApp.use(cors({
+    origin: true,
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+  }));
+  
+  // Define universal error handler
+  fallbackApp.all('*', (req, res) => {
+    res.status(503).json({
+      error: 'Service Temporarily Unavailable',
+      message: 'The application is currently being deployed or experiencing technical difficulties. Please try again in a few minutes.'
+    });
+  });
+  
+  return fallbackApp;
+};
+
 // Initialize the Express app instance
 let app;
 try {
   // Import the compiled Express application
-  const { default: expressApp } = require('../server/index.js');
-  app = expressApp;
+  // Use ESM-compatible import 
+  const serverModule = require('../server/index.js');
+  app = serverModule.default || serverModule;
+  
+  console.log('Successfully loaded main Express application');
 } catch (err) {
   console.error('Error loading Express app:', err);
-  
-  // Fallback to a simple Express app
-  const express = require('express');
-  const fallbackApp = express();
-  
-  fallbackApp.all('*', (req, res) => {
-    res.status(500).json({
-      error: 'Server initialization failed',
-      message: 'The application is experiencing technical difficulties. Please try again later.'
-    });
-  });
-  
-  app = fallbackApp;
+  app = createFallbackApp();
 }
 
-// Export the serverless handler function
-module.exports = (req, res) => {
-  // Normalize request URL
-  if (!req.url.startsWith('/')) {
-    req.url = '/' + req.url;
-  }
+// This wrapper ensures the response is always in the right format
+const serverlessHandler = (req, res) => {
+  try {
+    // Normalize request URL
+    if (!req.url.startsWith('/')) {
+      req.url = '/' + req.url;
+    }
 
-  // Special handling for WebSocket connections
-  if (req.method === 'GET' && req.headers.upgrade === 'websocket') {
-    req.url = '/ws';
-  }
+    // Special handling for WebSocket connections
+    if (req.method === 'GET' && req.headers && req.headers.upgrade === 'websocket') {
+      req.url = '/ws';
+    }
 
-  // Pass request to Express app
-  return app(req, res);
+    // Apply error handling to response methods to fix BODY_NOT_A_STRING_FROM_FUNCTION
+    const originalEnd = res.end;
+    const originalJson = res.json;
+    const originalSend = res.send;
+    
+    // Wrap res.end to ensure it always returns valid data
+    res.end = function(chunk, encoding) {
+      try {
+        // If chunk exists and is not a string or buffer, convert it
+        if (chunk && typeof chunk !== 'string' && !Buffer.isBuffer(chunk)) {
+          try {
+            chunk = JSON.stringify(chunk);
+          } catch (e) {
+            console.error('Failed to stringify response chunk:', e);
+            chunk = JSON.stringify({
+              error: 'Response serialization error',
+              message: 'The server response could not be properly formatted.'
+            });
+          }
+        }
+        
+        return originalEnd.call(this, chunk, encoding);
+      } catch (error) {
+        console.error('Response end error:', error);
+        
+        // Try sending a fallback response
+        if (!this.headersSent) {
+          this.setHeader('Content-Type', 'application/json');
+          return originalEnd.call(
+            this, 
+            JSON.stringify({ error: 'Internal Server Error' }),
+            'utf8'
+          );
+        }
+      }
+    };
+    
+    // Wrap res.json to ensure proper JSON responses
+    res.json = function(body) {
+      try {
+        // Ensure body is serializable
+        const safeBody = body === undefined ? {} : body;
+        return originalJson.call(this, safeBody);
+      } catch (error) {
+        console.error('JSON response error:', error);
+        
+        if (!this.headersSent) {
+          return originalJson.call(this, { 
+            error: 'Response Error',
+            message: 'An error occurred while processing the response.'
+          });
+        }
+      }
+    };
+    
+    // Wrap res.send to handle non-string values
+    res.send = function(body) {
+      try {
+        return originalSend.call(this, body);
+      } catch (error) {
+        console.error('Send response error:', error);
+        
+        if (!this.headersSent) {
+          this.setHeader('Content-Type', 'application/json');
+          return originalSend.call(this, JSON.stringify({ 
+            error: 'Response Error',
+            message: 'An error occurred while sending the response.'
+          }));
+        }
+      }
+    };
+
+    // Call the Express app with global error handling
+    return app(req, res);
+  } catch (error) {
+    console.error('Global serverless handler error:', error);
+    
+    // Ensure we always send a response
+    if (!res.headersSent) {
+      res.status(500).json({
+        error: 'Internal Server Error',
+        message: 'The server encountered an unexpected condition that prevented it from fulfilling the request.'
+      });
+    }
+  }
 };
+
+// Export the enhanced serverless handler
+module.exports = serverlessHandler;
 `);
 
 // Final confirmation
