@@ -8,11 +8,11 @@
   "rewrites": [
     {
       "source": "/ws",
-      "destination": "/api/index.ts"
+      "destination": "/api"
     },
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+      "destination": "/api"
     },
     {
       "source": "/(.*)",
@@ -40,5 +40,36 @@
   "env": {
     "NODE_ENV": "production",
     "SESSION_SECRET": "pilot-training-platform-session-secret"
-  }
+  },
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node",
+      "config": {
+        "includeFiles": ["dist/**"]
+      }
+    },
+    {
+      "src": "dist/public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "handle": "filesystem",
+      "src": "/assets/(.*)"
+    },
+    {
+      "src": "/ws",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/dist/public/index.html"
+    }
+  ]
 }
