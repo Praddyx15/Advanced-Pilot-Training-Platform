@@ -20,23 +20,55 @@
   ],
   "rewrites": [
     {
-      "source": "/assets/(.*)",
-      "destination": "/dist/public/assets/$1"
+      "source": "/assets/:path*",
+      "destination": "/dist/public/assets/:path*"
     },
     {
       "source": "/ws",
       "destination": "/api/index.js"
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "destination": "/api/index.js"
     },
     {
-      "source": "/(.*\\.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot))",
-      "destination": "/dist/public/$1"
+      "source": "/:path*.js",
+      "destination": "/dist/public/:path*.js"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*.css",
+      "destination": "/dist/public/:path*.css"
+    },
+    {
+      "source": "/:path*.png",
+      "destination": "/dist/public/:path*.png"
+    },
+    {
+      "source": "/:path*.jpg",
+      "destination": "/dist/public/:path*.jpg"
+    },
+    {
+      "source": "/:path*.svg",
+      "destination": "/dist/public/:path*.svg"
+    },
+    {
+      "source": "/:path*.ico",
+      "destination": "/dist/public/:path*.ico"
+    },
+    {
+      "source": "/:path*.woff",
+      "destination": "/dist/public/:path*.woff"
+    },
+    {
+      "source": "/:path*.woff2",
+      "destination": "/dist/public/:path*.woff2"
+    },
+    {
+      "source": "/:path*.ttf",
+      "destination": "/dist/public/:path*.ttf"
+    },
+    {
+      "source": "/:path*",
       "destination": "/dist/public/index.html"
     }
   ],
