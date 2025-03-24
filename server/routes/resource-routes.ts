@@ -401,4 +401,118 @@ export function registerResourceRoutes(app: Express) {
       res.status(500).json({ error: 'Failed to fetch resource types' });
     }
   });
+  
+  /**
+   * Share resource with users
+   */
+  app.post('/api/resources/:id/share', async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const resourceId = parseInt(req.params.id);
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ error: 'Resource not found' });
+      }
+      
+      // Check if user has permission to share
+      if (req.user.role !== 'admin' && resource.createdById !== req.user.id) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      
+      // Validate share schema
+      const shareSchema = z.object({
+        emails: z.array(z.string().email()),
+        message: z.string().optional(),
+        notifyUsers: z.boolean().optional(),
+      });
+      
+      const { emails, message, notifyUsers = true } = shareSchema.parse(req.body);
+      
+      // Share resource
+      const shareResults = await storage.shareResource(resourceId, {
+        sharedById: req.user.id,
+        emails,
+        message,
+        notifyUsers,
+      });
+      
+      res.status(200).json(shareResults);
+    } catch (error) {
+      logger.error('Error sharing resource', { context: { error } });
+      
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: 'Invalid share parameters', details: error.errors });
+      }
+      
+      res.status(500).json({ error: 'Failed to share resource' });
+    }
+  });
+  
+  /**
+   * Get shares for a resource
+   */
+  app.get('/api/resources/:id/shares', async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const resourceId = parseInt(req.params.id);
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ error: 'Resource not found' });
+      }
+      
+      // Check if user has permission to view shares
+      if (req.user.role !== 'admin' && resource.createdById !== req.user.id) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      
+      // Get shares
+      const shares = await storage.getResourceShares(resourceId);
+      
+      res.json(shares);
+    } catch (error) {
+      logger.error('Error fetching resource shares', { context: { error } });
+      res.status(500).json({ error: 'Failed to fetch resource shares' });
+    }
+  });
+  
+  /**
+   * Delete a share
+   */
+  app.delete('/api/resources/:id/shares/:shareId', async (req: Request, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Authentication required' });
+      }
+      
+      const resourceId = parseInt(req.params.id);
+      const shareId = parseInt(req.params.shareId);
+      
+      const resource = await storage.getResource(resourceId);
+      
+      if (!resource) {
+        return res.status(404).json({ error: 'Resource not found' });
+      }
+      
+      // Check if user has permission to delete share
+      if (req.user.role !== 'admin' && resource.createdById !== req.user.id) {
+        return res.status(403).json({ error: 'Permission denied' });
+      }
+      
+      // Delete share
+      await storage.deleteResourceShare(shareId);
+      
+      res.status(204).send();
+    } catch (error) {
+      logger.error('Error deleting resource share', { context: { error } });
+      res.status(500).json({ error: 'Failed to delete resource share' });
+    }
+  });
 }
