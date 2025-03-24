@@ -11,7 +11,11 @@ declare namespace Express {
 
 // Extend Session type for Express session
 declare module 'express-session' {
+  interface Session {
+    user?: any;
+  }
+  
   interface SessionData {
-    user: any;
+    user?: any;
   }
 }

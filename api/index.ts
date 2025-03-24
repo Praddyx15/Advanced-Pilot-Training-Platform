@@ -7,7 +7,7 @@ import compression from "compression";
 import helmet from "helmet";
 import cors from "cors";
 import type { Request, Response, NextFunction } from "express";
-import { MemStorage } from "../server/storage";
+import { MemStorage } from "./storage";
 import session from "express-session";
 
 // Create Express application
@@ -31,7 +31,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Create a session store in memory
-const memoryStore = require('memorystore')(session);
+const MemoryStore = require('memorystore')(session);
 
 // Set up simple session
 app.use(session({
@@ -39,16 +39,13 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: { secure: process.env.NODE_ENV === 'production' },
-  store: new memoryStore({
+  store: new MemoryStore({
     checkPeriod: 86400000 // prune expired entries every 24h
   })
 }));
 
 // Create memory storage instance
 const storage = new MemStorage();
-
-// Initialize auth middleware
-app.use(express.json());
 
 // Basic auth routes for API access
 app.post('/api/login', async (req, res) => {
@@ -58,7 +55,9 @@ app.post('/api/login', async (req, res) => {
     
     if (user) {
       // In production, you would verify the password hash here
-      req.session.user = user;
+      if (req.session) {
+        req.session.user = user;
+      }
       res.json(user);
     } else {
       res.status(401).json({ error: 'Invalid credentials' });
@@ -70,17 +69,21 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy((err) => {
-    if (err) {
-      res.status(500).json({ error: 'Logout failed' });
-    } else {
-      res.status(200).json({ message: 'Logged out successfully' });
-    }
-  });
+  if (req.session) {
+    req.session.destroy((err) => {
+      if (err) {
+        res.status(500).json({ error: 'Logout failed' });
+      } else {
+        res.status(200).json({ message: 'Logged out successfully' });
+      }
+    });
+  } else {
+    res.status(200).json({ message: 'No active session' });
+  }
 });
 
 app.get('/api/user', (req, res) => {
-  if (req.session.user) {
+  if (req.session && req.session.user) {
     res.json(req.session.user);
   } else {
     res.status(401).json({ error: 'Not authenticated' });
