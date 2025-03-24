@@ -7,6 +7,10 @@
   "regions": ["iad1"],
   "rewrites": [
     {
+      "source": "/assets/(.*)",
+      "destination": "/dist/public/assets/$1"
+    },
+    {
       "source": "/ws",
       "destination": "/api"
     },
@@ -52,24 +56,6 @@
     {
       "src": "dist/public/**",
       "use": "@vercel/static"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/assets/(.*)",
-      "dest": "/dist/public/assets/$1"
-    },
-    {
-      "src": "/ws",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/api/(.*)",
-      "dest": "/api/index.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/dist/public/index.html"
     }
   ]
 }
