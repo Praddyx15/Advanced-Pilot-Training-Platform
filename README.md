@@ -56,7 +56,7 @@ The Advanced Pilot Training Platform is a modern web application designed specif
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/advanced-pilot-training-platform.git
+git clone https://github.com/Praddyx15/Advanced-Pilot-Training-Platform.git
 cd advanced-pilot-training-platform
 ```
 
