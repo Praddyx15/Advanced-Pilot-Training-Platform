@@ -92,32 +92,25 @@ export default function OCRProcessingTab() {
   // Mutation for OCR processing
   const ocrMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      try {
-        // Simulate OCR processing steps with incremental progress
-        setProcessingStep('Uploading document...');
-        await simulateProgress(0, 15);
-        
-        setProcessingStep('Preprocessing image...');
-        await simulateProgress(15, 30);
-        
-        setProcessingStep('Applying OCR...');
-        await simulateProgress(30, 60);
-        
-        setProcessingStep('Detecting layout and structure...');
-        await simulateProgress(60, 80);
-        
-        setProcessingStep('Post-processing and analyzing results...');
-        await simulateProgress(80, 100);
-        
-        // Try to call the real API endpoint
-        const response = await apiRequest('POST', '/api/ocr/process', formData, true);
-        return await response.json();
-      } catch (error) {
-        console.error('OCR API error:', error);
-        
-        // Return mock result for demonstration if API is not yet implemented
-        return generateMockOcrResult();
-      }
+      // Update progress steps
+      setProcessingStep('Uploading document...');
+      await simulateProgress(0, 15);
+      
+      setProcessingStep('Preprocessing image...');
+      await simulateProgress(15, 30);
+      
+      setProcessingStep('Applying OCR...');
+      await simulateProgress(30, 60);
+      
+      setProcessingStep('Detecting layout and structure...');
+      await simulateProgress(60, 80);
+      
+      setProcessingStep('Post-processing and analyzing results...');
+      await simulateProgress(80, 100);
+      
+      // Call OCR API endpoint
+      const response = await apiRequest('POST', '/api/ocr/process', formData);
+      return await response.json();
     },
     onSuccess: (data) => {
       setOcrResult(data);
@@ -156,75 +149,7 @@ export default function OCRProcessingTab() {
     });
   };
   
-  // Generate mock OCR result for demonstration
-  const generateMockOcrResult = () => {
-    return {
-      text: `ADVANCED PILOT TRAINING PLATFORM
-      
-Flight Operations Manual
-Chapter 4: Standard Operating Procedures
 
-4.1 General Provisions
-These Standard Operating Procedures (SOPs) are established to ensure flight safety, standardization, and operational efficiency across all training operations conducted under this program.
-
-4.2 Preflight Procedures
-4.2.1 Documentation Check
-Pilots shall verify the following documents prior to every flight:
-- Valid pilot license with appropriate ratings
-- Medical certificate
-- Aircraft airworthiness certificate
-- Aircraft registration
-- Aircraft maintenance records
-- Weight and balance documentation
-
-4.2.2 Weather Briefing
-A thorough weather briefing must be obtained before all flights, including:
-- Current and forecast weather at departure, destination and alternate airports
-- En-route weather conditions
-- NOTAMs
-- TFRs and special use airspace activity
-
-4.3 Aircraft Inspection
-A complete preflight inspection must be conducted according to the checklist provided in the Pilot Operating Handbook (POH) or Aircraft Flight Manual (AFM).
-
-4.4 Emergency Procedures
-All pilots must be thoroughly familiar with emergency procedures specific to the aircraft being operated. Simulated emergency procedures during training shall only be conducted with a qualified instructor on board.`,
-      confidence: 96.4,
-      pageCount: 1,
-      detectedLanguage: "eng",
-      processingTime: 2.3, // seconds
-      words: [
-        { text: "ADVANCED", confidence: 99.2, boundingBox: [50, 50, 150, 75] },
-        { text: "PILOT", confidence: 98.8, boundingBox: [155, 50, 210, 75] },
-        // More words would be here in a real implementation
-      ],
-      lines: [
-        { text: "ADVANCED PILOT TRAINING PLATFORM", boundingBox: [50, 50, 500, 75] },
-        { text: "Flight Operations Manual", boundingBox: [50, 90, 300, 115] },
-        // More lines would be here in a real implementation
-      ],
-      tables: [
-        {
-          boundingBox: [50, 300, 500, 400],
-          cells: [
-            [{ text: "Documentation", confidence: 97.5 }, { text: "Required", confidence: 98.1 }],
-            [{ text: "Pilot license", confidence: 96.8 }, { text: "Yes", confidence: 99.2 }],
-            [{ text: "Medical certificate", confidence: 95.9 }, { text: "Yes", confidence: 99.3 }]
-          ]
-        }
-      ],
-      forms: [
-        {
-          boundingBox: [50, 450, 500, 550],
-          fields: [
-            { name: "Pilot Name", value: "", boundingBox: [100, 470, 300, 490] },
-            { name: "Date", value: "", boundingBox: [100, 510, 200, 530] }
-          ]
-        }
-      ]
-    };
-  };
-  
   // Handle file upload
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
