@@ -19,6 +19,7 @@ import { registerFlightRecordRoutes } from "./routes/flight-record-routes";
 import { registerAchievementRoutes } from "./routes/achievement-routes";
 import { registerOcrRoutes } from "./routes/ocr-routes";
 import { registerDocumentAnalysisRoutes } from "./routes/document-analysis-routes";
+import { registerScheduleRoutes } from "./routes/schedule-routes";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
 import v1Router from "./api/v1-router";
@@ -67,6 +68,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAchievementRoutes(app);
   registerOcrRoutes(app);
   registerDocumentAnalysisRoutes(app);
+  registerScheduleRoutes(app);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {
