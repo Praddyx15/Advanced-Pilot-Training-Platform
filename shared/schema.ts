@@ -43,12 +43,24 @@ export const trainingPrograms = pgTable("training_programs", {
   id: serial("id").primaryKey(),
   name: text("name").notNull(),
   description: text("description"),
+  programType: text("program_type").default("type_rating"),
+  aircraftType: text("aircraft_type"),
+  regulatoryAuthority: text("regulatory_authority"),
+  durationDays: integer("duration_days"),
+  status: text("status").default("draft"),
   createdById: integer("created_by_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 export const insertProgramSchema = createInsertSchema(trainingPrograms).pick({
   name: true,
   description: true,
+  programType: true,
+  aircraftType: true,
+  regulatoryAuthority: true,
+  durationDays: true,
+  status: true,
   createdById: true,
 });
 
