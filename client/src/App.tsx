@@ -15,6 +15,7 @@ import DocumentProcessorPage from "@/pages/document-processor-page";
 import CompliancePage from "@/pages/compliance-page";
 import TestNotificationPage from "@/pages/test-notification-page";
 import TrainingProgramsPage from "@/pages/training-programs-page";
+import HelpPage from "@/pages/help-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
@@ -35,6 +36,7 @@ function AppRouter() {
       <ProtectedRoute path="/compliance" component={CompliancePage} />
       <ProtectedRoute path="/training-programs" component={TrainingProgramsPage} />
       <ProtectedRoute path="/test-notification" component={TestNotificationPage} />
+      <ProtectedRoute path="/help" component={HelpPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
