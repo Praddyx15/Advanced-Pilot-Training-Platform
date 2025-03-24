@@ -89,6 +89,7 @@ app.use(
 
 // Session setup
 const MemoryStore = memorystore(session);
+// @ts-ignore - Type issue with express-session import
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'pilot-training-platform-session-secret',
   store: new MemoryStore({
