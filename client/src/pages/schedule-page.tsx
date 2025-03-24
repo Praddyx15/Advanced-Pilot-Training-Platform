@@ -110,6 +110,10 @@ export default function SchedulePage() {
     queryKey: ['/api/resources'],
   });
 
+  // States for editing
+  const [isEditingSession, setIsEditingSession] = useState(false);
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+
   // Create session mutation
   const createSessionMutation = useMutation({
     mutationFn: async (sessionData: SessionFormValues) => {
@@ -133,6 +137,54 @@ export default function SchedulePage() {
       });
     }
   });
+  
+  // Update session mutation
+  const updateSessionMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number, data: Partial<SessionFormValues> }) => {
+      const res = await apiRequest('PUT', `/api/protected/sessions/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Session updated successfully.",
+      });
+      form.reset();
+      setIsEditingSession(false);
+      setIsViewingSession(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update session.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Delete session mutation
+  const deleteSessionMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest('DELETE', `/api/protected/sessions/${id}`);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Session deleted successfully.",
+      });
+      setIsConfirmingDelete(false);
+      setIsViewingSession(false);
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete session.",
+        variant: "destructive",
+      });
+    }
+  });
 
   // Define the form
   const form = useForm<SessionFormValues>({
@@ -145,7 +197,39 @@ export default function SchedulePage() {
 
   // Handle form submission
   const onSubmit = (data: SessionFormValues) => {
-    createSessionMutation.mutate(data);
+    if (isEditingSession && selectedSession) {
+      updateSessionMutation.mutate({ 
+        id: selectedSession.id, 
+        data: data
+      });
+    } else {
+      createSessionMutation.mutate(data);
+    }
+  };
+  
+  // Start editing session
+  const handleEditSession = () => {
+    if (!selectedSession) return;
+    
+    // Set form values from selected session
+    form.reset({
+      programId: selectedSession.programId,
+      moduleId: selectedSession.moduleId,
+      status: selectedSession.status,
+      startTime: format(new Date(selectedSession.startTime), "yyyy-MM-dd'T'HH:mm"),
+      endTime: format(new Date(selectedSession.endTime), "yyyy-MM-dd'T'HH:mm"),
+      trainees: selectedSession.trainees || [],
+      resourceId: selectedSession.resourceId || undefined,
+      notes: selectedSession.notes || '',
+      location: selectedSession.location || '',
+    });
+    
+    // Set selected program ID for modules loading
+    setSelectedProgramId(selectedSession.programId);
+    
+    // Close view dialog and open edit dialog
+    setIsViewingSession(false);
+    setIsEditingSession(true);
   };
 
   // Handle program change in the form
@@ -610,6 +694,22 @@ export default function SchedulePage() {
             <>
               <DialogHeader>
                 <DialogTitle>Session Details</DialogTitle>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      selectedSession.status === 'completed' 
+                        ? 'bg-green-100 text-green-800' 
+                        : selectedSession.status === 'cancelled' 
+                          ? 'bg-red-100 text-red-800' 
+                          : 'bg-primary/20 text-primary'
+                    }`}>
+                      {selectedSession.status}
+                    </span>
+                  </div>
+                  <DialogDescription>
+                    ID: {selectedSession.id}
+                  </DialogDescription>
+                </div>
               </DialogHeader>
               
               <div className="space-y-4">
@@ -683,6 +783,16 @@ export default function SchedulePage() {
                   </div>
                 )}
                 
+                {selectedSession.location && (
+                  <div className="flex items-start space-x-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                    <div>
+                      <p className="font-medium">Location</p>
+                      <p>{selectedSession.location}</p>
+                    </div>
+                  </div>
+                )}
+                
                 {selectedSession.notes && (
                   <div className="border-t pt-2">
                     <p className="font-medium">Notes</p>
@@ -691,19 +801,57 @@ export default function SchedulePage() {
                 )}
               </div>
               
-              <DialogFooter>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setIsViewingSession(false)}
-                >
-                  Close
-                </Button>
+              <DialogFooter className="flex justify-between">
+                <div>
+                  {(user?.role === 'instructor' || user?.role === 'admin' || user?.role === 'ato_admin') && (
+                    <AlertDialog open={isConfirmingDelete} onOpenChange={setIsConfirmingDelete}>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            This will permanently delete this training session and cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction 
+                            onClick={() => deleteSessionMutation.mutate(selectedSession.id)}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {deleteSessionMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 mr-1" />
+                            )}
+                            Delete Session
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
                 
-                {(user?.role === 'instructor' || user?.role === 'admin') && (
-                  <Button>
-                    Edit Session
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsViewingSession(false)}
+                  >
+                    Close
                   </Button>
-                )}
+                  
+                  {(user?.role === 'instructor' || user?.role === 'admin' || user?.role === 'ato_admin') && (
+                    <Button onClick={handleEditSession}>
+                      <Pencil className="h-4 w-4 mr-1" />
+                      Edit Session
+                    </Button>
+                  )}
+                </div>
               </DialogFooter>
             </>
           )}
