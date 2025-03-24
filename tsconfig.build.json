@@ -3,7 +3,7 @@
   "exclude": ["client/src/**/*", "node_modules", "build", "dist", "**/*.test.ts"],
   "files": ["shared/build.d.ts"],
   "compilerOptions": {
-    "incremental": true,
+    "incremental": false,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
     "target": "ESNext",
     "module": "ESNext",
@@ -25,10 +25,10 @@
     "downlevelIteration": true,
     "allowSyntheticDefaultImports": true,
     "resolveJsonModule": true,
-    "isolatedModules": true,
+    "isolatedModules": false,
     "outDir": "dist",
     "declaration": false,
-    "sourceMap": true,
+    "sourceMap": false,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "suppressImplicitAnyIndexErrors": true,
@@ -39,7 +39,11 @@
     "allowJs": true,
     "noPropertyAccessFromIndexSignature": false,
     "useUnknownInCatchVariables": false,
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    "noEmitOnError": false,
+    "emitDeclarationOnly": false,
+    "noResolve": false,
+    "maxNodeModuleJsDepth": 10
   },
   "ts-node": {
     "transpileOnly": true,
