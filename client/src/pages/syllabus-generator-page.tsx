@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/use-auth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -151,6 +151,61 @@ export default function SyllabusGeneratorPage() {
     enabled: !!generatedSyllabusId,
   });
 
+  // Function to poll generation progress
+  const pollGenerationProgress = useCallback((generationId: string) => {
+    // Set generation status to processing
+    setGenerationStatus(GenerationStatus.PROCESSING);
+    
+    // Create the polling interval
+    const pollInterval = setInterval(async () => {
+      try {
+        // Fetch progress
+        const response = await apiRequest('GET', `/api/syllabus/generation/${generationId}/progress`);
+        const progressData = await response.json();
+        
+        // Update UI with progress
+        setGenerationProgress(progressData.progress);
+        
+        // Check if processing is complete
+        if (progressData.status === 'completed' && progressData.syllabusId) {
+          // Clear interval
+          clearInterval(pollInterval);
+          
+          // Set the syllabusId to trigger loading of the generated syllabus
+          setGeneratedSyllabusId(progressData.syllabusId);
+          
+          // Update generation status
+          setGenerationStatus(GenerationStatus.COMPLETED);
+          
+          // Show success toast
+          toast({
+            title: "Syllabus Generated Successfully",
+            description: "Your training syllabus has been created.",
+          });
+        } else if (progressData.status === 'failed') {
+          // Clear interval
+          clearInterval(pollInterval);
+          
+          // Update generation status
+          setGenerationStatus(GenerationStatus.ERROR);
+          
+          // Show error toast
+          toast({
+            title: "Generation Failed",
+            description: progressData.error || "There was a problem generating the syllabus.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        // Log error but continue polling
+        console.error("Error polling generation progress:", error);
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    // Cleanup function
+    return () => clearInterval(pollInterval);
+  }, [toast, setGenerationProgress, setGenerationStatus, setGeneratedSyllabusId]);
+
   // Generate syllabus mutation
   const generateMutation = useMutation({
     mutationFn: async (data: FormValues) => {
@@ -204,60 +259,7 @@ export default function SyllabusGeneratorPage() {
     }
   });
 
-  // Function to poll generation progress
-  const pollGenerationProgress = (generationId: string) => {
-    // Set generation status to processing
-    setGenerationStatus(GenerationStatus.PROCESSING);
-    
-    // Create the polling interval
-    const pollInterval = setInterval(async () => {
-      try {
-        // Fetch progress
-        const response = await apiRequest('GET', `/api/syllabus/generation/${generationId}/progress`);
-        const progressData = await response.json();
-        
-        // Update UI with progress
-        setGenerationProgress(progressData.progress);
-        
-        // Check if processing is complete
-        if (progressData.status === 'completed' && progressData.syllabusId) {
-          // Clear interval
-          clearInterval(pollInterval);
-          
-          // Set the syllabusId to trigger loading of the generated syllabus
-          setGeneratedSyllabusId(progressData.syllabusId);
-          
-          // Update generation status
-          setGenerationStatus(GenerationStatus.COMPLETED);
-          
-          // Show success toast
-          toast({
-            title: "Syllabus Generated Successfully",
-            description: "Your training syllabus has been created.",
-          });
-        } else if (progressData.status === 'failed') {
-          // Clear interval
-          clearInterval(pollInterval);
-          
-          // Update generation status
-          setGenerationStatus(GenerationStatus.ERROR);
-          
-          // Show error toast
-          toast({
-            title: "Generation Failed",
-            description: progressData.error || "There was a problem generating the syllabus.",
-            variant: "destructive",
-          });
-        }
-      } catch (error) {
-        // Log error but continue polling
-        console.error("Error polling generation progress:", error);
-      }
-    }, 2000); // Poll every 2 seconds
-    
-    // Cleanup function
-    return () => clearInterval(pollInterval);
-  };
+
 
   // Submit handler for the form
   const onSubmit = (data: FormValues) => {
@@ -439,7 +441,7 @@ export default function SyllabusGeneratorPage() {
               <div>
                 <h3 className="text-sm font-medium">Program Type</h3>
                 <p className="text-sm text-muted-foreground">
-                  {generatedSyllabus.programType?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {generatedSyllabus.programType?.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())}
                 </p>
               </div>
               <div>
