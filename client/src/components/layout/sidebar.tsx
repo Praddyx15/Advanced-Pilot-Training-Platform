@@ -45,7 +45,7 @@ export default function Sidebar() {
   );
 
   return (
-    <div className="w-64 hidden md:block bg-white border-r border-slate-200 py-4 px-2 overflow-y-auto">
+    <div className="w-64 h-full flex-shrink-0 hidden md:block bg-white border-r border-slate-200 py-4 px-2 overflow-y-auto">
       <div className="space-y-1 px-2">
         <MenuItem id="dashboard" icon={<BarChart className="h-5 w-5" />} label="Dashboard" />
         <MenuItem id="programs" icon={<Book className="h-5 w-5" />} label="Training Programs" />
