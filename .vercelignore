@@ -1,0 +1,13 @@
+# Server files (except for the api folder which is our serverless functions)
+server
+drizzle.config.ts
+
+# Development files
+.github
+.gitignore
+.env.example
+README.md
+
+# Tests
+test-*.js
+test-*.sh
