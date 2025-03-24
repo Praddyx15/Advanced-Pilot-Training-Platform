@@ -1,0 +1,13 @@
+// Export all route registration functions
+export { registerAssessmentRoutes } from './assessment-routes';
+export { registerDocumentRoutes } from './document-routes';
+export { registerSyllabusRoutes } from './syllabus-routes';
+export { registerKnowledgeGraphRoutes } from './knowledge-graph-routes';
+export { registerTrainingRoutes } from './training-routes';
+export { registerResourceRoutes } from './resource-routes';
+export { registerNotificationRoutes } from './notification-routes';
+export { registerFlightRecordRoutes } from './flight-record-routes';
+export { registerAchievementRoutes } from './achievement-routes';
+export { registerOcrRoutes } from './ocr-routes';
+export { registerDocumentAnalysisRoutes } from './document-analysis-routes';
+export { registerScheduleRoutes } from './schedule-routes';

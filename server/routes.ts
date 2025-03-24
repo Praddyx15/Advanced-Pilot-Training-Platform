@@ -8,18 +8,20 @@ import { syllabusGenerationOptionsSchema, syllabusImportSchema } from "@shared/s
 import { z } from "zod";
 import * as syllabusGenerator from "./services/syllabus-generator";
 import * as templateManager from "./services/syllabus-template-manager";
-import { registerDocumentRoutes } from "./routes/document-routes";
-import { registerSyllabusRoutes } from "./routes/syllabus-routes";
-import { registerKnowledgeGraphRoutes } from "./routes/knowledge-graph-routes";
-import { registerTrainingRoutes } from "./routes/training-routes";
-import { registerAssessmentRoutes } from "./routes/assessment-routes";
-import { registerResourceRoutes } from "./routes/resource-routes";
-import { registerNotificationRoutes } from "./routes/notification-routes";
-import { registerFlightRecordRoutes } from "./routes/flight-record-routes";
-import { registerAchievementRoutes } from "./routes/achievement-routes";
-import { registerOcrRoutes } from "./routes/ocr-routes";
-import { registerDocumentAnalysisRoutes } from "./routes/document-analysis-routes";
-import { registerScheduleRoutes } from "./routes/schedule-routes";
+import { 
+  registerDocumentRoutes,
+  registerSyllabusRoutes,
+  registerKnowledgeGraphRoutes,
+  registerTrainingRoutes,
+  registerAssessmentRoutes,
+  registerResourceRoutes,
+  registerNotificationRoutes,
+  registerFlightRecordRoutes,
+  registerAchievementRoutes,
+  registerOcrRoutes,
+  registerDocumentAnalysisRoutes,
+  registerScheduleRoutes
+} from "./routes/index";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
 import v1Router from "./api/v1-router";
