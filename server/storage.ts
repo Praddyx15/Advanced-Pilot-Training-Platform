@@ -2463,6 +2463,190 @@ export class MemStorage implements IStorage {
     this.userAchievements.set(id, updatedUserAchievement);
     return updatedUserAchievement;
   }
+  
+  async grantAchievementToUser(
+    userId: number, 
+    achievementId: number, 
+    options: {
+      progress?: number;
+      metadata?: Record<string, any>;
+      grantedById: number;
+      notes?: string;
+    }
+  ): Promise<UserAchievement> {
+    // Check if user exists
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+    
+    // Check if achievement exists
+    const achievement = await this.getAchievement(achievementId);
+    if (!achievement) {
+      throw new Error(`Achievement with ID ${achievementId} not found`);
+    }
+    
+    // Check if user already has this achievement
+    const existingUserAchievement = Array.from(this.userAchievements.values()).find(
+      ua => ua.userId === userId && ua.achievementId === achievementId
+    );
+    
+    if (existingUserAchievement) {
+      // Update progress if needed
+      if (options.progress !== undefined && options.progress > existingUserAchievement.progress) {
+        const updatedUserAchievement = await this.updateUserAchievement(
+          existingUserAchievement.id,
+          { 
+            progress: options.progress,
+            metadata: options.metadata || existingUserAchievement.metadata,
+            grantedById: options.grantedById,
+            notes: options.notes || existingUserAchievement.notes
+          }
+        );
+        
+        // If progress reaches 100, mark as awarded
+        if (options.progress >= 100 && !existingUserAchievement.awardedAt) {
+          return this.updateUserAchievement(
+            existingUserAchievement.id,
+            { awardedAt: new Date() }
+          ) as Promise<UserAchievement>;
+        }
+        
+        return updatedUserAchievement as UserAchievement;
+      }
+      
+      return existingUserAchievement;
+    }
+    
+    // Create new user achievement
+    const newUserAchievement: InsertUserAchievement = {
+      userId,
+      achievementId,
+      progress: options.progress || 100, // Default to 100% if not specified
+      metadata: options.metadata || null,
+      grantedById: options.grantedById,
+      notes: options.notes || null,
+      awardedAt: options.progress && options.progress < 100 ? null : new Date()
+    };
+    
+    const createdUserAchievement = await this.createUserAchievement(newUserAchievement);
+    
+    // Add notification about achievement
+    await this.createNotification({
+      userId,
+      type: 'achievement',
+      title: `Achievement Unlocked: ${achievement.name}`,
+      content: achievement.description,
+      metadata: { achievementId, userAchievementId: createdUserAchievement.id },
+      isRead: false,
+      priority: 'medium',
+      expiresAt: null,
+      sendEmail: false
+    });
+    
+    // Update user points if the achievement grants points
+    if (achievement.points && createdUserAchievement.awardedAt) {
+      // Here you could implement logic to update user points in a separate table
+      // For simplicity, let's just log that points have been granted
+      console.log(`User ${userId} earned ${achievement.points} points for achievement ${achievementId}`);
+    }
+    
+    return createdUserAchievement;
+  }
+  
+  async checkAchievementTriggers(
+    userId: number, 
+    triggerType: string, 
+    context: Record<string, any>
+  ): Promise<UserAchievement[]> {
+    // Get user
+    const user = await this.getUser(userId);
+    if (!user) {
+      throw new Error(`User with ID ${userId} not found`);
+    }
+    
+    // Get all achievements that might be triggered by this action
+    const achievementsToCheck = Array.from(this.achievements.values())
+      .filter(achievement => 
+        achievement.triggerType === triggerType &&
+        achievement.active
+      );
+    
+    const grantedAchievements: UserAchievement[] = [];
+    
+    // Check each relevant achievement
+    for (const achievement of achievementsToCheck) {
+      // Skip if user already has this achievement fully unlocked
+      const existingUserAchievement = Array.from(this.userAchievements.values()).find(
+        ua => ua.userId === userId && ua.achievementId === achievement.id && ua.awardedAt !== null
+      );
+      
+      if (existingUserAchievement) continue;
+      
+      let shouldGrant = false;
+      let progress = 0;
+      
+      // Evaluate achievement criteria based on the trigger type and context
+      switch (triggerType) {
+        case 'session_completion':
+          if (context.sessionCount) {
+            progress = Math.min(100, Math.floor((context.sessionCount / achievement.threshold) * 100));
+            shouldGrant = context.sessionCount >= achievement.threshold;
+          }
+          break;
+          
+        case 'assessment_score':
+          if (context.score !== undefined) {
+            progress = Math.min(100, Math.floor((context.score / achievement.threshold) * 100));
+            shouldGrant = context.score >= achievement.threshold;
+          }
+          break;
+          
+        case 'module_completion':
+          if (context.moduleCount) {
+            progress = Math.min(100, Math.floor((context.moduleCount / achievement.threshold) * 100));
+            shouldGrant = context.moduleCount >= achievement.threshold;
+          }
+          break;
+          
+        case 'login_streak':
+          if (context.loginDays) {
+            progress = Math.min(100, Math.floor((context.loginDays / achievement.threshold) * 100));
+            shouldGrant = context.loginDays >= achievement.threshold;
+          }
+          break;
+          
+        case 'resource_contribution':
+          if (context.resourceCount) {
+            progress = Math.min(100, Math.floor((context.resourceCount / achievement.threshold) * 100));
+            shouldGrant = context.resourceCount >= achievement.threshold;
+          }
+          break;
+          
+        // Add more trigger types as needed
+      }
+      
+      // Update or create user achievement based on progress
+      if (progress > 0) {
+        const userAchievement = await this.grantAchievementToUser(
+          userId,
+          achievement.id,
+          {
+            progress: progress,
+            metadata: { lastChecked: new Date(), context },
+            grantedById: 1, // System ID
+            notes: shouldGrant ? 'Automatically awarded' : 'Progress updated'
+          }
+        );
+        
+        if (shouldGrant && userAchievement.awardedAt) {
+          grantedAchievements.push(userAchievement);
+        }
+      }
+    }
+    
+    return grantedAchievements;
+  }
 
   // Leaderboards methods
   async getLeaderboard(id: number): Promise<Leaderboard | undefined> {
