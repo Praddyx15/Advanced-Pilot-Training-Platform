@@ -1,112 +1,92 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
-export type WebSocketMessage = {
-  type: string;
-  [key: string]: any;
-};
-
-type UseWebSocketOptions = {
-  onOpen?: (event: Event) => void;
+interface WebSocketOptions {
+  onOpen?: (ev: Event) => void;
   onMessage?: (data: any) => void;
-  onError?: (event: Event) => void;
-  onClose?: (event: CloseEvent) => void;
-  reconnectInterval?: number;
-  reconnectAttempts?: number;
-  autoConnect?: boolean;
-};
+  onClose?: (ev: CloseEvent) => void;
+  onError?: (ev: Event) => void;
+}
 
-export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const {
-    onOpen,
-    onMessage,
-    onError,
-    onClose,
-    reconnectInterval = 5000,
-    reconnectAttempts = 10,
-    autoConnect = true,
-  } = options;
-
+export const useWebSocket = (options?: WebSocketOptions) => {
   const [isConnected, setIsConnected] = useState(false);
-  const [lastMessage, setLastMessage] = useState<any>(null);
+  const [lastMessage, setLastMessage] = useState<any | null>(null);
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<number>();
-  const reconnectCountRef = useRef(0);
+  const subscribedChannels = useRef<Set<string>>(new Set());
 
-  // Create connection string
-  const getWebSocketUrl = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    // Use the full host (hostname:port) to ensure correct port handling in all environments
-    // Our vite-hmr-fix.ts will handle any WebSocket connection issues
-    return `${protocol}//${window.location.host}/ws`;
-  }, []);
+  // Connect to the WebSocket server
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
 
-  // Connect to WebSocket server
-  const connect = useCallback(() => {
-    // Clear any existing socket
-    if (socketRef.current) {
-      socketRef.current.close();
-    }
-
-    try {
-      const socket = new WebSocket(getWebSocketUrl());
+      const socket = new WebSocket(wsUrl);
       socketRef.current = socket;
 
-      socket.onopen = (event) => {
+      socket.onopen = (ev) => {
         setIsConnected(true);
-        reconnectCountRef.current = 0;
-        if (onOpen) onOpen(event);
+        options?.onOpen?.(ev);
+
+        // Resubscribe to existing channels
+        subscribedChannels.current.forEach((channel) => {
+          socket.send(JSON.stringify({ type: 'subscribe', channel }));
+        });
       };
 
-      socket.onmessage = (event) => {
+      socket.onmessage = (ev) => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(ev.data);
           setLastMessage(data);
-          if (onMessage) onMessage(data);
+          options?.onMessage?.(data);
         } catch (error) {
-          console.error('Error parsing WebSocket message:', error);
+          console.error('Failed to parse WebSocket message:', error);
         }
       };
 
-      socket.onerror = (event) => {
-        if (onError) onError(event);
-      };
-
-      socket.onclose = (event) => {
+      socket.onclose = (ev) => {
         setIsConnected(false);
-        
-        if (onClose) onClose(event);
-        
-        // Try to reconnect if not explicitly closed by the client
-        if (event.code !== 1000) {
-          reconnectCountRef.current += 1;
-          if (reconnectCountRef.current <= reconnectAttempts) {
-            reconnectTimeoutRef.current = window.setTimeout(() => {
-              connect();
-            }, reconnectInterval);
-          }
+        options?.onClose?.(ev);
+      };
+
+      socket.onerror = (ev) => {
+        console.error('WebSocket error:', ev);
+        options?.onError?.(ev);
+      };
+
+      return () => {
+        // Clean up the socket on component unmount
+        if (socket.readyState === 1) { // 1 = OPEN
+          socket.close();
         }
       };
-    } catch (error) {
-      console.error('Error connecting to WebSocket:', error);
     }
-  }, [getWebSocketUrl, onOpen, onMessage, onError, onClose, reconnectInterval, reconnectAttempts]);
+  }, [options]);
 
-  // Disconnect from WebSocket server
-  const disconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-    }
+  // Subscribe to a channel
+  const subscribe = useCallback((channel: string) => {
+    subscribedChannels.current.add(channel);
     
-    if (socketRef.current) {
-      socketRef.current.close(1000, 'Client disconnected');
-      socketRef.current = null;
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'subscribe',
+        channel
+      }));
     }
-    
-    setIsConnected(false);
   }, []);
 
-  // Send message to WebSocket server
-  const sendMessage = useCallback((message: WebSocketMessage) => {
+  // Unsubscribe from a channel
+  const unsubscribe = useCallback((channel: string) => {
+    subscribedChannels.current.delete(channel);
+    
+    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+      socketRef.current.send(JSON.stringify({
+        type: 'unsubscribe',
+        channel
+      }));
+    }
+  }, []);
+
+  // Send a message through the WebSocket
+  const sendMessage = useCallback((message: any) => {
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(message));
       return true;
@@ -114,39 +94,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
     return false;
   }, []);
 
-  // Ping the server
-  const ping = useCallback(() => {
-    return sendMessage({ type: 'ping', timestamp: new Date().toISOString() });
-  }, [sendMessage]);
-
-  // Subscribe to a channel
-  const subscribe = useCallback((channel: string) => {
-    return sendMessage({ 
-      type: 'subscribe', 
-      channel,
-      timestamp: new Date().toISOString() 
-    });
-  }, [sendMessage]);
-
-  // Auto-connect on mount
-  useEffect(() => {
-    if (autoConnect) {
-      connect();
-    }
-    
-    // Cleanup on unmount
-    return () => {
-      disconnect();
-    };
-  }, [autoConnect, connect, disconnect]);
-
   return {
     isConnected,
     lastMessage,
-    connect,
-    disconnect,
-    sendMessage,
-    ping,
     subscribe,
+    unsubscribe,
+    sendMessage
   };
-}
+};

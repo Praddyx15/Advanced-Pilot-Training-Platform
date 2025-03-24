@@ -20,6 +20,7 @@ import AssessmentsPage from "@/pages/assessments-page";
 import AssessmentGradingPage from "@/pages/assessment-grading-page";
 import TraineePerformancePage from "@/pages/trainee-performance-page";
 import SchedulePage from "@/pages/schedule-page";
+import MessagingPage from "@/pages/messaging-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
