@@ -4,73 +4,17 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "framework": null,
-  "regions": ["iad1"],
-  "builds": [
-    {
-      "src": "api/index.js",
-      "use": "@vercel/node",
-      "config": {
-        "includeFiles": ["dist/**"]
-      }
-    },
-    {
-      "src": "dist/public/**",
-      "use": "@vercel/static"
+  "functions": {
+    "api/index.js": {
+      "memory": 1024,
+      "maxDuration": 10
     }
-  ],
-  "rewrites": [
-    {
-      "source": "/assets/:path*",
-      "destination": "/dist/public/assets/:path*"
-    },
-    {
-      "source": "/ws",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/api/:path*",
-      "destination": "/api/index.js"
-    },
-    {
-      "source": "/:path*.js",
-      "destination": "/dist/public/:path*.js"
-    },
-    {
-      "source": "/:path*.css",
-      "destination": "/dist/public/:path*.css"
-    },
-    {
-      "source": "/:path*.png",
-      "destination": "/dist/public/:path*.png"
-    },
-    {
-      "source": "/:path*.jpg",
-      "destination": "/dist/public/:path*.jpg"
-    },
-    {
-      "source": "/:path*.svg",
-      "destination": "/dist/public/:path*.svg"
-    },
-    {
-      "source": "/:path*.ico",
-      "destination": "/dist/public/:path*.ico"
-    },
-    {
-      "source": "/:path*.woff",
-      "destination": "/dist/public/:path*.woff"
-    },
-    {
-      "source": "/:path*.woff2",
-      "destination": "/dist/public/:path*.woff2"
-    },
-    {
-      "source": "/:path*.ttf",
-      "destination": "/dist/public/:path*.ttf"
-    },
-    {
-      "source": "/:path*",
-      "destination": "/dist/public/index.html"
-    }
+  },
+  "routes": [
+    { "handle": "filesystem" },
+    { "src": "/ws", "dest": "api/index.js" },
+    { "src": "/api/(.*)", "dest": "api/index.js" },
+    { "src": "/(.*)", "dest": "/dist/public/index.html" }
   ],
   "headers": [
     {

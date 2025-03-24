@@ -341,10 +341,60 @@ if (!fs.existsSync(apiVercelDir)) {
   fs.mkdirSync(apiVercelDir, { recursive: true });
 }
 
-// Create a minimal index.js in the api directory
+// Create a proper serverless-compatible handler in the api directory
 fs.writeFileSync(path.join(apiVercelDir, 'index.js'), `
-import app from '../server/index.js';
-export default app;
+// Vercel serverless function handler
+const path = require('path');
+const fs = require('fs');
+
+// Try to load dotenv if available
+try {
+  const dotenvPath = path.resolve(process.cwd(), '.env.local');
+  if (fs.existsSync(dotenvPath)) {
+    require('dotenv').config({ path: dotenvPath });
+  }
+} catch (err) {
+  console.warn('Error loading .env.local file', err);
+}
+
+// Initialize the Express app instance
+let app;
+try {
+  // Import the compiled Express application
+  const { default: expressApp } = require('../server/index.js');
+  app = expressApp;
+} catch (err) {
+  console.error('Error loading Express app:', err);
+  
+  // Fallback to a simple Express app
+  const express = require('express');
+  const fallbackApp = express();
+  
+  fallbackApp.all('*', (req, res) => {
+    res.status(500).json({
+      error: 'Server initialization failed',
+      message: 'The application is experiencing technical difficulties. Please try again later.'
+    });
+  });
+  
+  app = fallbackApp;
+}
+
+// Export the serverless handler function
+module.exports = (req, res) => {
+  // Normalize request URL
+  if (!req.url.startsWith('/')) {
+    req.url = '/' + req.url;
+  }
+
+  // Special handling for WebSocket connections
+  if (req.method === 'GET' && req.headers.upgrade === 'websocket') {
+    req.url = '/ws';
+  }
+
+  // Pass request to Express app
+  return app(req, res);
+};
 `);
 
 // Final confirmation
