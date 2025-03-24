@@ -171,6 +171,7 @@ export function AppLayout({ children }: AppLayoutProps) {
       { name: 'Document Repository', href: '/documents', icon: FileText },
       { name: 'Document Processor', href: '/document-processor', icon: FileSearch },
       { name: 'Knowledge Base', href: '/knowledge', icon: BookOpen },
+      { name: 'Training Programs', href: '/training-programs', icon: Book },
     ];
 
     if (userRole === 'admin') {
