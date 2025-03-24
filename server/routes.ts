@@ -17,6 +17,7 @@ import { registerResourceRoutes } from "./routes/resource-routes";
 import { registerNotificationRoutes } from "./routes/notification-routes";
 import { registerFlightRecordRoutes } from "./routes/flight-record-routes";
 import { registerAchievementRoutes } from "./routes/achievement-routes";
+import { registerOcrRoutes } from "./routes/ocr-routes";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
 import v1Router from "./api/v1-router";
