@@ -1,13 +1,16 @@
 import { useAuth } from '@/hooks/use-auth';
 import { Loader2 } from 'lucide-react';
 import { Redirect, Route } from 'wouter';
+import { FC } from 'react';
+
+type ComponentType = FC<any> | (() => React.JSX.Element);
 
 export function ProtectedRoute({
   path,
   component: Component,
 }: {
   path: string;
-  component: () => React.JSX.Element;
+  component: ComponentType;
 }) {
   const { user, isLoading } = useAuth();
 
@@ -29,5 +32,7 @@ export function ProtectedRoute({
     );
   }
 
-  return <Route path={path} component={Component} />;
+  // Wrap Component with a function that returns JSX to satisfy type requirements
+  const RouteComponent = () => <Component />;
+  return <Route path={path} component={RouteComponent} />;
 }
