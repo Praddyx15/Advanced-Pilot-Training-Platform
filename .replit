@@ -19,7 +19,7 @@ localPort = 5000
 externalPort = 80
 
 [workflows]
-runButton = "Restart Application"
+runButton = "Restart Full Application"
 
 [[workflows.workflow]]
 name = "Project"
@@ -47,6 +47,15 @@ waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Restart Application"
+author = 39957229
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev"
+
+[[workflows.workflow]]
+name = "Restart Full Application"
 author = 39957229
 mode = "sequential"
 

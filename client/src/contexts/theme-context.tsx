@@ -84,3 +84,82 @@ export function useTheme() {
   }
   return context;
 }
+import React, { createContext, useState, useEffect, useContext } from 'react';
+import axios from 'axios';
+
+type Theme = 'light' | 'dark' | 'system';
+
+interface ThemeContextProps {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+}
+
+const ThemeContext = createContext<ThemeContextProps | undefined>(undefined);
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (context === undefined) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [theme, setThemeState] = useState<Theme>('system');
+
+  const setTheme = (newTheme: Theme) => {
+    setThemeState(newTheme);
+    localStorage.setItem('theme', newTheme);
+    
+    // Update the theme on the server
+    axios.post('/api/update-theme', { theme: newTheme })
+      .catch(error => console.error('Failed to update theme preference:', error));
+      
+    updateThemeClass(newTheme);
+  };
+
+  useEffect(() => {
+    // Get saved theme from localStorage or use system default
+    const savedTheme = localStorage.getItem('theme') as Theme | null;
+    if (savedTheme) {
+      setThemeState(savedTheme);
+      updateThemeClass(savedTheme);
+    } else {
+      // Use system preference
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      setThemeState('system');
+      updateThemeClass(systemTheme);
+    }
+    
+    // Listen for system theme changes
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = () => {
+      if (theme === 'system') {
+        updateThemeClass(mediaQuery.matches ? 'dark' : 'light');
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, [theme]);
+
+  // Function to update the class on the html element
+  const updateThemeClass = (themeValue: Theme) => {
+    const root = window.document.documentElement;
+    
+    if (themeValue === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.remove('light', 'dark');
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.remove('light', 'dark');
+      root.classList.add(themeValue);
+    }
+  };
+
+  return (
+    <ThemeContext.Provider value={{ theme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
+};

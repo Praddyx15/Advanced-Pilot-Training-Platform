@@ -162,3 +162,45 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+import React from 'react';
+import { ROUTES } from '../../lib/navigation';
+import { useTheme } from '../../contexts/theme-context';
+
+interface AppLayoutProps {
+  children: React.ReactNode;
+}
+
+const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
+  const { theme, setTheme } = useTheme();
+  
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
+        <div className="container flex h-16 items-center justify-between">
+          <div className="flex items-center gap-4">
+            <a href={ROUTES.HOME} className="font-bold text-xl">
+              Aviation Training
+            </a>
+            {/* Main navigation could go here */}
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+              className="rounded-md p-2 hover:bg-muted"
+            >
+              {theme === 'dark' ? '🌙' : '☀️'}
+            </button>
+            <div className="flex items-center gap-2">
+              <span className="text-sm">Profile</span>
+            </div>
+          </div>
+        </div>
+      </header>
+      <main className="container py-6">
+        {children}
+      </main>
+    </div>
+  );
+};
+
+export default AppLayout;

@@ -59,3 +59,32 @@ function App() {
 }
 
 export default App;
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from './contexts/theme-context';
+import AppLayout from './components/layouts/app-layout';
+import LoginPage from './pages/auth/login';
+import DashboardPage from './pages/dashboard';
+import './App.css';
+
+// Create a client
+const queryClient = new QueryClient();
+
+function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <Router>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<AppLayout><DashboardPage /></AppLayout>} />
+            {/* Add more routes as needed */}
+          </Routes>
+        </Router>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+}
+
+export default App;
