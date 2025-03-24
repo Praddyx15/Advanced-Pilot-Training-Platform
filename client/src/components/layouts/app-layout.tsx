@@ -513,7 +513,7 @@ export function AppLayout({ children }: AppLayoutProps) {
 
         {/* Main content */}
         <main className="flex-1 bg-background dark:bg-gray-900 min-h-screen">
-          <div className="w-full max-w-full py-6">
+          <div className="w-full max-w-full">
             {children}
           </div>
         </main>

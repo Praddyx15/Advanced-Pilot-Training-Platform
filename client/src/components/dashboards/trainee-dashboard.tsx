@@ -272,7 +272,7 @@ export function TraineeDashboard() {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="container mx-auto">
       <div className="space-y-6">
         {/* Welcome and summary */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center">
