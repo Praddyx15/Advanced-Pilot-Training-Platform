@@ -24,7 +24,20 @@ import { Request, Response, NextFunction } from 'express';
 
 declare global {
   namespace Express {
-    interface User extends Omit<User, 'password'> {
+    interface User {
+      id: number;
+      username: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+      role: string;
+      organizationType: string | null;
+      organizationName: string | null;
+      authProvider: string | null;
+      authProviderId: string | null;
+      profilePicture: string | null;
+      mfaEnabled: boolean | null;
+      lastLoginAt: Date | null;
       password?: string;
     }
   }
@@ -75,10 +88,10 @@ app.use(
 );
 
 // Session setup
-const MemoryStoreFactory = memorystore(session);
+const MemoryStore = memorystore(session);
 const sessionMiddleware = session({
   secret: process.env.SESSION_SECRET || 'pilot-training-platform-session-secret',
-  store: new MemoryStoreFactory({
+  store: new MemoryStore({
     checkPeriod: 86400000 // prune expired entries every 24h
   }),
   resave: false,
