@@ -723,8 +723,15 @@ function SessionCard({ session, onClick }: { session: any, onClick: () => void }
             <h3 className="font-medium">
               {format(new Date(session.startTime), 'h:mm a')} - {format(new Date(session.endTime), 'h:mm a')}
             </h3>
-            <p className="text-sm text-muted-foreground">
-              Module: {session.moduleId}
+            <p className="text-sm text-muted-foreground flex items-center mt-1">
+              <Clock className="w-3 h-3 mr-1" />
+              {format(new Date(session.startTime), 'EEE, MMM d, yyyy')}
+            </p>
+            <p className="text-sm text-muted-foreground mt-1">
+              <span className="flex items-center">
+                <User className="w-3 h-3 mr-1" />
+                Instructor: {session.instructorId}
+              </span>
             </p>
           </div>
           
@@ -732,9 +739,16 @@ function SessionCard({ session, onClick }: { session: any, onClick: () => void }
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary/20 text-primary">
               {session.status}
             </span>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-1 flex items-center justify-end">
+              <Users className="w-3 h-3 mr-1" />
               {session.trainees?.length || 0} trainees
             </p>
+            {session.location && (
+              <p className="text-xs text-muted-foreground mt-1 flex items-center justify-end">
+                <MapPin className="w-3 h-3 mr-1" />
+                {session.location}
+              </p>
+            )}
           </div>
         </div>
       </CardContent>
