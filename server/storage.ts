@@ -458,6 +458,12 @@ export class MemStorage implements IStorage {
     
     // Initialize sample user
     this.initializeSampleUser();
+    
+    // Initialize sample achievements
+    this.initializeSampleAchievements();
+    
+    // Initialize sample leaderboards
+    this.initializeSampleLeaderboards();
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
@@ -2869,6 +2875,308 @@ export class MemStorage implements IStorage {
   async deleteUser(id: number): Promise<boolean> {
     if (!this.users.has(id)) return false;
     return this.users.delete(id);
+  }
+
+  // Initialize sample achievements
+  private initializeSampleAchievements() {
+    // Achievement categories: training, skills, participation, milestones
+    
+    // Training achievements
+    const trainingCompletion = {
+      id: this.achievementIdCounter++,
+      name: "Training Completion",
+      description: "Complete any training program",
+      category: "training",
+      points: 50,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "module_completion",
+      threshold: 1
+    };
+
+    const perfectScore = {
+      id: this.achievementIdCounter++,
+      name: "Perfect Score",
+      description: "Achieve a perfect score on any assessment",
+      category: "skills",
+      points: 100,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "assessment_score",
+      threshold: 100
+    };
+
+    const sessionStreak = {
+      id: this.achievementIdCounter++,
+      name: "Session Streak",
+      description: "Complete 5 training sessions in a row",
+      category: "participation",
+      points: 75,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "session_completion",
+      threshold: 5
+    };
+
+    const loginStreak = {
+      id: this.achievementIdCounter++,
+      name: "Login Streak",
+      description: "Log in to the platform for 7 consecutive days",
+      category: "participation",
+      points: 30,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "login_streak",
+      threshold: 7
+    };
+
+    const resourceContributor = {
+      id: this.achievementIdCounter++,
+      name: "Resource Contributor",
+      description: "Share 3 resources with other users",
+      category: "participation",
+      points: 60,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "resource_contribution",
+      threshold: 3
+    };
+
+    const emergencyMaster = {
+      id: this.achievementIdCounter++,
+      name: "Emergency Procedures Master",
+      description: "Successfully complete all emergency procedure assessments",
+      category: "skills",
+      points: 120,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "assessment_score",
+      threshold: 90
+    };
+
+    const typeRatingAchievement = {
+      id: this.achievementIdCounter++,
+      name: "Type Rating Achievement",
+      description: "Complete a type rating training program",
+      category: "milestones",
+      points: 200,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "module_completion",
+      threshold: 10
+    };
+
+    const firstFlight = {
+      id: this.achievementIdCounter++,
+      name: "First Solo Flight",
+      description: "Complete your first solo flight session",
+      category: "milestones",
+      points: 150,
+      criteria: {},
+      badgeUrl: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      active: true,
+      triggerType: "session_completion",
+      threshold: 1
+    };
+
+    // Add achievements to storage
+    this.achievements.set(trainingCompletion.id, trainingCompletion);
+    this.achievements.set(perfectScore.id, perfectScore);
+    this.achievements.set(sessionStreak.id, sessionStreak);
+    this.achievements.set(loginStreak.id, loginStreak);
+    this.achievements.set(resourceContributor.id, resourceContributor);
+    this.achievements.set(emergencyMaster.id, emergencyMaster);
+    this.achievements.set(typeRatingAchievement.id, typeRatingAchievement);
+    this.achievements.set(firstFlight.id, firstFlight);
+
+    // Grant some sample achievements to users for testing
+    // Student user (ID: 3) has earned some achievements
+    const studentFirstAchievement: UserAchievement = {
+      id: this.userAchievementIdCounter++,
+      userId: 3, // student user
+      achievementId: firstFlight.id,
+      progress: 100,
+      metadata: {},
+      awardedAt: new Date(new Date().setDate(new Date().getDate() - 14)), // 14 days ago
+      grantedById: 2 // Instructor
+    };
+
+    const studentSecondAchievement: UserAchievement = {
+      id: this.userAchievementIdCounter++,
+      userId: 3, // student user
+      achievementId: trainingCompletion.id,
+      progress: 100,
+      metadata: {},
+      awardedAt: new Date(new Date().setDate(new Date().getDate() - 7)), // 7 days ago
+      grantedById: 2 // Instructor
+    };
+
+    // Add sample progress for an achievement that isn't completed yet
+    const studentInProgressAchievement: UserAchievement = {
+      id: this.userAchievementIdCounter++,
+      userId: 3, // student user
+      achievementId: sessionStreak.id,
+      progress: 60, // 60% completed (3 of 5 sessions)
+      metadata: {},
+      awardedAt: null, // Not completed yet
+      grantedById: 2 // Instructor
+    };
+
+    // Store user achievements
+    this.userAchievements.set(studentFirstAchievement.id, studentFirstAchievement);
+    this.userAchievements.set(studentSecondAchievement.id, studentSecondAchievement);
+    this.userAchievements.set(studentInProgressAchievement.id, studentInProgressAchievement);
+
+    console.log('Initialized sample achievements:', 
+      this.achievements.size, 
+      'achievements created with IDs:', 
+      Array.from(this.achievements.keys()).join(', ')
+    );
+  }
+
+  // Initialize sample leaderboards
+  private initializeSampleLeaderboards() {
+    // Create a "Weekly Training Progress" leaderboard
+    const weeklyLeaderboard = {
+      id: this.leaderboardIdCounter++,
+      name: "Weekly Training Progress",
+      description: "Top trainees based on weekly training progress",
+      category: "training",
+      timeframe: "weekly",
+      scoreType: "progress",
+      active: true,
+      criteria: {},
+      startDate: new Date(new Date().setDate(new Date().getDate() - 7)), // 1 week ago
+      endDate: new Date(new Date().setDate(new Date().getDate() + 7)), // 1 week from now
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Create a "Monthly Achievement Points" leaderboard
+    const monthlyLeaderboard = {
+      id: this.leaderboardIdCounter++,
+      name: "Monthly Achievement Points",
+      description: "Top users based on achievement points earned this month",
+      category: "achievements",
+      timeframe: "monthly",
+      scoreType: "points",
+      active: true,
+      criteria: {},
+      startDate: new Date(new Date().setDate(1)), // Start of current month
+      endDate: new Date(new Date().setMonth(new Date().getMonth() + 1, 0)), // End of current month
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Store leaderboards
+    this.leaderboards.set(weeklyLeaderboard.id, weeklyLeaderboard);
+    this.leaderboards.set(monthlyLeaderboard.id, monthlyLeaderboard);
+
+    // Add sample entries to the leaderboards
+    // Weekly leaderboard entries
+    const weeklyEntry1 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: weeklyLeaderboard.id,
+      userId: 3, // student
+      score: 85,
+      rank: 1,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const weeklyEntry2 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: weeklyLeaderboard.id,
+      userId: 4, // second student
+      score: 72,
+      rank: 2,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const weeklyEntry3 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: weeklyLeaderboard.id,
+      userId: 8, // ATO student
+      score: 68,
+      rank: 3,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Monthly leaderboard entries
+    const monthlyEntry1 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: monthlyLeaderboard.id,
+      userId: 3, // student
+      score: 250, // achievement points
+      rank: 1,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const monthlyEntry2 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: monthlyLeaderboard.id,
+      userId: 8, // ATO student
+      score: 200, // achievement points
+      rank: 2,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    const monthlyEntry3 = {
+      id: this.leaderboardEntryIdCounter++,
+      leaderboardId: monthlyLeaderboard.id,
+      userId: 4, // second student
+      score: 150, // achievement points
+      rank: 3,
+      metadata: {},
+      calculatedAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    // Store leaderboard entries
+    this.leaderboardEntries.set(weeklyEntry1.id, weeklyEntry1);
+    this.leaderboardEntries.set(weeklyEntry2.id, weeklyEntry2);
+    this.leaderboardEntries.set(weeklyEntry3.id, weeklyEntry3);
+    this.leaderboardEntries.set(monthlyEntry1.id, monthlyEntry1);
+    this.leaderboardEntries.set(monthlyEntry2.id, monthlyEntry2);
+    this.leaderboardEntries.set(monthlyEntry3.id, monthlyEntry3);
+
+    console.log('Initialized sample leaderboards:', 
+      this.leaderboards.size, 
+      'leaderboards created with IDs:', 
+      Array.from(this.leaderboards.keys()).join(', ')
+    );
   }
 }
 

@@ -356,6 +356,41 @@ export function registerAssessmentRoutes(app: express.Express) {
           status: 'completed',
           updatedAt: new Date()
         });
+        
+        // Check for achievement triggers related to assessment completion
+        // This can trigger achievements like "Perfect Score" or "Emergency Procedures Master"
+        try {
+          // Calculate average score for this assessment
+          const totalScore = createdGrades.reduce((sum, grade) => sum + grade.score, 0);
+          const averageScore = totalScore / createdGrades.length;
+          
+          // Check achievement triggers related to assessment scores
+          await storage.checkAchievementTriggers({
+            userId: assessment.traineeId,
+            type: 'assessment_score',
+            value: averageScore,
+            metadata: {
+              assessmentId: assessmentId,
+              moduleId: assessment.moduleId,
+              instructorId: assessment.instructorId
+            }
+          });
+          
+          // Also check for module completion achievement triggers
+          await storage.checkAchievementTriggers({
+            userId: assessment.traineeId,
+            type: 'module_completion',
+            value: 1, // Completed one module
+            metadata: {
+              moduleId: assessment.moduleId
+            }
+          });
+          
+          console.log(`Checked achievement triggers for trainee ${assessment.traineeId} after assessment completion`);
+        } catch (achievementError) {
+          console.error("Error processing achievement triggers:", achievementError);
+          // Don't fail the request if achievement processing fails
+        }
       }
 
       res.status(201).json(createdGrades);
