@@ -51,6 +51,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertCircle,
@@ -296,10 +297,17 @@ const ResourcesPage = () => {
 
   // Share resource mutation
   const shareResourceMutation = useMutation({
-    mutationFn: async ({ resourceId, emails }: { resourceId: number; emails: string[] }) => {
-      // In a real implementation, this would call the API
-      // return apiRequest("POST", `/api/resources/${resourceId}/share`, { emails });
-      return { success: true };
+    mutationFn: async ({ resourceId, emails, message, notifyUsers }: { 
+      resourceId: number; 
+      emails: string[]; 
+      message?: string;
+      notifyUsers?: boolean;
+    }) => {
+      return apiRequest("POST", `/api/resources/${resourceId}/share`, { 
+        emails, 
+        message, 
+        notifyUsers 
+      });
     },
     onSuccess: () => {
       toast({
@@ -307,6 +315,8 @@ const ResourcesPage = () => {
         description: "The resource has been shared successfully.",
       });
       setIsShareDialogOpen(false);
+      // Refresh the resource list to show shared status
+      queryClient.invalidateQueries({ queryKey: ["/api/resources"] });
     },
     onError: (error: Error) => {
       toast({
@@ -351,7 +361,7 @@ const ResourcesPage = () => {
   };
 
   // Handle sharing resource
-  const handleShareResource = (emails: string) => {
+  const handleShareResource = (emails: string, message?: string, notifyUsers: boolean = true) => {
     if (!selectedResource) return;
     
     const emailList = emails.split(",").map(email => email.trim()).filter(email => email);
@@ -368,6 +378,8 @@ const ResourcesPage = () => {
     shareResourceMutation.mutate({
       resourceId: selectedResource.id,
       emails: emailList,
+      message,
+      notifyUsers
     });
   };
 
@@ -776,7 +788,7 @@ const ResourcesPage = () => {
 
       {/* Share Dialog */}
       <Dialog open={isShareDialogOpen} onOpenChange={setIsShareDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Share Resource</DialogTitle>
             <DialogDescription>
@@ -792,15 +804,39 @@ const ResourcesPage = () => {
                 rows={3}
               />
               <p className="text-xs text-muted-foreground">
-                Users will receive an email notification with a link to access this resource.
+                Recipients will receive a link to access this resource.
               </p>
+            </div>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="shareMessage">Optional Message</Label>
+              <Textarea
+                id="shareMessage"
+                placeholder="Add a personalized message..."
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground">
+                A personal message to include with the sharing notification.
+              </p>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <Switch id="notifyUsers" defaultChecked />
+              <Label htmlFor="notifyUsers" className="text-sm">Send email notification to recipients</Label>
             </div>
           </div>
           <DialogFooter>
             <Button 
               onClick={() => {
                 const emailInput = document.getElementById("emails") as HTMLTextAreaElement;
-                handleShareResource(emailInput.value);
+                const messageInput = document.getElementById("shareMessage") as HTMLTextAreaElement;
+                const notifySwitch = document.getElementById("notifyUsers") as HTMLInputElement;
+                
+                handleShareResource(
+                  emailInput.value,
+                  messageInput.value,
+                  notifySwitch.checked
+                );
               }}
               disabled={shareResourceMutation.isPending}
             >
