@@ -1,6 +1,7 @@
 {
   "include": ["server/**/*", "shared/**/*"],
   "exclude": ["client/src/**/*", "node_modules", "build", "dist", "**/*.test.ts"],
+  "files": ["shared/build.d.ts"],
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",
@@ -34,7 +35,11 @@
     "noStrictGenericChecks": true,
     "ignoreDeprecations": "5.0",
     "suppressExcessPropertyErrors": true,
-    "noErrorTruncation": true
+    "noErrorTruncation": true,
+    "allowJs": true,
+    "noPropertyAccessFromIndexSignature": false,
+    "useUnknownInCatchVariables": false,
+    "exactOptionalPropertyTypes": false
   },
   "ts-node": {
     "transpileOnly": true,

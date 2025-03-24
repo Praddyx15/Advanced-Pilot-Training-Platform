@@ -60,8 +60,16 @@ if (!fs.existsSync(apiDir)) {
 // Special handling for schema files to avoid TypeScript errors in build
 console.log('Handling schema files to fix TypeScript errors...');
 
-// Compile shared/schema.ts with -noPropertyAccessFromIndexSignature flag
-console.log('Compiling schema files with extra flags to ignore errors...');
-exec('npx tsc shared/schema.ts shared/schema-build.ts shared/schema-build-fix.ts --noEmit --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false --noPropertyAccessFromIndexSignature false');
+// First, ensure the build-fix utilities are compiled
+console.log('Compiling schema fix utilities...');
+exec('npx tsc shared/schema-build-fix.ts --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false');
+
+// Then compile the schema-build wrapper that uses them
+console.log('Compiling schema build wrapper...');
+exec('npx tsc shared/schema-build.ts --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false');
+
+// Finally, compile the actual schema with the fixes applied
+console.log('Compiling schema with all fixes applied...');
+exec('npx tsc shared/schema.ts --noEmit --skipLibCheck --allowJs --noImplicitAny false --strictNullChecks false --strictPropertyInitialization false --noPropertyAccessFromIndexSignature false --downlevelIteration true');
 
 console.log('Build process completed successfully!');
