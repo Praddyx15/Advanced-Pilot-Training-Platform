@@ -56,8 +56,8 @@
   ],
   "routes": [
     {
-      "handle": "filesystem",
-      "src": "/assets/(.*)"
+      "src": "/assets/(.*)",
+      "dest": "/dist/public/assets/$1"
     },
     {
       "src": "/ws",
