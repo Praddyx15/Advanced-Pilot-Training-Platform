@@ -38,5 +38,23 @@ export const BuildSafeUtils = {
   allowOptionalFields: <T>(obj: T): T => obj as any,
   
   // For fixing Set iteration errors
-  makeSetIterable: <T>(set: Set<T>): Array<T> => Array.from(set)
+  makeSetIterable: <T>(set: Set<T>): Array<T> => Array.from(set),
+  
+  // For fixing Map iteration errors
+  makeMapIterable: <K, V>(map: Map<K, V>): Array<[K, V]> => Array.from(map.entries()),
+  
+  // Helper for Map to avoid downlevelIteration errors
+  forEachMap: <K, V>(map: Map<K, V>, callback: (value: V, key: K) => void): void => {
+    Array.from(map.entries()).forEach(([key, value]) => callback(value, key));
+  },
+  
+  // Helper for Set to avoid downlevelIteration errors
+  forEachSet: <T>(set: Set<T>, callback: (value: T) => void): void => {
+    Array.from(set).forEach(value => callback(value));
+  },
+  
+  // Helper to safely access null/undefined values
+  safeAccess: <T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined => {
+    return obj ? obj[key] : undefined;
+  }
 };

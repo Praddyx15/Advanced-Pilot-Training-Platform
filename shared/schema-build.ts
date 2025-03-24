@@ -74,6 +74,26 @@ export function setToArray<T>(set: Set<T>): T[] {
   return Array.from(set);
 }
 
+// Safe iterate through a Set (avoids downlevelIteration errors)
+export function safeForEachSet<T>(set: Set<T>, callback: (item: T) => void): void {
+  setToArray(set).forEach(callback);
+}
+
+// Safe iterate through a Map (avoids downlevelIteration errors)
+export function safeForEachMap<K, V>(map: Map<K, V>, callback: (value: V, key: K) => void): void {
+  mapToArray(map).forEach(([key, value]) => callback(value, key));
+}
+
+// Safe property access with null/undefined check
+export function safePropertyAccess<T, K extends keyof T>(obj: T | null | undefined, key: K): T[K] | undefined {
+  return obj ? obj[key] : undefined;
+}
+
+// Enhanced object utilities
+export function allowExtraProperties<T>(obj: T): T & Record<string, any> {
+  return obj as T & Record<string, any>;
+}
+
 // Export the utilities needed in schema.ts
 export { 
   patchNullableDate, 
