@@ -33,7 +33,8 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 
 // Set up simple session
-const MemoryStore = memorystore.default(session);
+// Fix for the TypeScript error with the session type
+const MemoryStore = memorystore.default(session as any);
 app.use(session({
   secret: process.env.SESSION_SECRET || 'pilot-training-platform-session-secret',
   resave: false,
@@ -49,8 +50,8 @@ const storage = new MemStorage();
 
 // Type safety addition for session
 declare module 'express-session' {
-  interface SessionData {
-    user: any;
+  interface Session {
+    user?: any;
   }
 }
 

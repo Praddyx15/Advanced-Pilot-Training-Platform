@@ -253,7 +253,7 @@ export default function SchedulePage() {
 
   // Get sessions for the selected date
   const getSessionsForDate = (date: Date) => {
-    if (!sessions) return [];
+    if (!sessions || !Array.isArray(sessions)) return [];
     
     return sessions.filter((session: any) => {
       const sessionDate = new Date(session.startTime);
@@ -263,7 +263,7 @@ export default function SchedulePage() {
 
   // Get sessions for the selected week
   const getSessionsForWeek = (date: Date) => {
-    if (!sessions) return [];
+    if (!sessions || !Array.isArray(sessions)) return [];
     
     const weekStart = startOfWeek(date, { weekStartsOn: 1 }); // Monday as week start
     const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -285,7 +285,7 @@ export default function SchedulePage() {
 
   // Filter sessions for the current user by role
   const filterSessionsByRole = () => {
-    if (!sessions) return [];
+    if (!sessions || !Array.isArray(sessions)) return [];
     
     switch(user?.role) {
       case 'instructor':
