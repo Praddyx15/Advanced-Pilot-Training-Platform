@@ -154,27 +154,45 @@ export default function SyllabusGeneratorPage() {
   // Generate syllabus mutation
   const generateMutation = useMutation({
     mutationFn: async (data: FormValues) => {
-      let endpoint = '/api/syllabus/generate';
-      
       // Add document or template ID based on the active tab
       if (activeTab === 'fromDocument' && selectedDocument) {
         data.documentId = selectedDocument;
-        endpoint = '/api/syllabus/generate-from-document';
       } else if (activeTab === 'fromTemplate' && selectedTemplate) {
         data.templateId = selectedTemplate;
-        endpoint = '/api/syllabus/generate-from-template';
       }
       
-      const response = await apiRequest('POST', endpoint, data);
-      return await response.json();
+      // Send the API request to generate the syllabus
+      const response = await apiRequest('POST', '/api/syllabus/generate', {
+        documentId: data.documentId,
+        options: {
+          programType: data.programType,
+          aircraftType: data.aircraftType,
+          regulatoryAuthority: data.regulatoryAuthority,
+          includeSimulatorExercises: data.includeSimulatorExercises,
+          includeClassroomModules: data.includeClassroomModules,
+          includeAircraftSessions: data.includeAircraftSessions,
+          includeAssessments: data.includeAssessments,
+          customRequirements: data.customRequirements,
+          trainingGoals: data.trainingGoals,
+        }
+      });
+      
+      const result = await response.json();
+      return result;
     },
     onSuccess: (data) => {
-      setGeneratedSyllabusId(data.id);
-      toast({
-        title: "Syllabus Generated Successfully",
-        description: "Your training syllabus has been created.",
-      });
-      setGenerationStatus(GenerationStatus.COMPLETED);
+      // Use the generationId to poll for progress
+      if (data.generationId) {
+        // Start polling for progress
+        pollGenerationProgress(data.generationId);
+      } else if (data.id) {
+        setGeneratedSyllabusId(data.id);
+        toast({
+          title: "Syllabus Generated Successfully",
+          description: "Your training syllabus has been created.",
+        });
+        setGenerationStatus(GenerationStatus.COMPLETED);
+      }
     },
     onError: (error) => {
       toast({
@@ -186,21 +204,66 @@ export default function SyllabusGeneratorPage() {
     }
   });
 
+  // Function to poll generation progress
+  const pollGenerationProgress = (generationId: string) => {
+    // Set generation status to processing
+    setGenerationStatus(GenerationStatus.PROCESSING);
+    
+    // Create the polling interval
+    const pollInterval = setInterval(async () => {
+      try {
+        // Fetch progress
+        const response = await apiRequest('GET', `/api/syllabus/generation/${generationId}/progress`);
+        const progressData = await response.json();
+        
+        // Update UI with progress
+        setGenerationProgress(progressData.progress);
+        
+        // Check if processing is complete
+        if (progressData.status === 'completed' && progressData.syllabusId) {
+          // Clear interval
+          clearInterval(pollInterval);
+          
+          // Set the syllabusId to trigger loading of the generated syllabus
+          setGeneratedSyllabusId(progressData.syllabusId);
+          
+          // Update generation status
+          setGenerationStatus(GenerationStatus.COMPLETED);
+          
+          // Show success toast
+          toast({
+            title: "Syllabus Generated Successfully",
+            description: "Your training syllabus has been created.",
+          });
+        } else if (progressData.status === 'failed') {
+          // Clear interval
+          clearInterval(pollInterval);
+          
+          // Update generation status
+          setGenerationStatus(GenerationStatus.ERROR);
+          
+          // Show error toast
+          toast({
+            title: "Generation Failed",
+            description: progressData.error || "There was a problem generating the syllabus.",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        // Log error but continue polling
+        console.error("Error polling generation progress:", error);
+      }
+    }, 2000); // Poll every 2 seconds
+    
+    // Cleanup function
+    return () => clearInterval(pollInterval);
+  };
+
   // Submit handler for the form
   const onSubmit = (data: FormValues) => {
     setGenerationStatus(GenerationStatus.PROCESSING);
+    setGenerationProgress(0);
     
-    // Simulate progress updates (this would be replaced with real progress updates from the server)
-    const interval = setInterval(() => {
-      setGenerationProgress((prev) => {
-        if (prev >= 90) {
-          clearInterval(interval);
-          return prev;
-        }
-        return prev + 10;
-      });
-    }, 1000);
-
     // Generate the syllabus
     generateMutation.mutate(data);
   };
@@ -271,7 +334,12 @@ export default function SyllabusGeneratorPage() {
   const saveSyllabusMutation = useMutation({
     mutationFn: async () => {
       if (!generatedSyllabusId) return null;
-      const response = await apiRequest('POST', `/api/syllabus/${generatedSyllabusId}/save-as-program`);
+      
+      // Use the API endpoint for syllabus import
+      const response = await apiRequest('POST', `/api/protected/syllabus/import`, {
+        syllabus: generatedSyllabus
+      });
+      
       return await response.json();
     },
     onSuccess: (data) => {
@@ -279,6 +347,11 @@ export default function SyllabusGeneratorPage() {
         title: "Saved as Training Program",
         description: "The syllabus has been saved as a training program.",
       });
+      
+      // Redirect to the training programs page
+      setTimeout(() => {
+        window.location.href = '/training-programs';
+      }, 1500);
     },
     onError: (error) => {
       toast({
