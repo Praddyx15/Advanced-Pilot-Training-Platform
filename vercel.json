@@ -1,36 +1,28 @@
 {
   "version": 2,
-  "builds": [
+  "buildCommand": "node api/build.js",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "framework": null,
+  "rewrites": [
     {
-      "src": "api/index.ts",
-      "use": "@vercel/node",
-      "config": {
-        "memory": 1024,
-        "maxDuration": 10,
-        "includeFiles": ["api/**", "shared/**", "server/**"],
-        "buildCommand": "node --loader tsx api/build.js"
-      }
+      "source": "/api/(.*)",
+      "destination": "/api/index.ts"
     },
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist/client",
-        "buildCommand": "vite build"
-      }
+      "source": "/(.*)",
+      "destination": "/"
     }
   ],
-  "routes": [
-    { 
-      "src": "/api/(.*)", 
-      "dest": "api/index.ts" 
-    },
-    { 
-      "handle": "filesystem"
-    },
-    { 
-      "src": "/(.*)", 
-      "dest": "/index.html" 
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Credentials", "value": "true" },
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT" },
+        { "key": "Access-Control-Allow-Headers", "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version" }
+      ]
     }
   ],
   "env": {

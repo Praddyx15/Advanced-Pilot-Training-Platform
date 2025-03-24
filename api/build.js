@@ -1,70 +1,56 @@
-const { exec } = require('child_process');
-const fs = require('fs');
+/**
+ * Custom build script for Vercel deployment
+ * Builds both server-side TypeScript and client-side Vite app
+ */
+
+const { execSync } = require('child_process');
 const path = require('path');
+const fs = require('fs');
+
+console.log('Starting Vercel build process...');
 
 // Function to execute shell commands
-function executeCommand(command) {
-  return new Promise((resolve, reject) => {
-    exec(command, (error, stdout, stderr) => {
-      if (error) {
-        console.error(`Error executing command: ${error.message}`);
-        reject(error);
-        return;
-      }
-      if (stderr) {
-        console.warn(`Command stderr: ${stderr}`);
-      }
-      console.log(`Command stdout: ${stdout}`);
-      resolve(stdout);
-    });
-  });
-}
-
-async function build() {
+function exec(cmd, options = {}) {
+  console.log(`Executing: ${cmd}`);
   try {
-    console.log('Starting build process...');
-    
-    // Make sure the build directory exists
-    if (!fs.existsSync('dist')) {
-      fs.mkdirSync('dist');
-    }
-    
-    // Build the client-side application
-    console.log('Building client-side application...');
-    await executeCommand('vite build --outDir dist/public');
-    
-    // Compile TypeScript server files
-    console.log('Compiling server TypeScript files...');
-    await executeCommand('tsc --project tsconfig.server.json');
-    
-    console.log('Build completed successfully!');
+    execSync(cmd, {
+      stdio: 'inherit',
+      ...options
+    });
   } catch (error) {
-    console.error('Build failed:', error);
+    console.error(`Command failed: ${cmd}`);
+    console.error(error);
     process.exit(1);
   }
 }
 
-// Create tsconfig.server.json for server-side TypeScript compilation
-const serverTsConfig = {
-  "compilerOptions": {
-    "target": "es2020",
-    "module": "commonjs",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true,
-    "outDir": "dist/server",
-    "baseUrl": ".",
-    "paths": {
-      "@shared/*": ["shared/*"]
-    }
-  },
-  "include": ["server/**/*", "api/**/*", "shared/**/*"],
-  "exclude": ["node_modules", "dist", "client"]
-};
+// Create dist directory if it doesn't exist
+const distDir = path.join(process.cwd(), 'dist');
+if (!fs.existsSync(distDir)) {
+  fs.mkdirSync(distDir, { recursive: true });
+}
 
-// Write the server tsconfig file
-fs.writeFileSync('tsconfig.server.json', JSON.stringify(serverTsConfig, null, 2));
+// Install dependencies if needed
+if (!fs.existsSync(path.join(process.cwd(), 'node_modules'))) {
+  console.log('Installing dependencies...');
+  exec('npm install');
+}
 
-// Run the build process
-build();
+// Build server-side TypeScript
+console.log('Building server-side TypeScript...');
+exec('npx tsc --project tsconfig.json');
+
+// Build client-side Vite app
+console.log('Building client-side Vite app...');
+exec('npx vite build --outDir dist/public');
+
+// Copy necessary files for Vercel
+console.log('Preparing files for Vercel deployment...');
+const apiDir = path.join(distDir, 'api');
+if (!fs.existsSync(apiDir)) {
+  fs.mkdirSync(apiDir, { recursive: true });
+}
+
+// Create any additional files or directories needed for Vercel
+
+console.log('Build process completed successfully!');

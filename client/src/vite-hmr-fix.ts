@@ -1,37 +1,53 @@
 /**
- * This module creates a workaround for Vite's HMR WebSocket connection issues in Replit
- * It catches and suppresses WebSocket connection errors
+ * Vite HMR WebSocket Fix for Vercel Deployment
+ * 
+ * This script patches the native WebSocket to properly handle WebSocket 
+ * connections in the Vite development environment and in production.
+ * It ensures WebSockets connect to the correct host for both local and 
+ * deployed environments.
  */
 
-// Create a simpler solution by adding a global error handler
-// This just suppresses the WebSocket error without monkey-patching the WebSocket constructor
-window.addEventListener('error', function(event) {
-  // Check if the error is related to WebSocket with undefined port
-  if (event.message && (
-    event.message.includes('wss://localhost:undefined') ||
-    event.message.includes('WebSocket connection to \'wss://localhost:undefined\'')
-  )) {
-    // Prevent the error from showing in the console
-    event.preventDefault();
-    console.info('[HMR] WebSocket connection error suppressed');
-    return false;
-  }
-}, true);
+// Store the original WebSocket constructor
+const OriginalWebSocket = window.WebSocket;
 
-// Intercept error events on the window
-const originalConsoleError = console.error;
-console.error = function(...args: any[]) {
-  // Check if this is a WebSocket error message
-  if (args.length > 0 && 
-      typeof args[0] === 'string' && 
-      (args[0].includes('WebSocket connection to') || 
-       args[0].includes('localhost:undefined'))) {
-    console.info('[HMR] Suppressed WebSocket error:', args[0].substring(0, 50) + '...');
-    return;
+// Create a patched version of WebSocket
+class PatchedWebSocket extends OriginalWebSocket {
+  constructor(url: string | URL, protocols?: string | string[]) {
+    // Convert URL object to string if needed
+    const urlString = url instanceof URL ? url.toString() : url;
+    
+    // Check if this is a Vite HMR WebSocket connection
+    if (urlString.includes('vite-hmr') || urlString.includes('__vite_hmr')) {
+      // Fix local development WebSocket connection
+      if (urlString.includes('ws://localhost:undefined')) {
+        const fixedUrl = urlString.replace('ws://localhost:undefined', 
+                                          `ws://localhost:${window.location.port}`);
+        super(fixedUrl, protocols);
+      } else {
+        super(urlString, protocols);
+      }
+    } 
+    // Check if this is our application WebSocket connection
+    else if (urlString.includes('/ws')) {
+      // For our app WebSockets, ensure we're using the correct protocol and host
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      
+      // Build the proper WebSocket URL
+      const fixedUrl = `${protocol}//${host}/ws`;
+      super(fixedUrl, protocols);
+    }
+    // For all other WebSocket connections, use them as-is
+    else {
+      super(urlString, protocols);
+    }
   }
-  
-  // Otherwise, pass through to the original console.error
-  originalConsoleError.apply(console, args);
-};
+}
 
-export {};
+// Apply the patch by replacing the global WebSocket constructor
+window.WebSocket = PatchedWebSocket;
+
+// Debug output to confirm patch is applied
+console.log('[vite-hmr-fix] WebSocket patch applied');
+
+export default {};
