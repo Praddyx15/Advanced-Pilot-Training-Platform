@@ -32,7 +32,7 @@
   "regions": ["iad1"],
   "headers": [
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "headers": [
         { "key": "X-Content-Type-Options", "value": "nosniff" },
         { "key": "X-Frame-Options", "value": "DENY" },
@@ -42,13 +42,13 @@
       ]
     },
     {
-      "source": "/api/(.*)",
+      "source": "/api/:path*",
       "headers": [
         { "key": "Cache-Control", "value": "no-store, max-age=0" }
       ]
     },
     {
-      "source": "/(.*)\\.(?:js|css|json|txt|html|xml|svg|jpg|jpeg|png|gif|webp|ico|woff|woff2|ttf|eot)",
+      "source": "/:path*\\.(js|css|json|txt|html|xml|svg|jpg|jpeg|png|gif|webp|ico|woff|woff2|ttf|eot)",
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
