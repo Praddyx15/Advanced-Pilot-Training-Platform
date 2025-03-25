@@ -1,45 +1,72 @@
-# Exclude development files
-**/node_modules
-**/.git
-.DS_Store
+# Logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# Exclude test files
+# Development
+node_modules
+.DS_Store
+dist-ssr
+coverage
+*.local
+/.git/
+/node_modules/
+tmp
+*.tmp
+.git
+.env.development.local
+.env.test.local
+.cache
+.bash_history
+.jest-coverage/
+.vscode/
+.idea/
+
+# Uploads (handle separately in production)
+/uploads/*
+
+# Configuration files that should not be included in deployment
+jest.config.*
+drizzle.config.ts
+vite.fix.js
+postcss.config.*
+tailwind.config.*
+
+# Documentation and examples
+/docs
+/examples
+*.md
+*.MD
+LICENSE
+
+# Tests
+__tests__
 **/*.test.*
 **/*.spec.*
-**/__tests__/
-**/__mocks__/
-/test/
-/coverage/
+/coverage
+/test-results/
 
-# Exclude unnecessary server files in client build
-/server/**/*.ts
-!/server/routes.ts
-!/server/auth.ts
-!/server/index.ts
-!/server/storage.ts
+# Development scripts
+scripts/
+tools/
 
-# Exclude TypeScript source files except core files
-/client/src/**/*.ts
-/client/src/**/*.tsx
-!/client/src/hooks/use-auth.tsx
-!/client/src/hooks/use-toast.tsx
-!/client/src/lib/protected-route.tsx
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
 
-# Exclude build artifacts and development configs
-/.github/
-/.vscode/
-/.idea/
-.env
-.env.*
-!.env.production
-!.env.local
+# Optional: Exclude client-side build artifacts to let Vercel build them
+# client/dist/
 
-# Keep necessary config files
-!tsconfig.json
-!tsconfig.build.json
-!drizzle.config.ts
-!vite.config.ts
-!postcss.config.js
-!tailwind.config.ts
-!theme.json
+# Optional: Exclude development-only files
+*.DRAFT.*
+*.dev.*

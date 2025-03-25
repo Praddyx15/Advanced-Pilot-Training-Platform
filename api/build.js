@@ -1,192 +1,99 @@
 /**
- * Build script for API serverless functions
+ * Vercel Serverless Function Build Script
  * 
- * This script is used during the build process to ensure the API routes
- * are properly bundled for serverless deployment. It handles path resolution,
- * imports, and error handling specific to the production build.
+ * This script is used by Vercel during the build process to create serverless functions.
+ * It ensures that the API is properly set up for a serverless environment.
  */
 
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
 
-// Paths for the build process
-const serverDir = path.resolve(__dirname, '../server');
-const sharedDir = path.resolve(__dirname, '../shared');
-const distDir = path.resolve(__dirname, '../dist');
-const serverDistDir = path.resolve(distDir, 'server');
-const sharedDistDir = path.resolve(distDir, 'shared');
-
-// Create directories if they don't exist
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir);
-}
-if (!fs.existsSync(serverDistDir)) {
-  fs.mkdirSync(serverDistDir);
-}
-if (!fs.existsSync(sharedDistDir)) {
-  fs.mkdirSync(sharedDistDir);
+// Ensure the API directory exists
+const apiDir = path.join(__dirname);
+if (!fs.existsSync(apiDir)) {
+  fs.mkdirSync(apiDir, { recursive: true });
 }
 
-// Add fallback for schema files
-const createFallbackFiles = () => {
-  const fallbackFiles = [
-    { 
-      path: path.resolve(sharedDistDir, 'schema.js'),
-      content: `
-// Schema fallback file for production
-// This is a simplified version used when TypeScript validation fails
-const z = require('zod');
-const { pgTable, text, integer, boolean, timestamp, varchar } = require('drizzle-orm/pg-core');
-
-// Export simplified schemas to prevent deployment failures
-exports.users = {};
-exports.insertUserSchema = z.object({
-  username: z.string(),
-  password: z.string(),
-  firstName: z.string(),
-  lastName: z.string(),
-  email: z.string(),
-  role: z.string(),
-});
-
-// Add other core schema as needed
-exports.trainingPrograms = {};
-exports.modules = {};
-exports.lessons = {};
-exports.sessions = {};
-exports.assessments = {};
-exports.grades = {};
-exports.documents = {};
-exports.resources = {};
-exports.achievements = {};
-exports.leaderboards = {};
-
-// Type exports
-exports.User = function() {};
-exports.InsertUser = function() {};
-      `
-    },
-    {
-      path: path.resolve(serverDistDir, 'routes.js'),
-      content: `
-// Routes fallback file for production
-// This is a simplified version used when TypeScript validation fails
-const { setupAuth } = require('./auth.js');
-
-// Export a simplified version of registerRoutes
-exports.registerRoutes = async function(app) {
-  console.log('Setting up auth with fallback routes');
-  setupAuth(app);
-  
-  // Add API health endpoint
-  app.get('/api/health', (req, res) => {
-    res.json({ status: 'ok', message: 'API is running with fallback routes' });
-  });
-  
-  // Return Express server
-  const { createServer } = require('http');
-  return createServer(app);
-};
-      `
-    },
-    {
-      path: path.resolve(serverDistDir, 'auth.js'),
-      content: `
-// Auth fallback file for production
-// This is a simplified version used when TypeScript validation fails
+// Create a minimal index.js file if it doesn't exist
+const apiIndexPath = path.join(apiDir, 'index.js');
+if (!fs.existsSync(apiIndexPath)) {
+  const apiIndexContent = `
+/**
+ * API entry point for serverless function handling
+ * Created by build.js during Vercel deployment
+ */
+const express = require('express');
+const session = require('express-session');
 const passport = require('passport');
 const { Strategy: LocalStrategy } = require('passport-local');
-const session = require('express-session');
-const { scrypt, randomBytes, timingSafeEqual } = require('crypto');
-const { promisify } = require('util');
 const MemoryStore = require('memorystore')(session);
 
-const scryptAsync = promisify(scrypt);
+const app = express();
+app.use(express.json());
 
-// Simplified auth setup function
-exports.setupAuth = function(app) {
-  console.log('Setting up auth with fallback implementation');
-  
-  // Session configuration
-  const sessionStore = new MemoryStore({
-    checkPeriod: 86400000
-  });
-  
-  app.use(session({
-    secret: process.env.SESSION_SECRET || 'fallback-secret-do-not-use-in-production',
-    resave: false,
-    saveUninitialized: false,
-    store: sessionStore
-  }));
-  
-  app.use(passport.initialize());
-  app.use(passport.session());
-  
-  // Basic auth endpoints
-  app.post('/api/register', (req, res) => {
-    res.status(503).json({ message: 'Registration is temporarily unavailable' });
-  });
-  
-  app.post('/api/login', (req, res) => {
-    res.status(503).json({ message: 'Login is temporarily unavailable' });
-  });
-  
-  app.post('/api/logout', (req, res) => {
-    req.logout((err) => {
-      if (err) return res.status(500).json({ error: err.message });
-      res.status(200).json({ message: 'Logged out successfully' });
-    });
-  });
-  
-  app.get('/api/user', (req, res) => {
-    if (!req.isAuthenticated()) return res.status(401).json({ message: 'Not authenticated' });
-    res.json(req.user);
-  });
-  
-  // Passport configuration
-  passport.serializeUser((user, done) => done(null, user.id));
-  passport.deserializeUser((id, done) => done(null, { id, username: 'user' }));
-};
-      `
-    }
-  ];
-  
-  fallbackFiles.forEach(file => {
-    if (!fs.existsSync(file.path)) {
-      console.log(`Creating fallback file: ${file.path}`);
-      fs.writeFileSync(file.path, file.content);
-    }
-  });
-};
+// Session setup
+const sessionStore = new MemoryStore({
+  checkPeriod: 86400000 // prune expired entries every 24h
+});
 
-// Build process
-const buildApi = () => {
-  console.log('Building API for serverless deployment...');
-  
-  // Create fallback files first
-  createFallbackFiles();
-  
-  // Run TypeScript compiler with tsconfig.build.json
-  const tscCommand = 'npx tsc --project tsconfig.build.json';
-  
-  exec(tscCommand, (error, stdout, stderr) => {
-    if (error) {
-      console.error('TypeScript compilation error:', error);
-      console.log('Using fallback files for deployment');
-    } else {
-      console.log('TypeScript compilation successful');
-    }
-    
-    // Make sure the main API file exists
-    if (!fs.existsSync(path.resolve(__dirname, './index.js'))) {
-      console.error('API entry point is missing!');
-      process.exit(1);
-    }
-    
-    console.log('API build completed successfully');
-  });
-};
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'default-secret-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  store: sessionStore
+}));
 
-// Execute the build
-buildApi();
+// Passport initialization
+app.use(passport.initialize());
+app.use(passport.session());
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Default 404 handler for API routes
+app.all('/api/*', (req, res) => {
+  res.status(404).json({ error: 'Endpoint not found', path: req.path });
+});
+
+// Export for serverless function handling
+module.exports = (req, res) => {
+  return app(req, res);
+};
+`;
+  fs.writeFileSync(apiIndexPath, apiIndexContent);
+  console.log(`Created ${apiIndexPath}`);
+}
+
+// Create a fallback vercel.json config if it doesn't exist at the root
+const vercelConfigPath = path.join(process.cwd(), 'vercel.json');
+if (!fs.existsSync(vercelConfigPath)) {
+  const vercelConfig = {
+    "version": 2,
+    "builds": [
+      {
+        "src": "api/index.js",
+        "use": "@vercel/node"
+      },
+      {
+        "src": "client/dist/**",
+        "use": "@vercel/static"
+      }
+    ],
+    "routes": [
+      {
+        "src": "/api/(.*)",
+        "dest": "api/index.js"
+      },
+      {
+        "src": "/(.*)",
+        "dest": "client/dist/$1"
+      }
+    ]
+  };
+  fs.writeFileSync(vercelConfigPath, JSON.stringify(vercelConfig, null, 2));
+  console.log(`Created ${vercelConfigPath}`);
+}
+
+console.log('Build script completed successfully');
