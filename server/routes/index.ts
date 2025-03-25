@@ -11,3 +11,4 @@ export { registerAchievementRoutes } from './achievement-routes';
 export { registerOcrRoutes } from './ocr-routes';
 export { registerDocumentAnalysisRoutes } from './document-analysis-routes';
 export { registerScheduleRoutes } from './schedule-routes';
+export { setupThemeRoutes } from './theme-routes';

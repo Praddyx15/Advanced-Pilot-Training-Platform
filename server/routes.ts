@@ -20,7 +20,8 @@ import {
   registerAchievementRoutes,
   registerOcrRoutes,
   registerDocumentAnalysisRoutes,
-  registerScheduleRoutes
+  registerScheduleRoutes,
+  setupThemeRoutes
 } from "./routes/index";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
@@ -71,6 +72,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerOcrRoutes(app);
   registerDocumentAnalysisRoutes(app);
   registerScheduleRoutes(app);
+  setupThemeRoutes(app);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {
