@@ -5,6 +5,7 @@ import { Button } from "../ui/button";
 import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../hooks/use-auth";
+import { ThemeToggle } from "../shared/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -169,7 +170,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </div>
           
           {/* User menu */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
+            {/* Theme Toggle */}
+            <div className="mr-2">
+              <ThemeToggle />
+            </div>
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full text-white">

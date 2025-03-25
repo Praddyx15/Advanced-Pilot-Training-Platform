@@ -1,43 +1,80 @@
 import { Express } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
+import { log } from '../vite';
 
+/**
+ * Setup routes for handling theme preferences
+ */
 export function setupThemeRoutes(app: Express) {
-  // API route for updating theme.json
-  app.post('/api/update-theme', (req, res) => {
+  const themeFilePath = path.resolve('theme.json');
+  
+  // Get current theme
+  app.get('/api/theme', (req, res) => {
     try {
-      const { appearance } = req.body;
-      
-      if (!appearance || !['light', 'dark', 'system'].includes(appearance)) {
-        return res.status(400).json({ error: 'Invalid theme appearance value' });
+      // Read from theme.json file
+      if (!fs.existsSync(themeFilePath)) {
+        return res.status(404).json({ error: 'Theme file not found' });
       }
       
-      // Read the current theme.json
-      const themePath = path.resolve(process.cwd(), 'theme.json');
-      const themeContent = JSON.parse(fs.readFileSync(themePath, 'utf8'));
-      
-      // Update the appearance
-      themeContent.appearance = appearance;
-      
-      // Write back to file
-      fs.writeFileSync(themePath, JSON.stringify(themeContent, null, 2));
-      
-      return res.status(200).json({ success: true, theme: themeContent });
+      const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
+      res.json(themeData);
     } catch (error) {
-      console.error('Error updating theme:', error);
-      return res.status(500).json({ error: 'Failed to update theme' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log(`Error reading theme: ${errorMessage}`);
+      res.status(500).json({ error: 'Failed to read theme' });
     }
   });
   
-  // API route for getting current theme
-  app.get('/api/theme', (req, res) => {
+  // Update theme (appearance only in this iteration)
+  app.post('/api/update-theme', (req, res) => {
     try {
-      const themePath = path.resolve(process.cwd(), 'theme.json');
-      const themeContent = JSON.parse(fs.readFileSync(themePath, 'utf8'));
-      return res.status(200).json(themeContent);
+      // Get appearance from request body
+      const { appearance } = req.body;
+      
+      // Read current theme
+      if (!fs.existsSync(themeFilePath)) {
+        return res.status(404).json({ error: 'Theme file not found' });
+      }
+      
+      const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
+      
+      // Update appearance if provided
+      if (appearance && ['light', 'dark', 'system'].includes(appearance)) {
+        themeData.appearance = appearance;
+      }
+      
+      // Write back to theme.json
+      fs.writeFileSync(themeFilePath, JSON.stringify(themeData, null, 2));
+      
+      res.json({ success: true, theme: themeData });
     } catch (error) {
-      console.error('Error getting theme:', error);
-      return res.status(500).json({ error: 'Failed to get theme' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log(`Error updating theme: ${errorMessage}`);
+      res.status(500).json({ error: 'Failed to update theme' });
+    }
+  });
+  
+  // Get all theme configuration
+  app.get('/api/theme/config', (req, res) => {
+    try {
+      // Read from theme.json file
+      if (!fs.existsSync(themeFilePath)) {
+        return res.status(404).json({ error: 'Theme file not found' });
+      }
+      
+      const themeData = JSON.parse(fs.readFileSync(themeFilePath, 'utf-8'));
+      
+      // Return theme with supported options
+      res.json({
+        ...themeData,
+        supportedThemes: ['light', 'dark', 'system'],
+        supportedVariants: ['professional', 'tint', 'vibrant'],
+      });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      log(`Error reading theme config: ${errorMessage}`);
+      res.status(500).json({ error: 'Failed to read theme configuration' });
     }
   });
 }
