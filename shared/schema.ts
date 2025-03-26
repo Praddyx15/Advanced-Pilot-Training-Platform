@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date, real, foreignKey } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, json, jsonb, date, real, foreignKey, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -162,19 +162,24 @@ export const insertGradeSchema = createInsertSchema(grades).pick({
   comments: true,
 });
 
-// Document schema
+// Enhanced Document schema
 export const documents = pgTable("documents", {
   id: serial("id").primaryKey(),
   title: text("title").notNull(),
   description: text("description"),
-  fileType: text("file_type").notNull(),
+  fileType: text("file_type").notNull(), // pdf, docx, xlsx, pptx, etc.
   url: text("url").notNull(),
+  filePath: text("file_path").notNull(),
+  fileSize: integer("file_size").notNull(),
   uploadedById: integer("uploaded_by_id").notNull(),
+  uploadedByRole: text("uploaded_by_role").notNull(), // instructor, examiner, admin
+  sharedWith: jsonb("shared_with").default('[]'),
+  isProcessed: boolean("is_processed").default(false),
+  metadata: jsonb("metadata").default('{}'),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   fileName: text("file_name"),
-  fileSize: integer("file_size"),
-  tags: text("tags").array(),
+  tags: text("tags"),
   currentVersionId: integer("current_version_id"),
 });
 
@@ -183,10 +188,171 @@ export const insertDocumentSchema = createInsertSchema(documents).pick({
   description: true,
   fileType: true,
   url: true,
-  uploadedById: true,
-  fileName: true,
+  filePath: true,
   fileSize: true,
+  uploadedById: true,
+  uploadedByRole: true,
+  sharedWith: true,
+  isProcessed: true,
+  metadata: true,
+  fileName: true,
   tags: true,
+});
+
+// Document content (extracted data) schema
+export const documentContent = pgTable("document_content", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  textContent: text("text_content"),
+  structuredContent: jsonb("structured_content").default('{}'),
+  sections: jsonb("sections").default('[]'),
+  extractedKeywords: jsonb("extracted_keywords").default('[]'),
+  confidenceScore: real("confidence_score").default(0),
+  extractionTime: integer("extraction_time"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertDocumentContentSchema = createInsertSchema(documentContent).pick({
+  documentId: true,
+  textContent: true,
+  structuredContent: true,
+  sections: true,
+  extractedKeywords: true,
+  confidenceScore: true,
+  extractionTime: true,
+});
+
+// Training sessions schema
+export const trainingSessions = pgTable("training_sessions", {
+  id: serial("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description"),
+  documentId: integer("document_id").references(() => documents.id, { onDelete: 'set null' }),
+  instructorId: integer("instructor_id").notNull(),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  location: text("location"),
+  sessionType: text("session_type").notNull(), // ground, simulator, aircraft
+  sessionStatus: text("session_status").default('scheduled'), // scheduled, in_progress, completed, cancelled
+  prerequisites: jsonb("prerequisites").default('[]'),
+  objectives: jsonb("objectives").default('[]'),
+  materialsRequired: jsonb("materials_required").default('[]'),
+  sessionNotes: text("session_notes"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertTrainingSessionSchema = createInsertSchema(trainingSessions).pick({
+  title: true,
+  description: true,
+  documentId: true,
+  instructorId: true,
+  startTime: true,
+  endTime: true,
+  location: true,
+  sessionType: true,
+  sessionStatus: true,
+  prerequisites: true,
+  objectives: true,
+  materialsRequired: true,
+  sessionNotes: true,
+});
+
+// Session attendees junction table
+export const sessionAttendees = pgTable("session_attendees", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => trainingSessions.id, { onDelete: 'cascade' }),
+  userId: integer("user_id").notNull(),
+  status: text("status").default('confirmed'), // confirmed, pending, absent, attended
+  feedback: text("feedback"),
+  attendanceRecorded: boolean("attendance_recorded").default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSessionAttendeeSchema = createInsertSchema(sessionAttendees).pick({
+  sessionId: true,
+  userId: true,
+  status: true,
+  feedback: true,
+  attendanceRecorded: true,
+});
+
+// Session plans for tracking what was done and what will be done
+export const sessionPlans = pgTable("session_plans", {
+  id: serial("id").primaryKey(),
+  sessionId: integer("session_id").notNull().references(() => trainingSessions.id, { onDelete: 'cascade' }),
+  previousSessionId: integer("previous_session_id").references(() => trainingSessions.id, { onDelete: 'set null' }),
+  previousTopicsCovered: jsonb("previous_topics_covered").default('[]'),
+  currentTopics: jsonb("current_topics").default('[]'),
+  nextTopics: jsonb("next_topics").default('[]'),
+  notes: text("notes"),
+  resources: jsonb("resources").default('[]'),
+  progressIndicators: jsonb("progress_indicators").default('{}'),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertSessionPlanSchema = createInsertSchema(sessionPlans).pick({
+  sessionId: true,
+  previousSessionId: true,
+  previousTopicsCovered: true,
+  currentTopics: true,
+  nextTopics: true,
+  notes: true,
+  resources: true,
+  progressIndicators: true,
+});
+
+// Compliance procedures schema
+export const complianceProcedures = pgTable("compliance_procedures", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  procedureName: text("procedure_name").notNull(),
+  regulatoryReference: text("regulatory_reference"),
+  description: text("description"),
+  requirements: jsonb("requirements").default('[]'),
+  checklistItems: jsonb("checklist_items").default('[]'),
+  complianceStatus: text("compliance_status").default('pending'), // pending, compliant, non_compliant
+  lastUpdatedById: integer("last_updated_by_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const insertComplianceProcedureSchema = createInsertSchema(complianceProcedures).pick({
+  documentId: true,
+  procedureName: true,
+  regulatoryReference: true,
+  description: true,
+  requirements: true,
+  checklistItems: true,
+  complianceStatus: true,
+  lastUpdatedById: true,
+});
+
+// Document sharing schema
+export const documentShares = pgTable("document_shares", {
+  id: serial("id").primaryKey(),
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
+  sharedById: integer("shared_by_id").notNull(),
+  sharedWithId: integer("shared_with_id").notNull(),
+  sharedAt: timestamp("shared_at").notNull().defaultNow(),
+  accessLevel: text("access_level").default('read'), // read, edit, admin
+  notificationSent: boolean("notification_sent").default(false),
+  isRead: boolean("is_read").default(false),
+  lastAccessed: timestamp("last_accessed"),
+});
+
+export const insertDocumentShareSchema = createInsertSchema(documentShares).pick({
+  documentId: true,
+  sharedById: true,
+  sharedWithId: true,
+  sharedAt: true,
+  accessLevel: true,
+  notificationSent: true,
+  isRead: true,
+  lastAccessed: true,
 });
 
 // Document Version schema
