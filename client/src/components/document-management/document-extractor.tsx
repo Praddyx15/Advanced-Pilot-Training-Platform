@@ -38,6 +38,22 @@ interface DocumentExtractorProps {
   onExtracted?: (data: any) => void;
 }
 
+// Document interface to type the data from API
+interface DocumentData {
+  id: number;
+  title: string;
+  fileName: string;
+  fileSize: number;
+  fileType: string;
+  uploadedBy: number;
+  uploadedAt: string;
+  description?: string;
+  tags?: string[];
+  isFavorite?: boolean;
+  category?: string;
+  status?: string;
+}
+
 type ExtractionMethod = 'basic' | 'advanced' | 'ai';
 
 interface ExtractionOptions {
@@ -77,7 +93,7 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
   const { toast } = useToast();
 
   // Fetch document details
-  const { data: document, isLoading: isLoadingDocument } = useQuery({
+  const { data: document, isLoading: isLoadingDocument } = useQuery<Document>({
     queryKey: [`/api/documents/${documentId}`],
     // Use default fetcher
   });
@@ -233,12 +249,14 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
-    const a = document.createElement('a');
+    // Type assertion for document
+    const doc = document as Document;
+    const a = doc.createElement('a');
     a.href = url;
     a.download = `extraction-${documentId}.json`;
-    document.body.appendChild(a);
+    doc.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
+    doc.body.removeChild(a);
     URL.revokeObjectURL(url);
     
     toast({
@@ -869,7 +887,7 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
       {!extractedData && !isExtracting && (
         <CardFooter className="flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground pt-6 gap-2 border-t">
           <div>
-            <p>Document: {document.fileName} ({formatFileSize(document.fileSize)})</p>
+            <p>Document: {document?.fileName || 'Unknown'} ({formatFileSize(document?.fileSize || 0)})</p>
           </div>
           <div className="flex items-center gap-1">
             <FileText className="h-3 w-3" />
