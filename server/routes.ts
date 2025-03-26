@@ -10,6 +10,7 @@ import * as syllabusGenerator from "./services/syllabus-generator";
 import * as templateManager from "./services/syllabus-template-manager";
 import { 
   registerDocumentRoutes,
+  registerSessionRoutes,
   registerSyllabusRoutes,
   registerKnowledgeGraphRoutes,
   registerTrainingRoutes,
@@ -61,6 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Register all routes from dedicated route files
   registerDocumentRoutes(app);
+  registerSessionRoutes(app);
   registerSyllabusRoutes(app);
   registerKnowledgeGraphRoutes(app);
   registerTrainingRoutes(app);
