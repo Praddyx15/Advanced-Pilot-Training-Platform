@@ -1,678 +1,546 @@
-import express from 'express';
+/**
+ * Document Management Routes
+ * 
+ * API endpoints for document management, upload, analysis and sharing.
+ */
+import { Express, Request, Response } from 'express';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
-import { db } from '../db';
-import { documents, documentContent, insertDocumentSchema, insertDocumentContentSchema } from '@shared/schema';
-import { eq, and } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
+import { documents, insertDocumentSchema, documentShares } from '@shared/schema';
+import { db } from '../db';
+import { eq, and, or, desc } from 'drizzle-orm';
+import { z } from 'zod';
+import { logger } from '../core/logger';
+import * as documentAnalysis from '../services/document-analysis-service';
 
-// Create uploads directory if it doesn't exist
-const uploadDir = path.join(process.cwd(), 'uploads');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
+// Ensure uploads directory exists
+const uploadsDir = path.join(process.cwd(), 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
-// Configure multer storage
+// Configure multer for file uploads
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
+  destination: function(req, file, cb) {
+    cb(null, uploadsDir);
   },
-  filename: function (req, file, cb) {
-    // Create a unique filename with original extension
+  filename: function(req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExt = path.extname(file.originalname);
-    cb(null, uniqueSuffix + fileExt);
+    const ext = path.extname(file.originalname);
+    cb(null, file.fieldname + '-' + uniqueSuffix + ext);
   }
 });
 
-// File size limit (10MB)
-const MAX_FILE_SIZE = 10 * 1024 * 1024;
-
-// Configure multer upload
-const upload = multer({
-  storage: storage,
+// Create the upload middleware
+const upload = multer({ 
+  storage,
   limits: {
-    fileSize: MAX_FILE_SIZE
+    fileSize: 30 * 1024 * 1024 // 30MB limit
   },
-  fileFilter: function (req, file, cb) {
-    // Accept only common document types
-    const filetypes = /pdf|doc|docx|xlsx|xls|ppt|pptx|txt|csv/;
-    const mimetype = filetypes.test(file.mimetype);
-    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+  fileFilter: function(req, file, cb) {
+    // Accept common document types
+    const allowedTypes = [
+      '.pdf', '.docx', '.doc', '.xlsx', '.xls', '.pptx', '.ppt', '.txt'
+    ];
     
-    if (mimetype && extname) {
-      return cb(null, true);
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowedTypes.includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Unsupported file type'));
     }
-    
-    cb(new Error('File upload only supports the following filetypes: ' + filetypes));
   }
 });
 
-// Get document file type from original filename
-function getDocumentType(filename: string): string {
-  const ext = path.extname(filename).toLowerCase();
-  
-  switch (ext) {
-    case '.pdf':
-      return 'pdf';
-    case '.doc':
-    case '.docx':
-      return 'word';
-    case '.xls':
-    case '.xlsx':
-      return 'excel';
-    case '.ppt':
-    case '.pptx':
-      return 'powerpoint';
-    case '.txt':
-      return 'text';
-    case '.csv':
-      return 'csv';
-    default:
-      return 'other';
-  }
-}
-
-// Get permission based on user role
-function getPermissionLevel(role: string): string {
-  switch (role.toLowerCase()) {
-    case 'admin':
-    case 'instructor':
-    case 'examiner':
-      return 'write';
-    case 'trainee':
-    case 'student':
-      return 'read';
-    default:
-      return 'none';
-  }
-}
-
-// Setup document routes
-export function registerDocumentRoutes(app: express.Express) {
-  // Get all documents (with role-based filtering)
-  app.get('/api/documents', async (req, res) => {
+/**
+ * Register document management routes
+ */
+export function registerDocumentRoutes(app: Express) {
+  /**
+   * Get all documents
+   * 
+   * Filter by role: instructors see all documents, trainees see assigned documents
+   */
+  app.get('/api/documents', async (req: Request, res: Response) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
       }
-
-      const user = req.user;
-      const allDocuments = await db.select().from(documents);
       
-      // Filter documents based on user role
-      let filteredDocuments = allDocuments;
+      const { role } = req.user;
+      const userId = req.user.id;
       
-      // If user is not admin, only show appropriate documents
-      if (user.role.toLowerCase() !== 'admin') {
-        // Students/trainees can only see documents they have access to
-        if (user.role.toLowerCase() === 'trainee' || user.role.toLowerCase() === 'student') {
-          filteredDocuments = allDocuments.filter(doc => {
-            const sharedWith = Array.isArray(doc.sharedWith) ? doc.sharedWith : [];
-            return doc.uploadedById === user.id || 
-                  sharedWith.includes(user.id) ||
-                  doc.uploadedByRole.toLowerCase() === 'instructor' ||
-                  doc.uploadedByRole.toLowerCase() === 'examiner';
-          });
+      // Different queries based on user role
+      let documents;
+      
+      if (role === 'admin') {
+        // Admin sees all documents
+        documents = await db.select()
+          .from(documents)
+          .orderBy(desc(documents.createdAt));
+      } else if (role === 'instructor') {
+        // Instructors see their documents and shared docs
+        documents = await db.select()
+          .from(documents)
+          .where(
+            or(
+              eq(documents.uploadedById, userId),
+              eq(documents.isPublic, true)
+            )
+          )
+          .orderBy(desc(documents.createdAt));
+          
+        // Also get documents shared with instructor
+        const sharedDocs = await db.select()
+          .from(documents)
+          .innerJoin(documentShares, eq(documents.id, documentShares.documentId))
+          .where(eq(documentShares.userId, userId))
+          .orderBy(desc(documents.createdAt));
+          
+        // Combine results (avoiding duplicates)
+        const docIds = new Set(documents.map(d => d.id));
+        for (const doc of sharedDocs) {
+          if (!docIds.has(doc.documents.id)) {
+            documents.push(doc.documents);
+          }
+        }
+      } else {
+        // Trainees only see documents shared with them or public docs
+        documents = await db.select()
+          .from(documents)
+          .where(eq(documents.isPublic, true))
+          .orderBy(desc(documents.createdAt));
+          
+        // Also get documents shared with trainee
+        const sharedDocs = await db.select()
+          .from(documents)
+          .innerJoin(documentShares, eq(documents.id, documentShares.documentId))
+          .where(eq(documentShares.userId, userId))
+          .orderBy(desc(documents.createdAt));
+          
+        // Combine results (avoiding duplicates)
+        const docIds = new Set(documents.map(d => d.id));
+        for (const doc of sharedDocs) {
+          if (!docIds.has(doc.documents.id)) {
+            documents.push(doc.documents);
+          }
         }
       }
-
-      res.json(filteredDocuments);
+      
+      res.json(documents);
     } catch (error) {
-      console.error('Error fetching documents:', error);
-      res.status(500).json({ error: 'Failed to fetch documents' });
+      logger.error(`Error getting documents: ${error}`);
+      res.status(500).json({ message: 'Failed to retrieve documents' });
     }
   });
-
-  // Get document by ID
-  app.get('/api/documents/:id', async (req, res) => {
+  
+  /**
+   * Get a single document by ID
+   */
+  app.get('/api/documents/:id', async (req: Request, res: Response) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
       }
-
-      const documentId = parseInt(req.params.id);
-      const user = req.user;
       
-      // Query document
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
+      const documentId = parseInt(req.params.id);
+      const userId = req.user.id;
+      const role = req.user.role;
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
       
       if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
+        return res.status(404).json({ message: 'Document not found' });
       }
       
-      // Check permissions - admins can see all, others are restricted
-      if (user.role.toLowerCase() !== 'admin') {
-        const sharedWith = Array.isArray(document.sharedWith) ? document.sharedWith : [];
-        if (document.uploadedById !== user.id && !sharedWith.includes(user.id)) {
-          return res.status(403).json({ error: 'You do not have permission to view this document' });
+      // Check access permission
+      const canAccess = 
+        role === 'admin' || 
+        document.uploadedById === userId || 
+        document.isPublic;
+      
+      if (!canAccess) {
+        // Check if document is shared with user
+        const [shared] = await db.select()
+          .from(documentShares)
+          .where(
+            and(
+              eq(documentShares.documentId, documentId),
+              eq(documentShares.userId, userId)
+            )
+          );
+        
+        if (!shared) {
+          return res.status(403).json({ message: 'Access denied' });
         }
+        
+        // Update last accessed time
+        await db.update(documentShares)
+          .set({ 
+            lastAccessed: new Date(),
+            isRead: true
+          })
+          .where(
+            and(
+              eq(documentShares.documentId, documentId),
+              eq(documentShares.userId, userId)
+            )
+          );
       }
-
+      
       res.json(document);
     } catch (error) {
-      console.error('Error fetching document:', error);
-      res.status(500).json({ error: 'Failed to fetch document' });
+      logger.error(`Error getting document: ${error}`);
+      res.status(500).json({ message: 'Failed to retrieve document' });
     }
   });
-
-  // Get document content
-  app.get('/api/documents/:id/content', async (req, res) => {
+  
+  /**
+   * Upload a new document
+   */
+  app.post('/api/documents/upload', upload.single('file'), async (req: Request, res: Response) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const documentId = parseInt(req.params.id);
-      
-      // First, check if document exists and user has access
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
-      
-      if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
       }
       
-      // Check permissions
-      const user = req.user;
-      if (user.role.toLowerCase() !== 'admin') {
-        const sharedWith = Array.isArray(document.sharedWith) ? document.sharedWith : [];
-        if (document.uploadedById !== user.id && !sharedWith.includes(user.id)) {
-          return res.status(403).json({ error: 'You do not have permission to view this document content' });
-        }
-      }
-      
-      // Get content
-      const [content] = await db.select().from(documentContent).where(eq(documentContent.documentId, documentId));
-      
-      if (!content) {
-        return res.status(404).json({ error: 'Document content not found' });
-      }
-
-      res.json(content);
-    } catch (error) {
-      console.error('Error fetching document content:', error);
-      res.status(500).json({ error: 'Failed to fetch document content' });
-    }
-  });
-
-  // Upload document
-  app.post('/api/documents/upload', upload.single('file'), async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      // Ensure file was uploaded
       if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
+        return res.status(400).json({ message: 'No file uploaded' });
       }
-
-      const user = req.user;
-      const file = req.file;
       
-      // Extract metadata from request body
-      const {
-        title = file.originalname,
-        description = '',
-        sharedWith = '[]'
-      } = req.body;
+      const { title, description, category, isPublic } = req.body;
+      const uploadedById = req.user.id;
+      const uploadedByName = req.user.name || 'Unknown';
+      const uploadedByRole = req.user.role || 'user';
       
-      // Prepare document data
+      // File details
+      const filePath = req.file.path;
+      const fileType = path.extname(req.file.originalname).substring(1);
+      const fileSize = req.file.size;
+      
+      // Create document record
       const documentData = {
         title,
         description,
-        fileType: getDocumentType(file.originalname),
-        url: `/api/documents/download/${path.basename(file.path)}`,
-        filePath: file.path,
-        fileSize: file.size,
-        uploadedById: user.id,
-        uploadedByRole: user.role,
-        sharedWith: typeof sharedWith === 'string' ? sharedWith : JSON.stringify(sharedWith),
-        isProcessed: false,
-        metadata: '{}',
-        fileName: file.originalname,
-        tags: req.body.tags || ''
+        filePath,
+        fileType,
+        fileSize,
+        uploadedById,
+        uploadedByName,
+        uploadedByRole,
+        category,
+        isPublic: isPublic === 'true',
+        createdAt: new Date(),
+        updatedAt: new Date()
       };
       
-      // Validate document data
-      const validatedData = insertDocumentSchema.parse(documentData);
+      // Insert into database
+      const [document] = await db.insert(documents)
+        .values({
+          title: documentData.title,
+          description: documentData.description,
+          filePath: documentData.filePath,
+          url: `/uploads/${path.basename(documentData.filePath)}`,
+          fileType: documentData.fileType,
+          fileSize: documentData.fileSize,
+          uploadedById: documentData.uploadedById,
+          uploadedByRole: documentData.uploadedByRole,
+          isProcessed: false,
+          createdAt: documentData.createdAt,
+          updatedAt: documentData.updatedAt
+        })
+        .returning();
       
-      // Insert document into database
-      const [document] = await db.insert(documents).values(validatedData).returning();
+      // Start processing the document in the background
+      documentAnalysis.analyzeDocument(document.id)
+        .catch(err => {
+          logger.error(`Background document analysis error: ${err}`);
+        });
       
-      // Create initial empty content entry
-      const contentData = {
-        documentId: document.id,
-        textContent: '',
-        structuredContent: '{}',
-        sections: '[]',
-        extractedKeywords: '[]',
-        confidenceScore: 0,
-        extractionTime: null
-      };
-      
-      const validatedContentData = insertDocumentContentSchema.parse(contentData);
-      await db.insert(documentContent).values(validatedContentData);
-
-      // Generate a download URL
-      const downloadUrl = `/api/documents/${document.id}/download`;
-      
-      // Return response with document details
-      res.status(201).json({
-        ...document,
-        downloadUrl
-      });
+      res.status(201).json(document);
     } catch (error) {
-      console.error('Error uploading document:', error);
-      
-      // Cleanup uploaded file if there was an error
-      if (req.file && fs.existsSync(req.file.path)) {
-        fs.unlinkSync(req.file.path);
-      }
-      
-      // Handle validation errors
-      if (error instanceof Error && error.name === 'ZodError') {
-        return res.status(400).json({ error: 'Invalid document data', details: error.message });
-      }
-      
-      res.status(500).json({ error: 'Failed to upload document' });
+      logger.error(`Error uploading document: ${error}`);
+      res.status(500).json({ message: 'Failed to upload document' });
     }
   });
-
-  // Download document
-  app.get('/api/documents/:id/download', async (req, res) => {
+  
+  /**
+   * Share a document with users
+   */
+  app.post('/api/documents/:id/share', async (req: Request, res: Response) => {
     try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
       }
-
-      const documentId = parseInt(req.params.id);
-      const user = req.user;
       
-      // Query document
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
+      const documentId = parseInt(req.params.id);
+      const { userIds, shareType } = req.body;
+      
+      if (!userIds || !Array.isArray(userIds)) {
+        return res.status(400).json({ message: 'User IDs are required' });
+      }
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
       
       if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
+        return res.status(404).json({ message: 'Document not found' });
       }
       
-      // Check permissions
-      if (user.role.toLowerCase() !== 'admin') {
-        const sharedWith = Array.isArray(document.sharedWith) ? document.sharedWith : [];
-        if (document.uploadedById !== user.id && !sharedWith.includes(user.id)) {
-          return res.status(403).json({ error: 'You do not have permission to download this document' });
+      // Only document owner or admin can share
+      if (document.uploadedById !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      // Share with each user
+      await documentAnalysis.shareDocumentWithUsers(
+        documentId,
+        userIds,
+        shareType || 'read',
+        req.user.id
+      );
+      
+      res.status(200).json({ message: 'Document shared successfully' });
+    } catch (error) {
+      logger.error(`Error sharing document: ${error}`);
+      res.status(500).json({ message: 'Failed to share document' });
+    }
+  });
+  
+  /**
+   * Get users who have access to a document
+   */
+  app.get('/api/documents/:id/shares', async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
+      
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Only document owner or admin can see shares
+      if (document.uploadedById !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      // Get shares
+      const shares = await db.select()
+        .from(documentShares)
+        .where(eq(documentShares.documentId, documentId));
+      
+      res.json(shares);
+    } catch (error) {
+      logger.error(`Error getting document shares: ${error}`);
+      res.status(500).json({ message: 'Failed to retrieve shares' });
+    }
+  });
+  
+  /**
+   * Remove document access for a user
+   */
+  app.delete('/api/documents/:id/shares/:userId', async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      const userId = parseInt(req.params.userId);
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
+      
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Only document owner or admin can remove shares
+      if (document.uploadedById !== req.user.id && req.user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      
+      // Remove share
+      await db.delete(documentShares)
+        .where(
+          and(
+            eq(documentShares.documentId, documentId),
+            eq(documentShares.userId, userId)
+          )
+        );
+      
+      res.status(204).send();
+    } catch (error) {
+      logger.error(`Error removing document share: ${error}`);
+      res.status(500).json({ message: 'Failed to remove share' });
+    }
+  });
+  
+  /**
+   * Get document content (text)
+   */
+  app.get('/api/documents/:id/content', async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      const userId = req.user.id;
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
+      
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Check access permission
+      const canAccess = 
+        req.user.role === 'admin' || 
+        document.uploadedById === userId || 
+        document.isPublic;
+      
+      if (!canAccess) {
+        // Check if document is shared with user
+        const [shared] = await db.select()
+          .from(documentShares)
+          .where(
+            and(
+              eq(documentShares.documentId, documentId),
+              eq(documentShares.userId, userId)
+            )
+          );
+        
+        if (!shared) {
+          return res.status(403).json({ message: 'Access denied' });
+        }
+      }
+      
+      // Get document content
+      const [content] = await db.select()
+        .from(documentContent)
+        .where(eq(documentContent.documentId, documentId));
+      
+      if (!content) {
+        return res.status(404).json({ message: 'Document content not found' });
+      }
+      
+      res.json(content);
+    } catch (error) {
+      logger.error(`Error getting document content: ${error}`);
+      res.status(500).json({ message: 'Failed to retrieve document content' });
+    }
+  });
+  
+  /**
+   * Get document analysis data
+   */
+  app.get('/api/documents/:id/analysis', async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
+      
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Get document analysis
+      const [analysis] = await db.select()
+        .from(documentAnalysis)
+        .where(eq(documentAnalysis.documentId, documentId));
+      
+      if (!analysis) {
+        return res.status(404).json({ message: 'Document analysis not found' });
+      }
+      
+      res.json(analysis);
+    } catch (error) {
+      logger.error(`Error getting document analysis: ${error}`);
+      res.status(500).json({ message: 'Failed to retrieve document analysis' });
+    }
+  });
+  
+  /**
+   * Download the original document file
+   */
+  app.get('/api/documents/:id/download', async (req: Request, res: Response) => {
+    try {
+      if (!req.isAuthenticated() || !req.user) {
+        return res.status(401).json({ message: 'Authentication required' });
+      }
+      
+      const documentId = parseInt(req.params.id);
+      const userId = req.user.id;
+      
+      // Get the document
+      const [document] = await db.select()
+        .from(documents)
+        .where(eq(documents.id, documentId));
+      
+      if (!document) {
+        return res.status(404).json({ message: 'Document not found' });
+      }
+      
+      // Check access permission
+      const canAccess = 
+        req.user.role === 'admin' || 
+        document.uploadedById === userId || 
+        document.isPublic;
+      
+      if (!canAccess) {
+        // Check if document is shared with user
+        const [shared] = await db.select()
+          .from(documentShares)
+          .where(
+            and(
+              eq(documentShares.documentId, documentId),
+              eq(documentShares.userId, userId)
+            )
+          );
+        
+        if (!shared) {
+          return res.status(403).json({ message: 'Access denied' });
         }
       }
       
       // Check if file exists
       if (!fs.existsSync(document.filePath)) {
-        return res.status(404).json({ error: 'File not found' });
+        return res.status(404).json({ message: 'File not found' });
       }
-      
-      // Set headers for file download
-      res.setHeader('Content-Disposition', `attachment; filename="${document.fileName}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
       
       // Send file
-      res.sendFile(document.filePath);
+      res.download(document.filePath, document.title + path.extname(document.filePath));
     } catch (error) {
-      console.error('Error downloading document:', error);
-      res.status(500).json({ error: 'Failed to download document' });
-    }
-  });
-
-  // Extract document content
-  app.post('/api/documents/:id/extract', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const documentId = parseInt(req.params.id);
-      const user = req.user;
-      
-      // Check if user has permission
-      if (user.role.toLowerCase() !== 'admin' && user.role.toLowerCase() !== 'instructor' && user.role.toLowerCase() !== 'examiner') {
-        return res.status(403).json({ error: 'You do not have permission to extract document content' });
-      }
-      
-      // Get document
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
-      
-      if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
-      }
-      
-      // Get extraction options from request body
-      const { method = 'basic', options = {} } = req.body;
-      
-      // Simple text extraction for demonstration
-      const filePath = document.filePath;
-      
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: 'Document file not found' });
-      }
-      
-      // This is a simplified extraction demo
-      // In a real implementation, you would use specialized libraries based on file type
-      let textContent = '';
-      let extractedData = {};
-      let startTime = Date.now();
-      
-      // Simulate different extraction methods
-      switch (method) {
-        case 'advanced':
-          // Simulate advanced extraction with more data
-          textContent = `Advanced extracted text from ${document.fileName}`;
-          extractedData = {
-            structure: {
-              elements: [
-                { type: 'heading', level: 1, text: 'Document Title', metadata: { pageNumber: 1 } },
-                { type: 'paragraph', text: 'This is the first paragraph of content.', metadata: { pageNumber: 1 } },
-                { type: 'heading', level: 2, text: 'Section 1', metadata: { pageNumber: 1 } },
-                { type: 'paragraph', text: 'Content for section 1 goes here.', metadata: { pageNumber: 1 } }
-              ]
-            },
-            metadata: {
-              author: 'Document Author',
-              creationDate: '2025-01-01',
-              pageCount: 10,
-              title: document.title
-            },
-            toc: [
-              { level: 1, text: 'Document Title', pageNumber: 1 },
-              { level: 2, text: 'Section 1', pageNumber: 1 },
-              { level: 2, text: 'Section 2', pageNumber: 3 }
-            ],
-            tables: [
-              {
-                headers: ['Header 1', 'Header 2', 'Header 3'],
-                data: [
-                  ['Row 1, Cell 1', 'Row 1, Cell 2', 'Row 1, Cell 3'],
-                  ['Row 2, Cell 1', 'Row 2, Cell 2', 'Row 2, Cell 3']
-                ],
-                rows: 2,
-                columns: 3
-              }
-            ],
-            regulations: [
-              { 
-                authority: 'FAA',
-                code: '14 CFR Part 61',
-                description: 'Certification for pilots and flight instructors'
-              }
-            ]
-          };
-          break;
-          
-        case 'ai':
-          // Simulate AI-powered extraction with richer data
-          textContent = `AI-enhanced extracted text from ${document.fileName}`;
-          extractedData = {
-            structure: {
-              elements: [
-                { type: 'heading', level: 1, text: 'Document Title', metadata: { pageNumber: 1, confidence: 0.95 } },
-                { type: 'paragraph', text: 'This is the first paragraph of content.', metadata: { pageNumber: 1, confidence: 0.92 } },
-                { type: 'heading', level: 2, text: 'Section 1', metadata: { pageNumber: 1, confidence: 0.94 } },
-                { type: 'paragraph', text: 'Content for section 1 goes here.', metadata: { pageNumber: 1, confidence: 0.91 } },
-                { type: 'list', text: 'List of items', metadata: { pageNumber: 2, confidence: 0.89 } }
-              ]
-            },
-            metadata: {
-              author: 'Document Author',
-              creationDate: '2025-01-01',
-              pageCount: 10,
-              title: document.title,
-              keywords: ['aviation', 'training', 'certification'],
-              summary: 'This document covers key aspects of aviation training and certification procedures.'
-            },
-            toc: [
-              { level: 1, text: 'Document Title', pageNumber: 1 },
-              { level: 2, text: 'Section 1', pageNumber: 1 },
-              { level: 2, text: 'Section 2', pageNumber: 3 },
-              { level: 3, text: 'Subsection 2.1', pageNumber: 4 }
-            ],
-            tables: [
-              {
-                headers: ['Header 1', 'Header 2', 'Header 3'],
-                data: [
-                  ['Row 1, Cell 1', 'Row 1, Cell 2', 'Row 1, Cell 3'],
-                  ['Row 2, Cell 1', 'Row 2, Cell 2', 'Row 2, Cell 3']
-                ],
-                rows: 2,
-                columns: 3
-              }
-            ],
-            regulations: [
-              { 
-                authority: 'FAA',
-                code: '14 CFR Part 61',
-                description: 'Certification for pilots and flight instructors'
-              },
-              {
-                authority: 'EASA',
-                code: 'Part-FCL',
-                description: 'Flight Crew Licensing requirements'
-              }
-            ],
-            knowledgeGraph: {
-              nodes: [
-                { id: '1', type: 'concept', content: 'Flight Training' },
-                { id: '2', type: 'concept', content: 'Certification Requirements' },
-                { id: '3', type: 'entity', content: 'FAA' },
-                { id: '4', type: 'procedure', content: 'Pre-flight Check' }
-              ],
-              edges: [
-                { source: '1', target: '2', relationship: 'related_to' },
-                { source: '2', target: '3', relationship: 'governed_by' },
-                { source: '1', target: '4', relationship: 'includes' }
-              ]
-            }
-          };
-          break;
-          
-        default: // basic
-          // Simulate basic extraction with minimal data
-          textContent = `Basic extracted text from ${document.fileName}`;
-          extractedData = {
-            metadata: {
-              title: document.title,
-              fileSize: document.fileSize,
-              fileType: document.fileType
-            }
-          };
-          break;
-      }
-      
-      // Calculate extraction time
-      const extractionTimeMs = Date.now() - startTime;
-      
-      // Get the structure and keywords safely
-      const structureElements = typeof extractedData === 'object' && extractedData !== null && 
-        'structure' in extractedData && typeof extractedData.structure === 'object' && extractedData.structure !== null && 
-        'elements' in extractedData.structure ? extractedData.structure.elements : [];
-        
-      const metadataKeywords = typeof extractedData === 'object' && extractedData !== null && 
-        'metadata' in extractedData && typeof extractedData.metadata === 'object' && extractedData.metadata !== null && 
-        'keywords' in extractedData.metadata ? extractedData.metadata.keywords : [];
-      
-      // Update document content in database
-      await db.update(documentContent)
-        .set({
-          textContent: textContent,
-          structuredContent: JSON.stringify(extractedData),
-          sections: JSON.stringify(structureElements),
-          extractedKeywords: JSON.stringify(metadataKeywords),
-          confidenceScore: 0.9, // Example confidence score
-          extractionTime: extractionTimeMs
-        })
-        .where(eq(documentContent.documentId, documentId));
-      
-      // Update document to mark as processed
-      await db.update(documents)
-        .set({
-          isProcessed: true,
-          updatedAt: new Date()
-        })
-        .where(eq(documents.id, documentId));
-      
-      // Return extracted content
-      res.json({
-        ...extractedData,
-        textContent,
-        extractionTime: extractionTimeMs
-      });
-    } catch (error) {
-      console.error('Error extracting document content:', error);
-      res.status(500).json({ error: 'Failed to extract document content' });
-    }
-  });
-
-  // Generate forms from document
-  app.post('/api/documents/:id/generate-forms', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const documentId = parseInt(req.params.id);
-      const user = req.user;
-      
-      // Check if user has permission
-      if (user.role.toLowerCase() !== 'admin' && user.role.toLowerCase() !== 'instructor' && user.role.toLowerCase() !== 'examiner') {
-        return res.status(403).json({ error: 'You do not have permission to generate forms' });
-      }
-      
-      // Get document and its content
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
-      
-      if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
-      }
-      
-      const [content] = await db.select().from(documentContent).where(eq(documentContent.documentId, documentId));
-      
-      if (!content) {
-        return res.status(404).json({ error: 'Document content not found' });
-      }
-      
-      if (!document.isProcessed) {
-        return res.status(400).json({ error: 'Document content has not been processed yet' });
-      }
-      
-      // Generate forms based on extracted content
-      // This is a simplified demo - in a real implementation, you would
-      // analyze the content and generate appropriate forms
-      
-      // Example generated forms
-      const generatedForms = {
-        trainingForms: [
-          {
-            id: uuidv4(),
-            title: 'Training Assessment Form',
-            description: 'Assessment form for training progress',
-            sections: [
-              {
-                title: 'Basic Information',
-                fields: [
-                  { type: 'text', label: 'Trainee Name', required: true },
-                  { type: 'date', label: 'Assessment Date', required: true },
-                  { type: 'select', label: 'Training Module', options: ['Module 1', 'Module 2', 'Module 3'] }
-                ]
-              },
-              {
-                title: 'Performance Evaluation',
-                fields: [
-                  { type: 'rating', label: 'Overall Performance', max: 5, required: true },
-                  { type: 'textarea', label: 'Strengths', required: false },
-                  { type: 'textarea', label: 'Areas for Improvement', required: false }
-                ]
-              }
-            ]
-          }
-        ],
-        complianceProcedures: [
-          {
-            id: uuidv4(),
-            title: 'Compliance Checklist',
-            description: 'Checklist for regulatory compliance',
-            items: [
-              { id: '1', text: 'Verify pilot license currency', reference: 'FAA 14 CFR Part 61.56' },
-              { id: '2', text: 'Complete pre-flight inspection', reference: 'Operations Manual Sec. 3.2' },
-              { id: '3', text: 'Review weather conditions', reference: 'Operations Manual Sec. 2.4' }
-            ]
-          }
-        ],
-        sessionPlans: [
-          {
-            id: uuidv4(),
-            title: 'Training Session Plan',
-            description: 'Plan for upcoming training session',
-            duration: 120, // minutes
-            objectives: [
-              'Demonstrate understanding of navigation principles',
-              'Successfully complete simulated cross-country flight',
-              'Demonstrate proper emergency procedures'
-            ],
-            activities: [
-              { title: 'Pre-flight briefing', duration: 20, description: 'Review flight plan and objectives' },
-              { title: 'Simulator session', duration: 60, description: 'Conduct simulated cross-country flight with emergency scenarios' },
-              { title: 'Debrief', duration: 30, description: 'Review performance and areas for improvement' }
-            ],
-            materials: [
-              'Flight simulator',
-              'Navigation charts',
-              'Emergency procedures checklist'
-            ]
-          }
-        ]
-      };
-      
-      res.json(generatedForms);
-    } catch (error) {
-      console.error('Error generating forms:', error);
-      res.status(500).json({ error: 'Failed to generate forms' });
-    }
-  });
-  
-  // Delete document
-  app.delete('/api/documents/:id', async (req, res) => {
-    try {
-      if (!req.isAuthenticated()) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const documentId = parseInt(req.params.id);
-      const user = req.user;
-      
-      // Get document
-      const [document] = await db.select().from(documents).where(eq(documents.id, documentId));
-      
-      if (!document) {
-        return res.status(404).json({ error: 'Document not found' });
-      }
-      
-      // Check permissions - only admin or the uploader can delete
-      if (user.role.toLowerCase() !== 'admin' && document.uploadedById !== user.id) {
-        return res.status(403).json({ error: 'You do not have permission to delete this document' });
-      }
-      
-      // Delete file from disk if it exists
-      if (fs.existsSync(document.filePath)) {
-        fs.unlinkSync(document.filePath);
-      }
-      
-      // Delete document content first (foreign key constraint)
-      await db.delete(documentContent).where(eq(documentContent.documentId, documentId));
-      
-      // Delete document
-      await db.delete(documents).where(eq(documents.id, documentId));
-      
-      res.json({ success: true, message: 'Document deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting document:', error);
-      res.status(500).json({ error: 'Failed to delete document' });
+      logger.error(`Error downloading document: ${error}`);
+      res.status(500).json({ message: 'Failed to download document' });
     }
   });
 }
