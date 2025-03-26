@@ -31,6 +31,8 @@ import {
   MfaCredential,
   InsertMfaCredential,
   InsertDocumentAnalysis,
+  SessionPlan,
+  InsertSessionPlan,
   RegulatoryRequirement,
   InsertRegulatoryRequirement,
   ProgramCompliance,
@@ -372,6 +374,7 @@ export class MemStorage implements IStorage {
   private knowledgeGraphEdges: Map<number, KnowledgeGraphEdge>;
   private regulatoryRequirements: Map<number, RegulatoryRequirement>;
   private programCompliances: Map<number, ProgramCompliance>;
+  private sessionPlans: Map<number, SessionPlan>;
   private auditLogs: Map<number, AuditLog>;
   private performanceMetrics: Map<number, PerformanceMetric>;
   private predictiveModels: Map<number, PredictiveModel>;
@@ -415,6 +418,7 @@ export class MemStorage implements IStorage {
   private leaderboardEntryIdCounter: number;
   private sharedScenarioIdCounter: number;
   private mfaCredentialIdCounter: number;
+  private sessionPlanIdCounter: number;
   private mfaCredentials: Map<number, MfaCredential>;
 
   constructor() {
@@ -450,6 +454,7 @@ export class MemStorage implements IStorage {
     this.leaderboardEntries = new Map();
     this.sharedScenarios = new Map();
     this.mfaCredentials = new Map();
+    this.sessionPlans = new Map();
 
     this.userIdCounter = 1;
     this.programIdCounter = 1;
