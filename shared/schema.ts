@@ -914,6 +914,9 @@ export type InsertSessionReplay = z.infer<typeof insertSessionReplaySchema>;
 export type SessionEvent = typeof sessionEvents.$inferSelect;
 export type InsertSessionEvent = z.infer<typeof insertSessionEventSchema>;
 
+export type SessionPlan = typeof sessionPlans.$inferSelect;
+export type InsertSessionPlan = z.infer<typeof insertSessionPlanSchema>;
+
 export type Achievement = typeof achievements.$inferSelect;
 export type InsertAchievement = z.infer<typeof insertAchievementSchema>;
 

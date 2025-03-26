@@ -130,17 +130,46 @@ export interface IStorage {
 
   // Session methods
   getSession(id: number): Promise<Session | undefined>;
-  getAllSessions(): Promise<Session[]>;
+  getAllSessions(filters?: {
+    programId?: number;
+    moduleId?: number;
+    status?: string;
+    fromDate?: Date;
+    toDate?: Date;
+  }): Promise<Session[]>;
   getSessionsByInstructor(instructorId: number): Promise<Session[]>;
   getSessionsByTrainee(traineeId: number): Promise<Session[]>;
+  getSessionsInDateRange(startDate: Date, endDate: Date): Promise<Session[]>;
+  getTraineeSessionsInDateRange(traineeId: number, startDate: Date, endDate: Date): Promise<Session[]>;
+  getInstructorSessionsInDateRange(instructorId: number, startDate: Date, endDate: Date): Promise<Session[]>;
   createSession(session: InsertSession): Promise<Session>;
   updateSession(id: number, session: Partial<Session>): Promise<Session | undefined>;
   deleteSession(id: number): Promise<boolean>;
 
   // Session Trainee methods
   getSessionTrainees(sessionId: number): Promise<number[]>;
+  getSessionAttendees(sessionId: number): Promise<SessionTrainee[]>;
   addTraineeToSession(sessionTrainee: InsertSessionTrainee): Promise<SessionTrainee>;
+  updateSessionAttendance(sessionId: number, traineeId: number, updates: {
+    present: boolean;
+    notes?: string;
+  }): Promise<SessionTrainee>;
   removeTraineeFromSession(sessionId: number, traineeId: number): Promise<boolean>;
+  
+  // Session Plan methods
+  getSessionPlan(sessionId: number): Promise<SessionPlan | undefined>;
+  createSessionPlan(plan: InsertSessionPlan): Promise<SessionPlan>;
+  updateSessionPlan(id: number, plan: Partial<SessionPlan>): Promise<SessionPlan | undefined>;
+  generateSessionPlan(options: {
+    sessionId: number;
+    documentIds?: number[];
+    previousSessionId?: number;
+    analysisDepth?: string;
+  }): Promise<SessionPlan>;
+  
+  // Session Events methods
+  getSessionEvents(sessionId: number): Promise<SessionEvent[]>;
+  addSessionEvent(event: InsertSessionEvent): Promise<SessionEvent>;
 
   // Assessment methods
   getAssessment(id: number): Promise<Assessment | undefined>;
