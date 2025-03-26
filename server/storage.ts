@@ -400,6 +400,225 @@ function getCompetencyLevel(scorePercentage: number): string {
 }
 
 export class MemStorage implements IStorage {
+  // Risk Assessment methods
+  async getRiskAssessment(id: number): Promise<RiskAssessment | undefined> {
+    return this.riskAssessments.get(id);
+  }
+
+  async getAllRiskAssessments(filters?: { userId?: number, category?: string, status?: string }): Promise<RiskAssessment[]> {
+    let assessments = Array.from(this.riskAssessments.values());
+    
+    // Apply filters if provided
+    if (filters) {
+      if (filters.userId !== undefined) {
+        assessments = assessments.filter(a => a.userId === filters.userId);
+      }
+      if (filters.category !== undefined) {
+        assessments = assessments.filter(a => a.category === filters.category);
+      }
+      if (filters.status !== undefined) {
+        assessments = assessments.filter(a => a.status === filters.status);
+      }
+    }
+    
+    return assessments;
+  }
+
+  async getRiskAssessmentsByUser(userId: number): Promise<RiskAssessment[]> {
+    return Array.from(this.riskAssessments.values()).filter(a => a.userId === userId);
+  }
+
+  async getRiskAssessmentsByCategory(category: string): Promise<RiskAssessment[]> {
+    return Array.from(this.riskAssessments.values()).filter(a => a.category === category);
+  }
+
+  async createRiskAssessment(assessment: InsertRiskAssessment): Promise<RiskAssessment> {
+    const id = this.riskAssessmentIdCounter++;
+    const now = new Date();
+    
+    const newAssessment: RiskAssessment = {
+      id,
+      ...assessment,
+      createdAt: now,
+      updatedAt: now,
+      incidentCount: assessment.incidentCount || 0
+    };
+    
+    this.riskAssessments.set(id, newAssessment);
+    
+    // Create initial risk trend entry for this assessment
+    const trendId = this.riskTrendIdCounter++;
+    const trend: RiskTrend = {
+      id: trendId,
+      riskAssessmentId: id,
+      recordDate: now,
+      severity: assessment.severity,
+      occurrence: assessment.occurrence,
+      detection: assessment.detection,
+      riskScore: assessment.severity * assessment.occurrence * assessment.detection,
+      createdAt: now
+    };
+    
+    this.riskTrends.set(trendId, trend);
+    
+    return newAssessment;
+  }
+
+  async updateRiskAssessment(id: number, assessment: Partial<RiskAssessment>): Promise<RiskAssessment | undefined> {
+    const existingAssessment = this.riskAssessments.get(id);
+    if (!existingAssessment) return undefined;
+    
+    const updatedAssessment = {
+      ...existingAssessment,
+      ...assessment,
+      updatedAt: new Date()
+    };
+    
+    this.riskAssessments.set(id, updatedAssessment);
+    
+    // If risk factors changed, create a new trend entry
+    if (
+      assessment.severity !== undefined || 
+      assessment.occurrence !== undefined || 
+      assessment.detection !== undefined
+    ) {
+      const trendId = this.riskTrendIdCounter++;
+      const now = new Date();
+      const trend: RiskTrend = {
+        id: trendId,
+        riskAssessmentId: id,
+        recordDate: now,
+        severity: updatedAssessment.severity,
+        occurrence: updatedAssessment.occurrence,
+        detection: updatedAssessment.detection,
+        riskScore: updatedAssessment.severity * updatedAssessment.occurrence * updatedAssessment.detection,
+        createdAt: now
+      };
+      
+      this.riskTrends.set(trendId, trend);
+    }
+    
+    return updatedAssessment;
+  }
+
+  async deleteRiskAssessment(id: number): Promise<boolean> {
+    if (!this.riskAssessments.has(id)) return false;
+    
+    // Delete related incidents
+    const incidents = Array.from(this.riskIncidents.values())
+      .filter(incident => incident.riskAssessmentId === id);
+    
+    for (const incident of incidents) {
+      this.riskIncidents.delete(incident.id);
+    }
+    
+    // Delete related trends
+    const trends = Array.from(this.riskTrends.values())
+      .filter(trend => trend.riskAssessmentId === id);
+    
+    for (const trend of trends) {
+      this.riskTrends.delete(trend.id);
+    }
+    
+    // Delete the assessment
+    return this.riskAssessments.delete(id);
+  }
+
+  // Risk Incident methods
+  async getRiskIncident(id: number): Promise<RiskIncident | undefined> {
+    return this.riskIncidents.get(id);
+  }
+
+  async getRiskIncidentsByAssessment(assessmentId: number): Promise<RiskIncident[]> {
+    return Array.from(this.riskIncidents.values())
+      .filter(incident => incident.riskAssessmentId === assessmentId);
+  }
+
+  async createRiskIncident(incident: InsertRiskIncident): Promise<RiskIncident> {
+    const id = this.riskIncidentIdCounter++;
+    const now = new Date();
+    
+    const newIncident: RiskIncident = {
+      id,
+      ...incident,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.riskIncidents.set(id, newIncident);
+    
+    // Update incident count on the associated risk assessment
+    const assessment = this.riskAssessments.get(incident.riskAssessmentId);
+    if (assessment) {
+      assessment.incidentCount = (assessment.incidentCount || 0) + 1;
+      this.riskAssessments.set(assessment.id, assessment);
+    }
+    
+    return newIncident;
+  }
+
+  async updateRiskIncident(id: number, incident: Partial<RiskIncident>): Promise<RiskIncident | undefined> {
+    const existingIncident = this.riskIncidents.get(id);
+    if (!existingIncident) return undefined;
+    
+    const updatedIncident = {
+      ...existingIncident,
+      ...incident,
+      updatedAt: new Date()
+    };
+    
+    this.riskIncidents.set(id, updatedIncident);
+    return updatedIncident;
+  }
+
+  async deleteRiskIncident(id: number): Promise<boolean> {
+    const incident = this.riskIncidents.get(id);
+    if (!incident) return false;
+    
+    // Decrement the incident count on the associated risk assessment
+    const assessment = this.riskAssessments.get(incident.riskAssessmentId);
+    if (assessment && assessment.incidentCount > 0) {
+      assessment.incidentCount -= 1;
+      this.riskAssessments.set(assessment.id, assessment);
+    }
+    
+    return this.riskIncidents.delete(id);
+  }
+
+  // Risk Trend methods
+  async getRiskTrend(id: number): Promise<RiskTrend | undefined> {
+    return this.riskTrends.get(id);
+  }
+
+  async getRiskTrendsByAssessment(assessmentId: number): Promise<RiskTrend[]> {
+    return Array.from(this.riskTrends.values())
+      .filter(trend => trend.riskAssessmentId === assessmentId)
+      .sort((a, b) => a.recordDate.getTime() - b.recordDate.getTime());
+  }
+
+  async getRiskTrendsTimeRange(assessmentId: number, startDate: Date, endDate: Date): Promise<RiskTrend[]> {
+    return Array.from(this.riskTrends.values())
+      .filter(trend => 
+        trend.riskAssessmentId === assessmentId &&
+        trend.recordDate >= startDate &&
+        trend.recordDate <= endDate
+      )
+      .sort((a, b) => a.recordDate.getTime() - b.recordDate.getTime());
+  }
+
+  async createRiskTrend(trend: InsertRiskTrend): Promise<RiskTrend> {
+    const id = this.riskTrendIdCounter++;
+    const now = new Date();
+    
+    const newTrend: RiskTrend = {
+      id,
+      ...trend,
+      createdAt: now
+    };
+    
+    this.riskTrends.set(id, newTrend);
+    return newTrend;
+  }
   private users: Map<number, User>;
   private programs: Map<number, TrainingProgram>;
   private modules: Map<number, Module>;
