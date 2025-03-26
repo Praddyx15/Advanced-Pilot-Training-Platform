@@ -486,6 +486,7 @@ export class MemStorage implements IStorage {
     this.leaderboardEntryIdCounter = 1;
     this.sharedScenarioIdCounter = 1;
     this.mfaCredentialIdCounter = 1;
+    this.sessionPlanIdCounter = 1;
 
     // Initialize with some common regulatory references
     this.initializeRegulatoryReferences();
