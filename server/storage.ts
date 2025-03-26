@@ -83,6 +83,44 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
   
+  // Risk Assessment methods
+  getRiskAssessment(id: number): Promise<RiskAssessment | undefined>;
+  getAllRiskAssessments(filters?: { userId?: number, category?: string, status?: string }): Promise<RiskAssessment[]>;
+  createRiskAssessment(assessment: InsertRiskAssessment): Promise<RiskAssessment>;
+  updateRiskAssessment(id: number, assessment: Partial<RiskAssessment>): Promise<RiskAssessment | undefined>;
+  deleteRiskAssessment(id: number): Promise<boolean>;
+  
+  // Risk Incident methods
+  getRiskIncident(id: number): Promise<RiskIncident | undefined>;
+  getRiskIncidentsByAssessment(assessmentId: number): Promise<RiskIncident[]>;
+  createRiskIncident(incident: InsertRiskIncident): Promise<RiskIncident>;
+  updateRiskIncident(id: number, incident: Partial<RiskIncident>): Promise<RiskIncident | undefined>;
+  
+  // Risk Trend methods
+  getRiskTrendsByAssessment(assessmentId: number): Promise<RiskTrend[]>;
+  createRiskTrend(trend: InsertRiskTrend): Promise<RiskTrend>;
+  
+  // Risk Assessment methods
+  getRiskAssessment(id: number): Promise<RiskAssessment | undefined>;
+  getRiskAssessmentsByUser(userId: number): Promise<RiskAssessment[]>;
+  getRiskAssessmentsByCategory(category: string): Promise<RiskAssessment[]>;
+  createRiskAssessment(assessment: InsertRiskAssessment): Promise<RiskAssessment>;
+  updateRiskAssessment(id: number, assessment: Partial<RiskAssessment>): Promise<RiskAssessment | undefined>;
+  deleteRiskAssessment(id: number): Promise<boolean>;
+  
+  // Risk Incident methods
+  getRiskIncident(id: number): Promise<RiskIncident | undefined>;
+  getRiskIncidentsByAssessment(assessmentId: number): Promise<RiskIncident[]>;
+  createRiskIncident(incident: InsertRiskIncident): Promise<RiskIncident>;
+  updateRiskIncident(id: number, incident: Partial<RiskIncident>): Promise<RiskIncident | undefined>;
+  deleteRiskIncident(id: number): Promise<boolean>;
+  
+  // Risk Trend methods
+  getRiskTrend(id: number): Promise<RiskTrend | undefined>;
+  getRiskTrendsByAssessment(assessmentId: number): Promise<RiskTrend[]>;
+  createRiskTrend(trend: InsertRiskTrend): Promise<RiskTrend>;
+  getRiskTrendsTimeRange(assessmentId: number, startDate: Date, endDate: Date): Promise<RiskTrend[]>;
+  
   // Syllabus Generator methods
   generateSyllabusFromDocument(documentId: number, options: SyllabusGenerationOptions): Promise<GeneratedSyllabus>;
   saveSyllabusAsProgram(syllabus: GeneratedSyllabus, createdById: number): Promise<TrainingProgram>;
@@ -364,6 +402,9 @@ export class MemStorage implements IStorage {
   private assessments: Map<number, Assessment>;
   private grades: Map<number, Grade>;
   private documents: Map<number, Document>;
+  private riskAssessments: Map<number, RiskAssessment>;
+  private riskIncidents: Map<number, RiskIncident>;
+  private riskTrends: Map<number, RiskTrend>;
   private documentVersions: Map<number, DocumentVersion>;
   private resources: Map<number, Resource>;
   private notifications: Map<number, Notification>;
