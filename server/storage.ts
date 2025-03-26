@@ -2962,6 +2962,76 @@ export class MemStorage implements IStorage {
     return this.mfaCredentials.delete(id);
   }
 
+  // SessionPlan methods
+  async getSessionPlan(sessionId: number): Promise<SessionPlan | undefined> {
+    // Find the session plan that matches the sessionId
+    for (const plan of this.sessionPlans.values()) {
+      if (plan.sessionId === sessionId) {
+        return plan;
+      }
+    }
+    return undefined;
+  }
+
+  async createSessionPlan(plan: InsertSessionPlan): Promise<SessionPlan> {
+    const id = this.sessionPlanIdCounter++;
+    const now = new Date();
+    
+    const newPlan: SessionPlan = {
+      id,
+      sessionId: plan.sessionId,
+      previousSessionId: plan.previousSessionId || null,
+      previousTopicsCovered: plan.previousTopicsCovered || [],
+      currentTopics: plan.currentTopics || [],
+      nextTopics: plan.nextTopics || [],
+      notes: plan.notes || null,
+      resources: plan.resources || [],
+      progressIndicators: plan.progressIndicators || {},
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.sessionPlans.set(id, newPlan);
+    return newPlan;
+  }
+
+  async updateSessionPlan(id: number, plan: Partial<SessionPlan>): Promise<SessionPlan | undefined> {
+    const existingPlan = this.sessionPlans.get(id);
+    if (!existingPlan) {
+      return undefined;
+    }
+    
+    const updatedPlan: SessionPlan = {
+      ...existingPlan,
+      ...plan,
+      updatedAt: new Date()
+    };
+    
+    this.sessionPlans.set(id, updatedPlan);
+    return updatedPlan;
+  }
+
+  async generateSessionPlan(options: {
+    sessionId: number;
+    documentIds?: number[];
+    previousSessionId?: number;
+    analysisDepth?: 'basic' | 'detailed' | 'comprehensive';
+  }): Promise<SessionPlan> {
+    // Import the service here to avoid circular dependency
+    const { generateSessionPlanFromDocuments } = await import('./services/document-to-session-service');
+    
+    // Use the document-to-session service to generate a plan
+    const planData = await generateSessionPlanFromDocuments({
+      sessionId: options.sessionId,
+      documentIds: options.documentIds || [],
+      previousSessionId: options.previousSessionId,
+      analysisDepth: options.analysisDepth || 'detailed'
+    });
+    
+    // Create the session plan
+    return this.createSessionPlan(planData);
+  }
+
   // User update method
   async updateUser(id: number, user: Partial<User>): Promise<User | undefined> {
     const existingUser = this.users.get(id);
