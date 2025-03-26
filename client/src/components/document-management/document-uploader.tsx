@@ -1,64 +1,204 @@
 import React, { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { useToast } from '@/hooks/use-toast';
 import { useMutation } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileUp, CheckCircle2, XCircle, AlertCircle, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
+import {
+  Upload,
+  File,
+  FileText,
+  FileSpreadsheet,
+  PresentationIcon,
+  FileArchive,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+} from 'lucide-react';
 
-// TypeScript interfaces
+// Updated UploadedDocument interface to match document-detail-page
 export interface UploadedDocument {
   id: number;
   title: string;
   fileName: string;
   fileType: string;
   fileSize: number;
-  isProcessed: boolean;
-  processingStatus?: 'pending' | 'processing' | 'completed' | 'failed';
-  uploadedById: number;
+  description?: string;
+  url: string;
   createdAt: string;
-  updatedAt: string;
+  updatedAt?: string;
+  processingStatus: string;
+  isProcessed: boolean;
+  tags?: string[];
+  uploadedByName?: string;
+  uploadedByAvatar?: string;
+  uploadedByRole?: string;
+  uploadedById: number;
 }
 
 interface DocumentUploaderProps {
   onUploadComplete?: (document: UploadedDocument) => void;
+  maxFiles?: number;
+  acceptedFileTypes?: string[];
+  maxFileSize?: number; // in MB
 }
 
-export function DocumentUploader({ onUploadComplete }: DocumentUploaderProps) {
-  const [uploading, setUploading] = useState(false);
+export function DocumentUploader({
+  onUploadComplete,
+  maxFiles = 1,
+  acceptedFileTypes = ['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx'],
+  maxFileSize = 10 // 10MB
+}: DocumentUploaderProps) {
+  const [files, setFiles] = useState<File[]>([]);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [customTitle, setCustomTitle] = useState('');
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Handle file drop
+  const onDrop = useCallback((acceptedFiles: File[]) => {
+    setError(null);
+    
+    // Validate max files
+    if (acceptedFiles.length > maxFiles) {
+      setError(`You can only upload ${maxFiles} file${maxFiles === 1 ? '' : 's'} at a time.`);
+      return;
+    }
+    
+    // Validate file size
+    const oversizedFiles = acceptedFiles.filter(file => file.size > maxFileSize * 1024 * 1024);
+    if (oversizedFiles.length > 0) {
+      setError(`File${oversizedFiles.length > 1 ? 's' : ''} too large. Maximum size is ${maxFileSize}MB.`);
+      return;
+    }
+    
+    // Set the title to the first file name by default (without extension)
+    if (acceptedFiles.length > 0 && !title) {
+      const fileName = acceptedFiles[0].name;
+      const nameWithoutExtension = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
+      setTitle(nameWithoutExtension);
+    }
+    
+    setFiles(acceptedFiles);
+  }, [maxFiles, maxFileSize, title]);
+
+  // Configure dropzone
+  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
+    onDrop,
+    maxFiles,
+    accept: acceptedFileTypes.reduce((acc, type) => {
+      // Map file extensions to MIME types
+      const mimeType = getMimeType(type);
+      return { ...acc, [mimeType]: [type] };
+    }, {}),
+    maxSize: maxFileSize * 1024 * 1024,
+  });
+
+  // Map file extensions to MIME types
+  function getMimeType(extension: string): string {
+    const extensionMap: Record<string, string> = {
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.ppt': 'application/vnd.ms-powerpoint',
+      '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    };
+    
+    return extensionMap[extension] || 'application/octet-stream';
+  }
+
+  // Get file icon based on file type
+  const getFileIcon = (file: File) => {
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    
+    switch (extension) {
+      case 'pdf':
+        return <FileText className="h-12 w-12 text-red-500" />;
+      case 'doc':
+      case 'docx':
+        return <File className="h-12 w-12 text-blue-500" />;
+      case 'xls':
+      case 'xlsx':
+        return <FileSpreadsheet className="h-12 w-12 text-green-500" />;
+      case 'ppt':
+      case 'pptx':
+        return <PresentationIcon className="h-12 w-12 text-orange-500" />;
+      default:
+        return <FileArchive className="h-12 w-12 text-gray-500" />;
+    }
+  };
+
+  // Format file size
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Upload mutation
   const uploadMutation = useMutation({
     mutationFn: async (formData: FormData) => {
-      const response = await apiRequest('POST', '/api/documents/upload', formData, {
-        onUploadProgress: (progressEvent: any) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-        }
-      });
-      return await response.json() as UploadedDocument;
-    },
-    onSuccess: (data) => {
-      setUploading(false);
-      setSelectedFile(null);
-      setCustomTitle('');
+      setUploading(true);
       setUploadProgress(0);
       
-      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      // Simulate progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          const increment = Math.random() * 15;
+          const newProgress = Math.min(prev + increment, 95);
+          return newProgress;
+        });
+      }, 500);
       
+      try {
+        const response = await apiRequest('POST', '/api/documents/upload', formData, {
+          headers: {
+            // Let the browser set the Content-Type header with the boundary
+            // No Content-Type header here to avoid boundary issues
+          },
+        });
+        
+        clearInterval(progressInterval);
+        setUploadProgress(100);
+        
+        return await response.json();
+      } catch (error) {
+        clearInterval(progressInterval);
+        throw error;
+      }
+    },
+    onSuccess: (data: UploadedDocument) => {
+      // Reset form
+      setFiles([]);
+      setTitle('');
+      setDescription('');
+      setUploading(false);
+      setUploadProgress(0);
+      
+      // Show success toast
       toast({
-        title: "Document uploaded successfully",
-        description: `${data.title} has been uploaded and is being processed.`,
+        title: "Upload successful",
+        description: "Your document has been uploaded and is being processed.",
         variant: "default",
       });
       
+      // Invalidate documents query
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      
+      // Call callback
       if (onUploadComplete) {
         onUploadComplete(data);
       }
@@ -75,69 +215,31 @@ export function DocumentUploader({ onUploadComplete }: DocumentUploaderProps) {
     }
   });
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      const file = acceptedFiles[0];
-      setSelectedFile(file);
-      // Set default title from filename (without extension)
-      const defaultTitle = file.name.replace(/\.[^/.]+$/, "");
-      setCustomTitle(defaultTitle);
-    }
-  }, []);
-
-  const { getRootProps, getInputProps, isDragActive, isDragAccept, isDragReject } = useDropzone({
-    onDrop,
-    accept: {
-      'application/pdf': ['.pdf'],
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['.pptx'],
-      'text/plain': ['.txt'],
-    },
-    maxFiles: 1,
-    disabled: uploading,
-  });
-
-  const handleUpload = async () => {
-    if (!selectedFile) return;
+  // Handle form submission
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     
-    setUploading(true);
-    setUploadProgress(0);
+    if (files.length === 0) {
+      setError('Please select a file to upload.');
+      return;
+    }
+    
+    if (!title.trim()) {
+      setError('Please enter a title for the document.');
+      return;
+    }
     
     const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('title', customTitle || selectedFile.name.replace(/\.[^/.]+$/, ""));
+    formData.append('title', title);
+    formData.append('description', description);
     
+    // Append each file
+    files.forEach(file => {
+      formData.append('files', file);
+    });
+    
+    // Upload files
     uploadMutation.mutate(formData);
-  };
-
-  // Format file size in a readable way
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // Get file type icon/color based on extension
-  const getFileTypeInfo = (fileName: string) => {
-    const extension = fileName.split('.').pop()?.toLowerCase() || '';
-    
-    switch (extension) {
-      case 'pdf':
-        return { color: 'text-red-500', name: 'PDF' };
-      case 'docx':
-        return { color: 'text-blue-500', name: 'Word Document' };
-      case 'xlsx':
-        return { color: 'text-green-500', name: 'Excel Spreadsheet' };
-      case 'pptx':
-        return { color: 'text-orange-500', name: 'PowerPoint Presentation' };
-      case 'txt':
-        return { color: 'text-gray-500', name: 'Text Document' };
-      default:
-        return { color: 'text-gray-500', name: 'Document' };
-    }
   };
 
   return (
@@ -145,126 +247,127 @@ export function DocumentUploader({ onUploadComplete }: DocumentUploaderProps) {
       <CardHeader>
         <CardTitle>Upload Document</CardTitle>
         <CardDescription>
-          Upload training documents, manuals, or procedures for processing
+          Upload your document to extract content and generate forms.
         </CardDescription>
       </CardHeader>
-      
-      <CardContent className="space-y-6">
-        {!selectedFile ? (
+      <form onSubmit={handleSubmit}>
+        <CardContent className="space-y-6">
+          {/* File drop area */}
           <div 
             {...getRootProps()} 
-            className={cn(
-              "border-2 border-dashed rounded-lg p-12 flex flex-col items-center justify-center text-center cursor-pointer transition-colors",
-              isDragActive && "border-primary/50 bg-primary/5",
-              isDragAccept && "border-green-500/50 bg-green-500/5",
-              isDragReject && "border-red-500/50 bg-red-500/5",
-              !isDragActive && "border-muted-foreground/25 hover:border-primary/50"
-            )}
+            className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors
+              ${isDragActive ? 'bg-primary/5 border-primary' : 'border-border hover:bg-muted/50'}
+              ${isDragReject ? 'border-destructive bg-destructive/5' : ''}
+              ${error ? 'border-destructive' : ''}
+            `}
           >
             <input {...getInputProps()} />
             
-            <FileUp className="h-12 w-12 text-muted-foreground mb-4" />
-            
-            <h3 className="text-lg font-medium mb-1">Drag and drop your file here</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              or click to browse your files
-            </p>
-            
-            <p className="text-xs text-muted-foreground">
-              Supported file types: PDF, DOCX, XLSX, PPTX, TXT
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="flex items-start gap-4 p-4 border rounded-lg bg-muted/20">
-              <div className={cn("p-2 rounded-md bg-background", getFileTypeInfo(selectedFile.name).color)}>
-                <FileUp className="h-6 w-6" />
+            {files.length > 0 ? (
+              <div className="space-y-4">
+                {files.map(file => (
+                  <div key={file.name} className="flex items-center gap-4">
+                    {getFileIcon(file)}
+                    <div className="flex-1 text-left">
+                      <p className="font-medium truncate">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">{formatFileSize(file.size)}</p>
+                    </div>
+                    <Badge variant="outline" className="ml-auto">
+                      {file.type}
+                    </Badge>
+                  </div>
+                ))}
               </div>
-              
-              <div className="flex-1 space-y-1">
-                <p className="font-medium">{selectedFile.name}</p>
-                <p className="text-sm text-muted-foreground flex items-center gap-2">
-                  <span>{getFileTypeInfo(selectedFile.name).name}</span>
-                  <span>•</span>
-                  <span>{formatFileSize(selectedFile.size)}</span>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-4">
+                <Upload className="h-10 w-10 text-muted-foreground mb-2" />
+                <p className="text-lg font-medium">Drop your file here or click to browse</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Supports {acceptedFileTypes.join(', ')} (Max: {maxFileSize}MB)
                 </p>
-              </div>
-              
-              <Button
-                variant="ghost" 
-                size="sm" 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedFile(null);
-                  setCustomTitle('');
-                }}
-                disabled={uploading}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="title">Document Title</Label>
-              <Input
-                id="title"
-                value={customTitle}
-                onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="Enter a descriptive title for this document"
-                disabled={uploading}
-              />
-              <p className="text-xs text-muted-foreground">
-                This title will be used to identify your document in the system
-              </p>
-            </div>
-            
-            {uploading && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-xs">
-                  <span>Uploading...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="bg-primary h-2 rounded-full" 
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
               </div>
             )}
           </div>
-        )}
-      </CardContent>
-      
-      <CardFooter className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={() => {
-            setSelectedFile(null);
-            setCustomTitle('');
-          }}
-          disabled={!selectedFile || uploading}
-        >
-          Cancel
-        </Button>
-        
-        <Button 
-          onClick={handleUpload}
-          disabled={!selectedFile || !customTitle || uploading}
-        >
-          {uploading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading...
-            </>
-          ) : (
-            <>
-              <FileUp className="mr-2 h-4 w-4" />
-              Upload Document
-            </>
+          
+          {error && (
+            <div className="flex items-center gap-2 text-destructive">
+              <AlertCircle className="h-4 w-4" />
+              <p className="text-sm">{error}</p>
+            </div>
           )}
-        </Button>
-      </CardFooter>
+          
+          {/* Document details */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="title">Title</Label>
+              <Input
+                id="title"
+                value={title}
+                onChange={e => setTitle(e.target.value)}
+                placeholder="Enter document title"
+                disabled={uploading}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="description">Description (optional)</Label>
+              <Textarea
+                id="description"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                placeholder="Enter document description"
+                disabled={uploading}
+                rows={3}
+              />
+            </div>
+          </div>
+          
+          {/* Upload progress */}
+          {uploading && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium">Uploading...</p>
+                <p className="text-sm text-muted-foreground">{Math.round(uploadProgress)}%</p>
+              </div>
+              <Progress value={uploadProgress} />
+            </div>
+          )}
+        </CardContent>
+        
+        <CardFooter className="flex justify-end gap-2">
+          <Button 
+            type="button" 
+            variant="outline"
+            onClick={() => {
+              setFiles([]);
+              setTitle('');
+              setDescription('');
+              setError(null);
+            }}
+            disabled={uploading || files.length === 0}
+          >
+            Cancel
+          </Button>
+          
+          <Button 
+            type="submit" 
+            disabled={uploading || files.length === 0 || !title.trim()}
+          >
+            {uploading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Uploading...
+              </>
+            ) : (
+              <>
+                <Upload className="mr-2 h-4 w-4" />
+                Upload
+              </>
+            )}
+          </Button>
+        </CardFooter>
+      </form>
     </Card>
   );
 }

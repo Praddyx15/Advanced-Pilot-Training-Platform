@@ -1,21 +1,23 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
- * Hook to set the document title with an optional suffix
- * @param title The title to set
- * @param suffix Optional suffix to append to the title, defaults to '| Aviation Training'
+ * Custom hook to set the document title safely, with cleanup
+ * @param title The title to set for the document
+ * @param prefix An optional prefix to add before the title
  */
-export function useDocumentTitle(title: string, suffix: string = '| Aviation Training') {
+export function useDocumentTitle(title: string, prefix?: string) {
+  const originalTitle = useRef(document.title);
+
   useEffect(() => {
-    // Save the original title to restore it when the component unmounts
-    const originalTitle = document.title;
-    
-    // Set the new title with suffix
-    document.title = `${title} ${suffix}`;
-    
-    // Cleanup function to restore the original title when the component unmounts
+    // Skip update if title is empty or undefined
+    if (!title) return;
+
+    // Set the document title
+    document.title = prefix ? `${prefix} | ${title}` : title;
+
+    // Cleanup function to restore original title when component unmounts
     return () => {
-      document.title = originalTitle;
+      document.title = originalTitle.current;
     };
-  }, [title, suffix]); // Re-run the effect if title or suffix changes
+  }, [title, prefix]);
 }
