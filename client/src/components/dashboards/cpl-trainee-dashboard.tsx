@@ -50,6 +50,45 @@ import {
   Tooltip,
 } from 'recharts';
 
+// Type definitions for data
+interface TraineeProfile {
+  firstName: string;
+  lastName: string;
+  id: string;
+  program: string;
+  phase: string;
+  programCompletion: number;
+  flightHours: number;
+  theorySessions: number;
+  theorySessions_total: number;
+  daysRemaining: number;
+  criticalPath: boolean;
+}
+
+interface ScheduleItem {
+  activity: string;
+  date: string;
+  time: string;
+  status: string;
+}
+
+interface PerformanceDataItem {
+  skill: string;
+  value: number;
+}
+
+interface ResourceItem {
+  title: string;
+  type: string;
+  description: string;
+  action: string;
+}
+
+interface TrainingGoal {
+  goal: string;
+  progress: number;
+}
+
 export function CPLTraineeDashboard() {
   // Fetch trainee profile and progress data
   const { data: traineeData, isLoading: isTraineeLoading } = useQuery({
@@ -291,7 +330,8 @@ export function CPLTraineeDashboard() {
             <Progress 
               value={30} 
               className="h-2 mt-2 bg-red-200" 
-              indicatorClassName="bg-red-500"
+              // Custom styling for the indicator directly using CSS
+              style={{ '--progress-indicator-color': '#ef4444' } as React.CSSProperties}
             />
           </CardContent>
         </Card>
@@ -314,7 +354,7 @@ export function CPLTraineeDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {upcomingSchedule.map((item, index) => (
+                {upcomingSchedule.map((item: ScheduleItem, index: number) => (
                   <TableRow key={index}>
                     <TableCell>{item.activity}</TableCell>
                     <TableCell>{item.date}, {item.time}</TableCell>
@@ -369,7 +409,7 @@ export function CPLTraineeDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {recommendedResources.map((resource, index) => (
+              {recommendedResources.map((resource: ResourceItem, index: number) => (
                 <div key={index} className="flex items-start gap-3">
                   <div className={`flex items-center justify-center size-10 rounded ${
                     resource.type === 'document' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'
@@ -411,7 +451,7 @@ export function CPLTraineeDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {trainingGoals.map((goal, index) => (
+                {trainingGoals.map((goal: TrainingGoal, index: number) => (
                   <div key={index}>
                     <div className="flex justify-between text-sm mb-1">
                       <span>{goal.goal}</span>
