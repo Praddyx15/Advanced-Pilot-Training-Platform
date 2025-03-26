@@ -93,7 +93,7 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
   const { toast } = useToast();
 
   // Fetch document details
-  const { data: document, isLoading: isLoadingDocument } = useQuery<Document>({
+  const { data: document, isLoading: isLoadingDocument } = useQuery<DocumentData>({
     queryKey: [`/api/documents/${documentId}`],
     // Use default fetcher
   });
@@ -249,14 +249,13 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     
-    // Type assertion for document
-    const doc = document as Document;
-    const a = doc.createElement('a');
+    // Use the global window.document object for DOM operations
+    const a = window.document.createElement('a');
     a.href = url;
     a.download = `extraction-${documentId}.json`;
-    doc.body.appendChild(a);
+    window.document.body.appendChild(a);
     a.click();
-    doc.body.removeChild(a);
+    window.document.body.removeChild(a);
     URL.revokeObjectURL(url);
     
     toast({
@@ -887,7 +886,7 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
       {!extractedData && !isExtracting && (
         <CardFooter className="flex flex-col sm:flex-row items-center justify-between text-xs text-muted-foreground pt-6 gap-2 border-t">
           <div>
-            <p>Document: {document?.fileName || 'Unknown'} ({formatFileSize(document?.fileSize || 0)})</p>
+            <p>Document: {document?.title || 'Unknown'} ({document?.fileSize ? formatFileSize(document.fileSize) : '0 Bytes'})</p>
           </div>
           <div className="flex items-center gap-1">
             <FileText className="h-3 w-3" />

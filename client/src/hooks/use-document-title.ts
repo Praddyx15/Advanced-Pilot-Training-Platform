@@ -1,19 +1,24 @@
 import { useEffect } from 'react';
 
 /**
- * Hook to set the document title
- * @param title The title to set for the document
- * @param addAppName Whether to add the app name after the title (defaults to true)
+ * A custom hook to update the document title
+ * @param title The title to set (will be appended with app name)
+ * @param appName Optional app name to append to title
  */
-export function useDocumentTitle(title: string, addAppName = true) {
+export function useDocumentTitle(
+  title: string,
+  appName: string = 'Advanced Pilot Training Platform'
+) {
   useEffect(() => {
-    const appName = 'Advanced Pilot Training Platform';
-    const newTitle = addAppName ? `${title} | ${appName}` : title;
-    document.title = newTitle;
+    // Save the original title to restore on unmount
+    const originalTitle = document.title;
     
-    // Reset to default when component unmounts
+    // Update the document title
+    document.title = title ? `${title} | ${appName}` : appName;
+    
+    // Restore the original title when the component unmounts
     return () => {
-      document.title = appName;
+      document.title = originalTitle;
     };
-  }, [title, addAppName]);
+  }, [title, appName]);
 }
