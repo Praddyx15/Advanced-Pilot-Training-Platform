@@ -288,6 +288,15 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
     }
   };
 
+  // Format file size utility
+  const formatFileSize = (bytes: number) => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+  
   return (
     <Card className="w-full">
       <CardHeader>
@@ -296,7 +305,7 @@ export function DocumentExtractor({ documentId, onExtracted }: DocumentExtractor
           Extract Document Content
         </CardTitle>
         <CardDescription>
-          Extract and analyze content from "{document.title}"
+          Extract and analyze content from "{document?.title || 'Document'}"
         </CardDescription>
       </CardHeader>
       
