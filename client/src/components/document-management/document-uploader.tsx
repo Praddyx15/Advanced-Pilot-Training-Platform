@@ -41,6 +41,7 @@ export interface UploadedDocument {
   uploadedByAvatar?: string;
   uploadedByRole?: string;
   uploadedById: number;
+  isFavorite?: boolean;
 }
 
 interface DocumentUploaderProps {
@@ -164,12 +165,7 @@ export function DocumentUploader({
       }, 500);
       
       try {
-        const response = await apiRequest('POST', '/api/documents/upload', formData, {
-          headers: {
-            // Let the browser set the Content-Type header with the boundary
-            // No Content-Type header here to avoid boundary issues
-          },
-        });
+        const response = await apiRequest('POST', '/api/documents/upload', formData);
         
         clearInterval(progressInterval);
         setUploadProgress(100);
@@ -233,12 +229,10 @@ export function DocumentUploader({
     formData.append('title', title);
     formData.append('description', description);
     
-    // Append each file
-    files.forEach(file => {
-      formData.append('files', file);
-    });
+    // Append the file (our backend expects 'file' as the field name)
+    formData.append('file', files[0]);
     
-    // Upload files
+    // Upload file
     uploadMutation.mutate(formData);
   };
 

@@ -59,7 +59,7 @@ export function DocumentDetailPage({ documentId }: DocumentDetailPageProps) {
   });
 
   // Set document title
-  useDocumentTitle(document?.title || 'Document Details', 'Aviation Training');
+  useDocumentTitle(document?.title || 'Document Details');
 
   // Favorite document mutation
   const favoriteDocumentMutation = useMutation({

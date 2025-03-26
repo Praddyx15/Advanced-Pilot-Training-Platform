@@ -1,23 +1,19 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 /**
- * Custom hook to set the document title safely, with cleanup
+ * Hook to set the document title
  * @param title The title to set for the document
- * @param prefix An optional prefix to add before the title
+ * @param addAppName Whether to add the app name after the title (defaults to true)
  */
-export function useDocumentTitle(title: string, prefix?: string) {
-  const originalTitle = useRef(document.title);
-
+export function useDocumentTitle(title: string, addAppName = true) {
   useEffect(() => {
-    // Skip update if title is empty or undefined
-    if (!title) return;
-
-    // Set the document title
-    document.title = prefix ? `${prefix} | ${title}` : title;
-
-    // Cleanup function to restore original title when component unmounts
+    const appName = 'Advanced Pilot Training Platform';
+    const newTitle = addAppName ? `${title} | ${appName}` : title;
+    document.title = newTitle;
+    
+    // Reset to default when component unmounts
     return () => {
-      document.title = originalTitle.current;
+      document.title = appName;
     };
-  }, [title, prefix]);
+  }, [title, addAppName]);
 }

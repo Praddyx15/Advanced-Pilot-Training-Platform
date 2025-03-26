@@ -488,13 +488,22 @@ export function registerDocumentRoutes(app: express.Express) {
       // Calculate extraction time
       const extractionTimeMs = Date.now() - startTime;
       
+      // Get the structure and keywords safely
+      const structureElements = typeof extractedData === 'object' && extractedData !== null && 
+        'structure' in extractedData && typeof extractedData.structure === 'object' && extractedData.structure !== null && 
+        'elements' in extractedData.structure ? extractedData.structure.elements : [];
+        
+      const metadataKeywords = typeof extractedData === 'object' && extractedData !== null && 
+        'metadata' in extractedData && typeof extractedData.metadata === 'object' && extractedData.metadata !== null && 
+        'keywords' in extractedData.metadata ? extractedData.metadata.keywords : [];
+      
       // Update document content in database
       await db.update(documentContent)
         .set({
           textContent: textContent,
           structuredContent: JSON.stringify(extractedData),
-          sections: JSON.stringify(extractedData.structure?.elements || []),
-          extractedKeywords: JSON.stringify(extractedData.metadata?.keywords || []),
+          sections: JSON.stringify(structureElements),
+          extractedKeywords: JSON.stringify(metadataKeywords),
           confidenceScore: 0.9, // Example confidence score
           extractionTime: extractionTimeMs
         })
