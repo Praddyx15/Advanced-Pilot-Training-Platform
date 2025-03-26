@@ -22,7 +22,8 @@ import {
   registerOcrRoutes,
   registerDocumentAnalysisRoutes,
   registerScheduleRoutes,
-  setupThemeRoutes
+  setupThemeRoutes,
+  riskAssessmentRouter
 } from "./routes/index";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
@@ -75,6 +76,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDocumentAnalysisRoutes(app);
   registerScheduleRoutes(app);
   setupThemeRoutes(app);
+  
+  // Risk Assessment API
+  app.use('/api/risk-assessments', riskAssessmentRouter);
 
   // === Syllabus Generator API ===
   app.post("/api/protected/syllabus/generate", async (req, res) => {
