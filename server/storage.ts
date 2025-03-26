@@ -554,10 +554,152 @@ export class MemStorage implements IStorage {
     
     // Initialize sample leaderboards
     this.initializeSampleLeaderboards();
+    
+    // Initialize sample risk assessments
+    this.initializeSampleRiskAssessments();
 
     this.sessionStore = new MemoryStore({
       checkPeriod: 86400000, // prune expired entries every 24h
     });
+  }
+  
+  // Initialize sample risk assessments data
+  private initializeSampleRiskAssessments() {
+    // Create sample risk assessments
+    const weather: RiskAssessment = {
+      id: this.riskAssessmentIdCounter++,
+      userId: 2, // instructor
+      title: 'Severe Weather Operations',
+      description: 'Risk assessment for flight operations during severe weather conditions',
+      severity: 4, // High severity
+      occurrence: 3, // Medium occurrence
+      detection: 2, // Good detection capability
+      category: 'environmental',
+      status: 'active',
+      mitigationPlan: 'Enhanced weather briefing, conservative go/no-go decisions, designated alternate airports',
+      incidentCount: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metadata: { affectedAircraft: ['C172', 'PA28'] }
+    };
+
+    const maintenance: RiskAssessment = {
+      id: this.riskAssessmentIdCounter++,
+      userId: 7, // ATO
+      title: 'Maintenance Procedure Compliance',
+      description: 'Risk assessment for ensuring proper maintenance procedures are followed',
+      severity: 3, // Medium severity
+      occurrence: 2, // Low occurrence
+      detection: 3, // Medium detection capability
+      category: 'technical',
+      status: 'active',
+      mitigationPlan: 'Dual sign-off process, maintenance verification checklist, scheduled audits',
+      incidentCount: 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metadata: { regulations: ['FAA Part 43', 'EASA Part M'] }
+    };
+
+    // Create sample incidents
+    const maintenanceIncident: RiskIncident = {
+      id: this.riskIncidentIdCounter++,
+      riskAssessmentId: maintenance.id,
+      reportedById: 2, // instructor
+      incidentDate: new Date(new Date().setDate(new Date().getDate() - 15)),
+      description: 'Maintenance log discrepancy found during pre-flight inspection',
+      severity: 2, // Low severity incident
+      impact: 'Flight delayed by 2 hours while paperwork was corrected',
+      resolution: 'Maintenance logbook procedures updated, staff retrained',
+      isResolved: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      metadata: { aircraft: 'C172', registration: 'N12345' }
+    };
+
+    // Create risk trends
+    const weatherTrend1: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: weather.id,
+      recordDate: new Date(new Date().setDate(new Date().getDate() - 30)),
+      severity: 4,
+      occurrence: 4,
+      detection: 3,
+      riskScore: 48, // 4 * 4 * 3
+      createdAt: new Date()
+    };
+
+    const weatherTrend2: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: weather.id,
+      recordDate: new Date(new Date().setDate(new Date().getDate() - 15)),
+      severity: 4,
+      occurrence: 3,
+      detection: 3,
+      riskScore: 36, // 4 * 3 * 3
+      createdAt: new Date()
+    };
+
+    const weatherTrend3: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: weather.id,
+      recordDate: new Date(),
+      severity: 4,
+      occurrence: 3,
+      detection: 2,
+      riskScore: 24, // 4 * 3 * 2 (improving detection)
+      createdAt: new Date()
+    };
+
+    const maintenanceTrend1: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: maintenance.id,
+      recordDate: new Date(new Date().setDate(new Date().getDate() - 30)),
+      severity: 3,
+      occurrence: 3,
+      detection: 4,
+      riskScore: 36, // 3 * 3 * 4
+      createdAt: new Date()
+    };
+
+    const maintenanceTrend2: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: maintenance.id,
+      recordDate: new Date(new Date().setDate(new Date().getDate() - 15)),
+      severity: 3,
+      occurrence: 2,
+      detection: 3,
+      riskScore: 18, // 3 * 2 * 3
+      createdAt: new Date()
+    };
+
+    const maintenanceTrend3: RiskTrend = {
+      id: this.riskTrendIdCounter++,
+      riskAssessmentId: maintenance.id,
+      recordDate: new Date(),
+      severity: 3,
+      occurrence: 2,
+      detection: 3,
+      riskScore: 18, // 3 * 2 * 3 (stable)
+      createdAt: new Date()
+    };
+
+    // Store in maps
+    this.riskAssessments.set(weather.id, weather);
+    this.riskAssessments.set(maintenance.id, maintenance);
+    this.riskIncidents.set(maintenanceIncident.id, maintenanceIncident);
+    
+    this.riskTrends.set(weatherTrend1.id, weatherTrend1);
+    this.riskTrends.set(weatherTrend2.id, weatherTrend2);
+    this.riskTrends.set(weatherTrend3.id, weatherTrend3);
+    this.riskTrends.set(maintenanceTrend1.id, maintenanceTrend1);
+    this.riskTrends.set(maintenanceTrend2.id, maintenanceTrend2);
+    this.riskTrends.set(maintenanceTrend3.id, maintenanceTrend3);
+
+    console.log('Initialized sample risk assessments:', 
+      this.riskAssessments.size, 
+      'risk assessments created with IDs:', 
+      Array.from(this.riskAssessments.keys()).join(', ')
+    );
   }
 
   // Helper method to convert string requirements to RegulatoryReference objects
