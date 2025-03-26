@@ -60,6 +60,14 @@ import {
   SharedScenario,
   InsertSharedScenario
 } from "@shared/schema";
+import {
+  RiskAssessment,
+  InsertRiskAssessment,
+  RiskIncident,
+  InsertRiskIncident,
+  RiskTrend,
+  InsertRiskTrend
+} from "@shared/risk-assessment-types";
 import { 
   SyllabusGenerationOptions, 
   GeneratedSyllabus, 
@@ -496,6 +504,9 @@ export class MemStorage implements IStorage {
     this.sharedScenarios = new Map();
     this.mfaCredentials = new Map();
     this.sessionPlans = new Map();
+    this.riskAssessments = new Map();
+    this.riskIncidents = new Map();
+    this.riskTrends = new Map();
 
     this.userIdCounter = 1;
     this.programIdCounter = 1;
@@ -528,6 +539,9 @@ export class MemStorage implements IStorage {
     this.sharedScenarioIdCounter = 1;
     this.mfaCredentialIdCounter = 1;
     this.sessionPlanIdCounter = 1;
+    this.riskAssessmentIdCounter = 1;
+    this.riskIncidentIdCounter = 1;
+    this.riskTrendIdCounter = 1;
 
     // Initialize with some common regulatory references
     this.initializeRegulatoryReferences();
