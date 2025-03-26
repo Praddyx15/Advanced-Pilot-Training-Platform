@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'wouter';
+import { Link, useLocation } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
+import { ComingSoon } from '@/components/shared/coming-soon';
+import { CPLTraineeDashboard } from './cpl-trainee-dashboard';
 import {
   Card,
   CardContent,
