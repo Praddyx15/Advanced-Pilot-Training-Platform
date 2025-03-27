@@ -6,6 +6,8 @@ import { ScrollArea } from "../ui/scroll-area";
 import { cn } from "../../lib/utils";
 import { useAuth } from "../../hooks/use-auth";
 import { ThemeToggle } from "../shared/theme-toggle";
+import { getNavigationItems, getThemeColors } from "../../lib/routes";
+import { RoleType } from "@shared/risk-assessment-types";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,56 +26,26 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const userRole = user?.role || 'trainee';
   const userOrgType = user?.organizationType || 'personal';
   
-  // Define theme colors based on user role & organization
-  const getThemeColors = () => {
-    if (userRole === 'admin') {
-      return {
-        primary: '#0e7490', // Teal 600
-        secondary: '#0891b2', // Teal 500
-        sidebar: 'from-slate-800 to-slate-900',
-        header: 'bg-slate-800',
-        text: 'text-white',
-        logo: 'Admin Portal'
-      };
-    } else if (userRole === 'instructor') {
-      return {
-        primary: '#0f766e', // Teal 700
-        secondary: '#14b8a6', // Teal 400
-        sidebar: 'from-teal-800 to-teal-900',
-        header: 'bg-teal-800',
-        text: 'text-white',
-        logo: 'Instructor Portal'
-      };
-    } else {
-      return {
-        primary: '#2563eb', // Blue 600
-        secondary: '#3b82f6', // Blue 500
-        sidebar: 'from-blue-800 to-blue-900',
-        header: 'bg-blue-800',
-        text: 'text-white',
-        logo: 'Training Management'
-      };
-    }
-  };
+  // Get role-specific theme colors from utility
+  const theme = getThemeColors(userRole, userOrgType);
   
-  const theme = getThemeColors();
-  
-  // Define basic navigation
-  const navigation = [
-    { name: 'Dashboard', href: '/', icon: 'home' },
-    { name: 'Training Programs', href: '/training-programs', icon: 'book' },
-    { name: 'Schedule', href: '/schedule', icon: 'calendar' },
-    { name: 'Assessments', href: '/assessments', icon: 'clipboard' },
-    { name: 'Documents', href: '/documents', icon: 'file' },
-    { name: 'Knowledge Graph', href: '/knowledge-graph', icon: 'network' }
-  ];
+  // Get role-specific navigation items
+  const navigation = getNavigationItems(userRole);
 
   // Update document root CSS variables for theming
   useEffect(() => {
     const root = document.documentElement;
     root.style.setProperty('--theme-primary', theme.primary);
     root.style.setProperty('--theme-secondary', theme.secondary);
-  }, [theme]);
+    
+    // Set accent color if available
+    if (theme.accent) {
+      root.style.setProperty('--theme-accent', theme.accent);
+    }
+    
+    // Add data-role attribute to allow role-specific styling
+    document.body.setAttribute('data-role', userRole);
+  }, [theme, userRole]);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -112,7 +84,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <ScrollArea className="flex-1 py-2 px-4 h-[calc(100vh-4rem)]">
           <nav className="space-y-0.5">
             {navigation.map((item) => {
-              const isActive = location === item.href;
+              const isActive = location === item.path;
               // Map the icon names to Lucide React components
               const getIcon = (iconName: string) => {
                 switch(iconName) {
@@ -129,7 +101,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
               return (
                 <Link
                   key={item.name}
-                  to={item.href}
+                  to={item.path}
                   onClick={() => setSidebarOpen(false)}
                 >
                   <div

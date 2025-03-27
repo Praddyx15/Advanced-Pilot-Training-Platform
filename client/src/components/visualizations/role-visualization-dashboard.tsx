@@ -213,18 +213,77 @@ export const RoleVisualizationDashboard: React.FC<RoleVisualizationDashboardProp
         </TabsContent>
         
         <TabsContent value="riskMatrix" className="p-4">
-          <RiskAssessmentMatrix3D 
-            data={sampleData.riskMatrixData}
-            config={{
-              colors: {
-                veryLow: "#1bc5bd",
-                low: "#3699ff",
-                medium: "#ffa800",
-                high: "#f64e60",
-                veryHigh: "#8950fc"
-              }
-            }}
-          />
+          {/* Role-specific configuration for risk assessment matrix */}
+          {userRole === RoleType.TRAINEE && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Flight Risk Assessment</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Visualize and understand your flight training risk profile in three dimensions
+              </p>
+              <RiskAssessmentMatrix3D 
+                data={sampleData.riskMatrixData}
+                config={{
+                  minValue: 0,
+                  maxValue: 100,
+                  colors: {
+                    veryLow: "#1bc5bd",
+                    low: "#3699ff",
+                    medium: "#ffa800",
+                    high: "#f64e60",
+                    veryHigh: "#8950fc"
+                  },
+                  animate: true,
+                  showLabels: true,
+                  rotationSpeed: 0.5
+                }}
+              />
+            </div>
+          )}
+          
+          {userRole === RoleType.INSTRUCTOR && (
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Student Risk Assessment Matrix</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Visualize and manage risk factors for your trainees across multiple dimensions
+              </p>
+              <RiskAssessmentMatrix3D 
+                data={sampleData.riskMatrixData}
+                config={{
+                  minValue: 0,
+                  maxValue: 100,
+                  colors: {
+                    veryLow: "#1bc5bd",
+                    low: "#3699ff",
+                    medium: "#ffa800",
+                    high: "#f64e60",
+                    veryHigh: "#8950fc"
+                  },
+                  animate: true,
+                  showLabels: true,
+                  rotationSpeed: 0.3
+                }}
+              />
+            </div>
+          )}
+          
+          {userRole !== RoleType.TRAINEE && userRole !== RoleType.INSTRUCTOR && (
+            <RiskAssessmentMatrix3D 
+              data={sampleData.riskMatrixData}
+              config={{
+                minValue: 0,
+                maxValue: 100,
+                colors: {
+                  veryLow: "#1bc5bd",
+                  low: "#3699ff",
+                  medium: "#ffa800",
+                  high: "#f64e60",
+                  veryHigh: "#8950fc"
+                },
+                animate: true,
+                showLabels: true
+              }}
+            />
+          )}
         </TabsContent>
         
         <TabsContent value="trends" className="p-4">

@@ -238,8 +238,26 @@ export function DocumentUploader({
 
   return (
     <Card className="w-full">
-      <CardHeader>
-        <CardTitle>Upload Document</CardTitle>
+      <CardHeader className="pb-4">
+        <div className="flex justify-between items-center mb-2">
+          <CardTitle>Upload Document</CardTitle>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            className="text-blue-600 hover:text-blue-800 hover:bg-blue-50"
+            onClick={() => {
+              if (onUploadComplete) {
+                onUploadComplete({} as any);
+              }
+            }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-1">
+              <path d="m12 19-7-7 7-7"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+            Back to Documents
+          </Button>
+        </div>
         <CardDescription>
           Upload your document to extract content and generate forms.
         </CardDescription>
