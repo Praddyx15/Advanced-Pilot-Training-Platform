@@ -147,11 +147,7 @@ app.use((req, res, next) => {
   const port = serverConfig.port;
   
   // Start the server
-  server.listen({
-    port,
-    host: serverConfig.host,
-    reusePort: true,
-  }, () => {
+  server.listen(port, () => {
     logger.info(`Server started`, { 
       port, 
       environment: serverConfig.environment,
