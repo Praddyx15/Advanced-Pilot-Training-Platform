@@ -22,11 +22,27 @@ import TraineePerformancePage from "@/pages/trainee-performance-page";
 import SchedulePage from "@/pages/schedule-page";
 import MessagingPage from "@/pages/messaging-page";
 import ResourcesPage from "@/pages/resources-page";
+import WebSocketTestPage from "@/pages/websocket-test-page";
 import { ProtectedRoute } from "./lib/protected-route";
 import { AuthProvider } from "./hooks/use-auth";
 import { AppProvider } from "./contexts/app-context";
 import { ThemeProvider } from "./contexts/theme-context";
 import { NotificationProvider } from "./components/notification/notification-provider";
+import WebSocketProvider from "@/providers/websocket-provider";
+import { useEffect } from "react";
+import websocketClient from "@/lib/websocket";
+
+// Initialize WebSocket connection on app startup
+function WebSocketInitializer() {
+  useEffect(() => {
+    websocketClient.connect();
+    return () => {
+      websocketClient.disconnect();
+    };
+  }, []);
+  
+  return null;
+}
 
 function AppRouter() {
   return (
@@ -50,6 +66,7 @@ function AppRouter() {
       <ProtectedRoute path="/schedule" component={SchedulePage} />
       <ProtectedRoute path="/messaging" component={MessagingPage} />
       <ProtectedRoute path="/resources" component={ResourcesPage} />
+      <ProtectedRoute path="/websocket-test" component={WebSocketTestPage} />
       <Route path="/auth" component={AuthPage} />
       <Route component={NotFound} />
     </Switch>
@@ -60,14 +77,17 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <AuthProvider>
-          <AppProvider>
-            <NotificationProvider>
-              <AppRouter />
-              <Toaster />
-            </NotificationProvider>
-          </AppProvider>
-        </AuthProvider>
+        <WebSocketProvider>
+          <WebSocketInitializer />
+          <AuthProvider>
+            <AppProvider>
+              <NotificationProvider>
+                <AppRouter />
+                <Toaster />
+              </NotificationProvider>
+            </AppProvider>
+          </AuthProvider>
+        </WebSocketProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

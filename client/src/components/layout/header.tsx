@@ -5,6 +5,8 @@ import SearchBar from "@/components/shared/search-bar";
 import UserMenu from "@/components/shared/user-menu";
 import NotificationsPopover from "@/components/shared/notifications";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { WebSocketStatusIndicator } from "@/components/ui/websocket-status-indicator";
+import { Separator } from "@/components/ui/separator";
 
 interface HeaderProps {
   searchQuery: string;
@@ -32,6 +34,10 @@ export default function Header({ searchQuery, onSearch }: HeaderProps) {
                 value={searchQuery}
                 onChange={onSearch}
               />
+            </div>
+            
+            <div className="hidden md:flex items-center">
+              <WebSocketStatusIndicator size={14} />
             </div>
             
             <ThemeToggle />
