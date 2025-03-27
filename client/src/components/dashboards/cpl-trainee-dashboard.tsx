@@ -415,7 +415,27 @@ export function CPLTraineeDashboard() {
             <Box className="h-6 w-6 text-primary" />
           </CardHeader>
           <CardContent className="pt-0">
-            <TraineeRiskMatrix className="w-full" />
+            {/* Wrap in an error boundary div */}
+            <div className="relative">
+              <div className="w-full">
+                {(() => {
+                  try {
+                    return <TraineeRiskMatrix className="w-full" />;
+                  } catch (error) {
+                    console.error("Error rendering 3D Risk Matrix:", error);
+                    return (
+                      <div className="p-6 text-center border border-yellow-200 bg-yellow-50 rounded-md">
+                        <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
+                        <h3 className="font-medium text-yellow-800">3D Visualization Issue</h3>
+                        <p className="text-sm text-yellow-700 mt-1">
+                          Unable to load the 3D risk matrix. This may be due to browser compatibility issues.
+                        </p>
+                      </div>
+                    );
+                  }
+                })()}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
