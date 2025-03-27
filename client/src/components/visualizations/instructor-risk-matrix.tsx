@@ -703,7 +703,7 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
               <div className="flex-1 p-2 rounded-lg border bg-card">
                 <div className="flex justify-between items-center">
                   <div>
-                    <div className="text-xs text-muted-foreground">Syllabus Progress</div>
+                    <div className="text-xs text-muted-foreground">Overall Syllabus Progress</div>
                     <div className="text-xl font-bold">
                       {trainees.find(t => t.id === selectedTrainee)?.progress || 0}%
                     </div>
@@ -714,29 +714,172 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                   />
                 </div>
               </div>
+              
+              <div className="p-2 rounded-lg border bg-card flex items-center space-x-2">
+                <div className="bg-blue-100 dark:bg-blue-900 p-2 rounded-full">
+                  <FileText className="h-4 w-4 text-blue-500 dark:text-blue-300" />
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Required Modules</div>
+                  <div className="text-xl font-bold">7/9</div>
+                </div>
+              </div>
+              
+              <div className="p-2 rounded-lg border bg-card flex items-center space-x-2">
+                <div className="bg-amber-100 dark:bg-amber-900 p-2 rounded-full">
+                  <AlertCircle className="h-4 w-4 text-amber-500 dark:text-amber-300" />
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground">Risk Assessment</div>
+                  <div className="text-xl font-bold">Medium</div>
+                </div>
+              </div>
             </div>
             
             <div className="grid grid-cols-2 gap-4 h-[450px]">
               <div className="rounded-lg border overflow-hidden p-4">
-                <h3 className="text-sm font-medium mb-3">Syllabus Coverage</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {["Aircraft Systems", "Weather & Planning", "Navigation", "Flight Maneuvers", "Emergency Procedures", "Communications", "Human Factors"].map((module, idx) => {
+                <h3 className="text-sm font-medium mb-3 flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Syllabus Coverage
+                </h3>
+                <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[380px]">
+                  {["Aircraft Systems", "Weather & Planning", "Navigation", "Flight Maneuvers", "Emergency Procedures", "Communications", "Human Factors", "Regulatory Knowledge", "Flight Planning"].map((module, idx) => {
                     // Generate a progress value that loosely correlates with the trainee's overall progress
                     const traineeProgress = trainees.find(t => t.id === selectedTrainee)?.progress || 0;
                     const moduleProgress = Math.max(0, Math.min(100, 
                       traineeProgress + (Math.random() * 30 - 15) // Add some variance
                     ));
                     
+                    // Add completion status badges
+                    let status = "In Progress";
+                    let statusColor = "bg-blue-500";
+                    
+                    if (moduleProgress >= 100) {
+                      status = "Complete";
+                      statusColor = "bg-green-500";
+                    } else if (moduleProgress < 25) {
+                      status = "Not Started";
+                      statusColor = "bg-gray-500";
+                    } else if (moduleProgress >= 75) {
+                      status = "Almost Complete";
+                      statusColor = "bg-teal-500";
+                    }
+                    
                     return (
-                      <div key={idx} className="rounded-md border p-2">
+                      <div key={idx} className="rounded-md border p-3">
+                        <div className="flex justify-between mb-2">
+                          <div className="text-sm font-medium">{module}</div>
+                          <Badge variant="outline" className={`text-xs ${moduleProgress >= 100 ? "border-green-500 text-green-500" : ""}`}>
+                            {status}
+                          </Badge>
+                        </div>
                         <div className="flex justify-between mb-1">
-                          <div className="text-xs font-medium">{module}</div>
+                          <div className="text-xs text-muted-foreground">Progress</div>
                           <div className="text-xs">{Math.round(moduleProgress)}%</div>
                         </div>
-                        <Progress value={moduleProgress} className="h-1.5" />
+                        <Progress value={moduleProgress} className="h-2 mb-2" />
+                        
+                        <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                          <div className="flex items-center">
+                            <Calendar className="h-3 w-3 mr-1" />
+                            {moduleProgress >= 100 ? "Completed" : "Due"}: {new Date(Date.now() + (idx * 7 * 24 * 60 * 60 * 1000)).toLocaleDateString()}
+                          </div>
+                          <div className="flex items-center">
+                            <CheckSquare className="h-3 w-3 mr-1" />
+                            {Math.round(moduleProgress / 10)}/10 Tasks
+                          </div>
+                        </div>
                       </div>
                     );
                   })}
+                </div>
+              </div>
+              
+              <div className="flex flex-col">
+                <div className="rounded-lg border overflow-hidden p-4 mb-4">
+                  <h3 className="text-sm font-medium mb-3 flex items-center">
+                    <BarChart4 className="h-4 w-4 mr-2" />
+                    Regulatory Compliance Analytics
+                  </h3>
+                  
+                  <div className="rounded-md border p-3 mb-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-sm font-medium">EASA Part-FCL Compliance</div>
+                      <Badge variant="outline" className="border-green-500 text-green-500">
+                        Compliant
+                      </Badge>
+                    </div>
+                    <Progress value={92} className="h-2 mb-2" />
+                    <div className="text-xs text-muted-foreground mt-1">
+                      92% of required elements covered in syllabus
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-md border p-3 mb-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-sm font-medium">Training Risk Assessment</div>
+                      <div className="flex items-center space-x-1">
+                        {[1, 2, 3, 4, 5].map((_, i) => (
+                          <div 
+                            key={i} 
+                            className={`h-2 w-2 rounded-full ${i < 3 ? "bg-green-500" : i === 3 ? "bg-amber-500" : "bg-gray-200"}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Medium risk - 3 high-risk activities identified in current modules
+                    </div>
+                  </div>
+                  
+                  <div className="rounded-md border p-3">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="text-sm font-medium">Competency Coverage Gaps</div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between items-center">
+                        <div className="text-xs text-muted-foreground">Adverse Weather Ops</div>
+                        <div className="text-xs font-medium text-destructive">Critical</div>
+                      </div>
+                      <Progress value={25} className="h-1.5" />
+                      
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-muted-foreground">Abnormal Procedures</div>
+                        <div className="text-xs font-medium text-amber-500">Medium</div>
+                      </div>
+                      <Progress value={65} className="h-1.5" />
+                      
+                      <div className="flex justify-between items-center mt-2">
+                        <div className="text-xs text-muted-foreground">Communication</div>
+                        <div className="text-xs font-medium text-green-500">Low</div>
+                      </div>
+                      <Progress value={85} className="h-1.5" />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="rounded-lg border overflow-hidden p-4">
+                  <h3 className="text-sm font-medium mb-3 flex items-center">
+                    <Lightbulb className="h-4 w-4 mr-2" />
+                    Improvement Suggestions
+                  </h3>
+                  
+                  <div className="space-y-2 text-xs">
+                    <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                      <div className="font-medium text-blue-700 dark:text-blue-300">Add advanced weather scenario training</div>
+                      <div className="text-muted-foreground mt-1">Enhance training for METAR/TAF interpretation under rapidly changing conditions</div>
+                    </div>
+                    
+                    <div className="p-2 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
+                      <div className="font-medium text-amber-700 dark:text-amber-300">Increase emergency procedures practice</div>
+                      <div className="text-muted-foreground mt-1">Current coverage is 35% below industry best practices</div>
+                    </div>
+                    
+                    <div className="p-2 rounded-md bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
+                      <div className="font-medium text-green-700 dark:text-green-300">Strong navigation training detected</div>
+                      <div className="text-muted-foreground mt-1">Continue emphasis on VOR/NDB procedures which shows high proficiency</div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
