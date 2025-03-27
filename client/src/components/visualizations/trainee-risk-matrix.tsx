@@ -8,39 +8,21 @@ import {
   Html,
   Sphere
 } from "@react-three/drei";
-import { Vector3, Color } from "three";
+import * as THREE from "three";
 import { RiskMatrixData, RiskMatrixConfig } from "@shared/risk-assessment-types";
 import { useToast } from "@/hooks/use-toast";
-import { 
-  Card
-} from "@/components/ui/card";
-import {
-  CardContent
-} from "@/components/ui/card";
-import {
-  CardDescription
-} from "@/components/ui/card";
-import {
-  CardHeader
-} from "@/components/ui/card";
-import {
-  CardTitle
-} from "@/components/ui/card";
-import {
-  Button
-} from "@/components/ui/button";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger
-} from "@/components/ui/tabs";
-import {
-  Badge
-} from "@/components/ui/badge";
-import {
-  Progress
-} from "@/components/ui/progress";
+import { Card } from "@/components/ui/card";
+import { CardContent } from "@/components/ui/card";
+import { CardDescription } from "@/components/ui/card";
+import { CardHeader } from "@/components/ui/card";
+import { CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Tabs } from "@/components/ui/tabs";
+import { TabsContent } from "@/components/ui/tabs";
+import { TabsList } from "@/components/ui/tabs";
+import { TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
 import { 
   AlertCircle,
   BarChart4,
