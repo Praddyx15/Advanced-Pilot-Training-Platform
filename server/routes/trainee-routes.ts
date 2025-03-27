@@ -177,11 +177,14 @@ export function registerTraineeRoutes(app: Express) {
       // Get performance metrics for this trainee
       const metrics = await storage.getTraineePerformanceMetrics(req.user.id);
 
-      // Format metrics for radar chart
-      const formattedMetrics = metrics.map(metric => ({
-        skill: metric.name,
-        value: metric.value
-      }));
+      // Extract competency breakdown for radar chart if it exists
+      let formattedMetrics = [];
+      if (metrics && metrics.competencyBreakdown && Array.isArray(metrics.competencyBreakdown)) {
+        formattedMetrics = metrics.competencyBreakdown.map(metric => ({
+          skill: metric.area,
+          value: metric.averageScore
+        }));
+      }
 
       // Add demo data if none found (to be removed in production)
       if (formattedMetrics.length === 0) {
