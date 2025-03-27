@@ -91,6 +91,15 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
   
+  // Trainee specific methods
+  getTraineePrograms(traineeId: number): Promise<TrainingProgram[]>;
+  getTraineeSessionsByDateRange(traineeId: number, startDate: Date, endDate: Date): Promise<Session[]>;
+  getTraineePerformanceMetrics(traineeId: number): Promise<any[]>;
+  getRecommendedResourcesForUser(userId: number): Promise<Resource[]>;
+  getRecentAssessments(traineeId: number, limit?: number): Promise<Assessment[]>;
+  getTrainingGoalsForUser(userId: number): Promise<{id: number, name: string, progress: number}[]>;
+  getTraineeRiskData(traineeId: number): Promise<any>;
+  
   // Risk Assessment methods
   getRiskAssessment(id: number): Promise<RiskAssessment | undefined>;
   getAllRiskAssessments(filters?: { userId?: number, category?: string, status?: string }): Promise<RiskAssessment[]>;
@@ -400,6 +409,9 @@ function getCompetencyLevel(scorePercentage: number): string {
 }
 
 export class MemStorage implements IStorage {
+  // Session store for authentication
+  sessionStore: session.Store;
+  
   // Risk Assessment methods
   async getRiskAssessment(id: number): Promise<RiskAssessment | undefined> {
     return this.riskAssessments.get(id);
@@ -654,7 +666,6 @@ export class MemStorage implements IStorage {
   private leaderboards: Map<number, Leaderboard>;
   private leaderboardEntries: Map<number, LeaderboardEntry>;
   private sharedScenarios: Map<number, SharedScenario>;
-  public sessionStore: session.Store;
 
   private userIdCounter: number;
   private programIdCounter: number;
@@ -1646,6 +1657,387 @@ export class MemStorage implements IStorage {
 
   async getUsersByRole(role: string): Promise<User[]> {
     return Array.from(this.users.values()).filter(user => user.role === role);
+  }
+  
+  // Trainee specific methods
+  async getTraineePrograms(traineeId: number): Promise<TrainingProgram[]> {
+    // Find programs where the trainee is enrolled
+    const traineePrograms: TrainingProgram[] = [];
+    
+    // Check each program for the trainee's sessions
+    for (const program of this.programs.values()) {
+      // Check if trainee has any sessions in this program
+      const hasSessionsInProgram = Array.from(this.sessions.values()).some(session => {
+        const trainees = this.getSessionTrainees(session.id);
+        return session.programId === program.id && trainees.includes(traineeId);
+      });
+      
+      if (hasSessionsInProgram) {
+        // Calculate completion percentage based on completed vs. total sessions
+        const programSessions = Array.from(this.sessions.values()).filter(s => s.programId === program.id);
+        const traineeCompletedSessions = programSessions.filter(s => {
+          const trainees = this.getSessionTrainees(s.id);
+          return trainees.includes(traineeId) && s.status === 'completed';
+        });
+        
+        const completionPercentage = programSessions.length > 0 
+          ? Math.round((traineeCompletedSessions.length / programSessions.length) * 100) 
+          : 0;
+        
+        // Add program with completion data
+        traineePrograms.push({
+          ...program,
+          completionPercentage,
+          phase: this.getProgramPhaseForTrainee(program.id, traineeId)
+        });
+      }
+    }
+    
+    return traineePrograms;
+  }
+  
+  private getProgramPhaseForTrainee(programId: number, traineeId: number): string {
+    // Get all modules for this program
+    const modules = Array.from(this.modules.values()).filter(m => m.programId === programId);
+    
+    // Sort modules by sequence
+    modules.sort((a, b) => (a.sequence || 0) - (b.sequence || 0));
+    
+    // Find the current module based on sessions
+    for (const module of modules) {
+      const moduleSessions = Array.from(this.sessions.values()).filter(s => 
+        s.programId === programId && s.moduleId === module.id
+      );
+      
+      // Check if trainee has incomplete sessions in this module
+      const hasIncompleteSessions = moduleSessions.some(s => {
+        const trainees = this.getSessionTrainees(s.id);
+        return trainees.includes(traineeId) && s.status !== 'completed';
+      });
+      
+      if (hasIncompleteSessions) {
+        return module.name || 'Current Module';
+      }
+    }
+    
+    // If all modules are complete or no modules found
+    return 'Advanced';
+  }
+  
+  async getTraineeSessionsByDateRange(traineeId: number, startDate: Date, endDate: Date): Promise<Session[]> {
+    const result: Session[] = [];
+    
+    // Get all sessions
+    for (const session of this.sessions.values()) {
+      // Check if trainee is in this session
+      const trainees = await this.getSessionTrainees(session.id);
+      
+      if (trainees.includes(traineeId)) {
+        // Check if session is in date range
+        if (session.startTime >= startDate && session.startTime <= endDate) {
+          result.push(session);
+        }
+      }
+    }
+    
+    // Sort by start time
+    return result.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  }
+  
+  async getTraineePerformanceMetrics(traineeId: number): Promise<any[]> {
+    const metrics: any[] = [];
+    
+    // Get trainee assessments
+    const assessments = await this.getAssessmentsByTrainee(traineeId);
+    
+    // Group assessments by competency area
+    const competencyScores = new Map<string, number[]>();
+    
+    for (const assessment of assessments) {
+      // Get grades for this assessment
+      const grades = await this.getGradesByAssessment(assessment.id);
+      
+      for (const grade of grades) {
+        const competencyId = grade.competencyAreaId;
+        if (!competencyScores.has(competencyId)) {
+          competencyScores.set(competencyId, []);
+        }
+        competencyScores.get(competencyId)?.push(grade.score);
+      }
+    }
+    
+    // Calculate average score for each competency
+    const competencyAreas = ['Technical Knowledge', 'Communication', 'Flight Skills', 'Decision Making', 'CRM'];
+    let index = 0;
+    
+    for (const [competencyId, scores] of competencyScores.entries()) {
+      const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      
+      metrics.push({
+        id: index++,
+        name: competencyAreas[index % competencyAreas.length], // Use a predefined name or the competencyId
+        value: Math.round(avgScore)
+      });
+    }
+    
+    // If no metrics were found, add sample data
+    if (metrics.length === 0) {
+      metrics.push({ id: 0, name: 'Technical Knowledge', value: 75 });
+      metrics.push({ id: 1, name: 'Communication', value: 68 });
+      metrics.push({ id: 2, name: 'Flight Skills', value: 80 });
+      metrics.push({ id: 3, name: 'Decision Making', value: 70 });
+      metrics.push({ id: 4, name: 'CRM', value: 65 });
+    }
+    
+    return metrics;
+  }
+  
+  async getRecommendedResourcesForUser(userId: number): Promise<Resource[]> {
+    const resources: Resource[] = [];
+    
+    // Get user info to tailor recommendations
+    const user = await this.getUser(userId);
+    if (!user) return resources;
+    
+    // Get all resources
+    const allResources = Array.from(this.resources.values());
+    
+    // Get user's sessions to determine relevant topics
+    const userSessions = await this.getSessionsByTrainee(userId);
+    
+    // Extract module IDs from sessions
+    const moduleIds = userSessions.map(session => session.moduleId);
+    
+    // Get modules user is studying
+    const modules = Array.from(this.modules.values()).filter(module => 
+      moduleIds.includes(module.id)
+    );
+    
+    // Filter resources relevant to user's modules
+    for (const resource of allResources) {
+      // Check if resource is related to any of the user's modules
+      const isRelevant = modules.some(module => 
+        resource.title.toLowerCase().includes(module.name.toLowerCase()) ||
+        (resource.tags && resource.tags.some(tag => 
+          module.name.toLowerCase().includes(tag.toLowerCase())
+        ))
+      );
+      
+      if (isRelevant) {
+        resources.push(resource);
+      }
+    }
+    
+    // Limit to 5 recommendations
+    return resources.slice(0, 5);
+  }
+  
+  async getRecentAssessments(traineeId: number, limit: number = 5): Promise<Assessment[]> {
+    // Get all assessments for this trainee
+    const traineeAssessments = await this.getAssessmentsByTrainee(traineeId);
+    
+    // Sort by date (newest first)
+    traineeAssessments.sort((a, b) => b.date.getTime() - a.date.getTime());
+    
+    // Return limited number
+    return traineeAssessments.slice(0, limit);
+  }
+  
+  async getTrainingGoalsForUser(userId: number): Promise<{id: number, name: string, progress: number}[]> {
+    const goals: {id: number, name: string, progress: number}[] = [];
+    
+    // Get user's achievements which can represent goals
+    const userAchievements = await this.getUserAchievementsByUser(userId);
+    
+    // Add each achievement as a goal with its progress
+    for (const userAchiev of userAchievements) {
+      const achievement = await this.getAchievement(userAchiev.achievementId);
+      if (achievement) {
+        goals.push({
+          id: userAchiev.id,
+          name: achievement.name,
+          progress: userAchiev.progress || 0
+        });
+      }
+    }
+    
+    // If no goals found, create sample goals based on likely training needs
+    if (goals.length === 0) {
+      // Try to base goals on user's training program
+      const user = await this.getUser(userId);
+      if (user) {
+        // Get trainee's programs
+        const programs = await this.getTraineePrograms(userId);
+        
+        if (programs.length > 0) {
+          // Add program-specific goals
+          const programName = programs[0].name;
+          
+          goals.push({
+            id: 1,
+            name: `Complete ${programName} Training`,
+            progress: programs[0].completionPercentage || 65
+          });
+          
+          goals.push({
+            id: 2,
+            name: "Pass Final Assessment",
+            progress: 45
+          });
+          
+          goals.push({
+            id: 3,
+            name: "Complete Required Flight Hours",
+            progress: 70
+          });
+        } else {
+          // Generic aviation training goals
+          goals.push({
+            id: 1,
+            name: "Complete Ground School",
+            progress: 75
+          });
+          
+          goals.push({
+            id: 2,
+            name: "Master Emergency Procedures",
+            progress: 60
+          });
+          
+          goals.push({
+            id: 3,
+            name: "Complete Cross-Country Requirements",
+            progress: 50
+          });
+        }
+      }
+    }
+    
+    return goals;
+  }
+  
+  async getTraineeRiskData(traineeId: number): Promise<any> {
+    // Create 3D visualization data for trainee's risk assessment
+    
+    // Get trainee's assessment data to build visualization
+    const assessments = await this.getAssessmentsByTrainee(traineeId);
+    const performanceMetrics = await this.getTraineePerformanceMetrics(traineeId);
+    const sessions = await this.getSessionsByTrainee(traineeId);
+    
+    // Calculate visualization data
+    
+    // Position nodes in 3D space with good distribution
+    const createPosition = (index: number, total: number) => {
+      const angle = (index / total) * Math.PI * 2;
+      const radius = 2 + Math.random() * 0.5;
+      const height = -1 + Math.random() * 2;
+      return [
+        Math.sin(angle) * radius,
+        height,
+        Math.cos(angle) * radius
+      ];
+    };
+    
+    // Color scale from green to yellow to red
+    const getColor = (value: number) => {
+      if (value >= 80) return "#10b981"; // green
+      if (value >= 65) return "#84cc16"; // green-yellow
+      if (value >= 50) return "#facc15"; // yellow
+      if (value >= 35) return "#f97316"; // orange
+      return "#ef4444"; // red
+    };
+    
+    // Convert performance metrics to 3D nodes
+    const performanceNodes = performanceMetrics.map((metric, idx) => ({
+      label: metric.name,
+      value: metric.value,
+      color: getColor(metric.value),
+      position: createPosition(idx, performanceMetrics.length)
+    }));
+    
+    // Session metrics
+    const sessionTypes = new Map<string, number>();
+    let totalSessions = 0;
+    
+    for (const session of sessions) {
+      const type = session.type || 'Other';
+      totalSessions++;
+      
+      const currentCount = sessionTypes.get(type) || 0;
+      sessionTypes.set(type, currentCount + 1);
+    }
+    
+    const sessionNodes = Array.from(sessionTypes.entries()).map(([type, count], idx) => {
+      const percentage = (count / totalSessions) * 100;
+      return {
+        label: type,
+        value: percentage,
+        color: getColor(percentage),
+        position: createPosition(idx + performanceMetrics.length, sessionTypes.size)
+      };
+    });
+    
+    // Competency areas from assessments
+    const competencyMap = new Map<string, number[]>();
+    
+    for (const assessment of assessments) {
+      const grades = await this.getGradesByAssessment(assessment.id);
+      
+      for (const grade of grades) {
+        const area = grade.competencyAreaId;
+        if (!competencyMap.has(area)) {
+          competencyMap.set(area, []);
+        }
+        competencyMap.get(area)?.push(grade.score);
+      }
+    }
+    
+    const competencyNodes = Array.from(competencyMap.entries()).map(([area, scores], idx) => {
+      const avgScore = scores.reduce((sum, score) => sum + score, 0) / scores.length;
+      return {
+        label: area,
+        value: avgScore,
+        color: getColor(avgScore),
+        position: createPosition(idx + performanceMetrics.length + sessionTypes.size, competencyMap.size)
+      };
+    });
+    
+    // Create connections between related nodes
+    const connections: { from: number[], to: number[], color: string }[] = [];
+    
+    // Connect performance nodes to competency nodes
+    for (let i = 0; i < performanceNodes.length; i++) {
+      for (let j = 0; j < competencyNodes.length; j++) {
+        if (Math.random() > 0.7) { // Only connect some nodes
+          connections.push({
+            from: performanceNodes[i].position as number[],
+            to: competencyNodes[j].position as number[],
+            color: performanceNodes[i].color
+          });
+        }
+      }
+    }
+    
+    // Connect session nodes to competency nodes
+    for (let i = 0; i < sessionNodes.length; i++) {
+      for (let j = 0; j < competencyNodes.length; j++) {
+        if (Math.random() > 0.6) { // Only connect some nodes
+          connections.push({
+            from: sessionNodes[i].position as number[],
+            to: competencyNodes[j].position as number[],
+            color: sessionNodes[i].color
+          });
+        }
+      }
+    }
+    
+    // Finalize visualization data
+    return {
+      performance: performanceNodes,
+      sessions: sessionNodes,
+      competencies: competencyNodes,
+      connections
+    };
   }
 
   // Training Program methods

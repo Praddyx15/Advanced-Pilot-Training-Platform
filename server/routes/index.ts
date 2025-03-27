@@ -8,6 +8,7 @@
 export { registerDocumentRoutes } from './document-routes';
 export { registerSessionRoutes } from './session-routes';
 export { riskAssessmentRouter } from './risk-assessment-routes';
+export { registerTraineeRoutes } from './trainee-routes';
 
 // The following route registrations would be implemented in future files
 export function registerSyllabusRoutes(app: any) {}

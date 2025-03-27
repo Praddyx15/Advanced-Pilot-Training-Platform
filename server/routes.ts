@@ -23,7 +23,8 @@ import {
   registerDocumentAnalysisRoutes,
   registerScheduleRoutes,
   setupThemeRoutes,
-  riskAssessmentRouter
+  riskAssessmentRouter,
+  registerTraineeRoutes
 } from "./routes/index";
 import { apiVersioning } from "./api/api-versioning";
 import { setupApiDocs } from "./api/api-docs";
@@ -76,6 +77,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerDocumentAnalysisRoutes(app);
   registerScheduleRoutes(app);
   setupThemeRoutes(app);
+  registerTraineeRoutes(app);
   
   // Risk Assessment API
   app.use('/api/risk-assessments', riskAssessmentRouter);
