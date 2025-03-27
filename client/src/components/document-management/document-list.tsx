@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -18,27 +19,152 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   File, FileText, FileSpreadsheet, PresentationIcon, FileArchive, 
   Search, MoreVertical, Eye, ArrowUpDown, Download, Trash2, Clock, 
-  Filter, CheckCircle2
+  Filter, CheckCircle2, BookOpenCheck, BookOpen, Brain, 
+  CalendarDays, FilePlus2, FileSearch, BarChart3, Database, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { UploadedDocument } from './document-uploader';
 import { cn } from '@/lib/utils';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 
 export function DocumentList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<keyof UploadedDocument>('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
+  const [documentToDelete, setDocumentToDelete] = useState<UploadedDocument | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [activeDocument, setActiveDocument] = useState<UploadedDocument | null>(null);
+  const { toast } = useToast();
 
   // Fetch documents
   const { data: documents, isLoading, error } = useQuery<UploadedDocument[]>({
     queryKey: ['/api/documents'],
     // Use default fetcher
   });
+  
+  // Delete document mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      const response = await apiRequest(
+        'DELETE',
+        `/api/documents/${documentId}`
+      );
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      toast({
+        title: "Document deleted",
+        description: "The document has been permanently deleted.",
+        variant: "default",
+      });
+      setShowDeleteConfirm(false);
+      setDocumentToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: `Failed to delete document: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Extract data from document mutation
+  const extractDataMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      const response = await apiRequest(
+        'POST',
+        `/api/documents/${documentId}/extract`
+      );
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
+      toast({
+        title: "Data extraction complete",
+        description: "Document data has been successfully extracted.",
+        variant: "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Extraction failed",
+        description: `Failed to extract data: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Generate session plan mutation
+  const generateSessionPlanMutation = useMutation({
+    mutationFn: async (documentId: number) => {
+      const response = await apiRequest(
+        'POST',
+        `/api/documents/${documentId}/generate-session-plan`
+      );
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Session plan generated",
+        description: "A new training session plan has been created from the document.",
+        variant: "default",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Generation failed",
+        description: `Failed to generate session plan: ${error.message}`,
+        variant: "destructive",
+      });
+    }
+  });
+  
+  // Handler for document download
+  const handleDownload = (document: UploadedDocument) => {
+    toast({
+      title: "Download started",
+      description: `Downloading ${document.fileName}...`,
+    });
+    
+    // Create download link
+    const downloadLink = `/api/documents/${document.id}/download`;
+    const link = window.document.createElement('a');
+    link.href = downloadLink;
+    link.setAttribute('download', document.fileName);
+    window.document.body.appendChild(link);
+    link.click();
+    window.document.body.removeChild(link);
+  };
+  
+  // Confirmation for document deletion
+  const confirmDelete = (document: UploadedDocument) => {
+    setDocumentToDelete(document);
+    setShowDeleteConfirm(true);
+  };
+  
+  // View document details
+  const viewDocumentDetails = (document: UploadedDocument) => {
+    // Redirect to document detail page
+    window.location.href = `/documents/${document.id}`;
+  };
 
   // Define file type icons
   const fileIcons: Record<string, React.ReactNode> = {
@@ -185,6 +311,39 @@ export function DocumentList() {
 
   return (
     <Card>
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to delete this document?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete{" "}
+              <span className="font-semibold">{documentToDelete?.title}</span> and all its extracted data.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (documentToDelete) {
+                  deleteMutation.mutate(documentToDelete.id);
+                }
+              }}
+              className="bg-destructive hover:bg-destructive/90"
+              disabled={deleteMutation.isPending}
+            >
+              {deleteMutation.isPending ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+      
       <CardHeader>
         <CardTitle>Documents</CardTitle>
         <CardDescription>Your uploaded training documents and manuals</CardDescription>
@@ -351,17 +510,52 @@ export function DocumentList() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => viewDocumentDetails(doc)}>
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownload(doc)}>
                             <Download className="mr-2 h-4 w-4" />
                             Download
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-destructive">
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setActiveDocument(doc);
+                              extractDataMutation.mutate(doc.id);
+                            }}
+                            disabled={doc.isProcessed || extractDataMutation.isPending}
+                          >
+                            <FileSearch className="mr-2 h-4 w-4" />
+                            Extract Data
+                            {extractDataMutation.isPending && doc.id === activeDocument?.id && (
+                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setActiveDocument(doc);
+                              generateSessionPlanMutation.mutate(doc.id);
+                            }}
+                            disabled={!doc.isProcessed || generateSessionPlanMutation.isPending}
+                          >
+                            <CalendarDays className="mr-2 h-4 w-4" />
+                            Generate Session Plan
+                            {generateSessionPlanMutation.isPending && doc.id === activeDocument?.id && (
+                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
+                            )}
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            onClick={() => confirmDelete(doc)}
+                            className="text-destructive"
+                            disabled={deleteMutation.isPending}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
+                            {deleteMutation.isPending && doc.id === documentToDelete?.id && (
+                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
+                            )}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
