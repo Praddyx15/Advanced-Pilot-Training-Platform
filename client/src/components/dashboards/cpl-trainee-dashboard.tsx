@@ -31,7 +31,11 @@ import {
   ArrowRight,
   BarChart3,
   PieChart,
+  Dices,
+  Box,
 } from 'lucide-react';
+import { RoleType } from "@shared/risk-assessment-types";
+import { TraineeRiskMatrix } from "@/components/visualizations/trainee-risk-matrix";
 import {
   Table,
   TableBody,
@@ -396,6 +400,22 @@ export function CPLTraineeDashboard() {
                 <Tooltip />
               </RadarChart>
             </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* 3D Risk Matrix Visualization */}
+      <div className="mb-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Risk Assessment Matrix</CardTitle>
+              <CardDescription>Interactive 3D visualization of your safety performance</CardDescription>
+            </div>
+            <Box className="h-6 w-6 text-primary" />
+          </CardHeader>
+          <CardContent className="pt-0">
+            <TraineeRiskMatrix className="w-full" />
           </CardContent>
         </Card>
       </div>

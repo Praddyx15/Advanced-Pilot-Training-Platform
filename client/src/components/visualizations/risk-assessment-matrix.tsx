@@ -1,18 +1,59 @@
-import React, { useRef, useState, useEffect } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Text, Box, Stars } from "@react-three/drei";
-import { RiskMatrixData, RiskMatrixConfig } from "@shared/risk-assessment-types";
+import React, { useRef, useState, useEffect, useMemo } from "react";
+import { Canvas, useFrame, ThreeElements } from "@react-three/fiber";
+import { 
+  OrbitControls, 
+  Text, 
+  Box, 
+  Stars, 
+  Grid, 
+  Html, 
+  QuadraticBezierLine,
+  Cylinder,
+  Sphere,
+  useHelper,
+  Line
+} from "@react-three/drei";
+import { Vector3, Group, Mesh, Box3, Color, DirectionalLight, DirectionalLightHelper, Raycaster } from "three";
+import { RiskMatrixData, RiskMatrixConfig, RoleType } from "@shared/risk-assessment-types";
 import { useToast } from "@/hooks/use-toast";
+import { 
+  Card, 
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Button,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+  Badge
+} from "@/components/ui";
+import { 
+  AlertCircle, 
+  ArrowUpDown, 
+  Info, 
+  RefreshCcw, 
+  RotateCcw, 
+  ZoomIn, 
+  ZoomOut, 
+  PanelLeftClose, 
+  PanelLeftOpen,
+  BarChart4,
+  Layers3,
+  PieChart,
+  Lightbulb
+} from "lucide-react";
 
 const DEFAULT_CONFIG: RiskMatrixConfig = {
   minValue: 1,
   maxValue: 125, // 5 * 5 * 5 (severity * occurrence * detection)
   colors: {
-    veryLow: "#1bc5bd", // teal
-    low: "#3699ff", // blue
-    medium: "#ffa800", // orange
-    high: "#f64e60", // red
-    veryHigh: "#8950fc" // purple
+    veryLow: "#10b981", // green
+    low: "#3b82f6", // blue
+    medium: "#f59e0b", // amber
+    high: "#ef4444", // red
+    veryHigh: "#7c3aed" // purple
   },
   animate: true,
   showLabels: true,
