@@ -200,7 +200,7 @@ const defaultTraineeData: TraineeRiskData = {
   ]
 };
 
-export const TraineeRiskMatrix: React.FC<TraineeRiskMatrixProps> = ({
+const TraineeRiskMatrix: React.FC<TraineeRiskMatrixProps> = ({
   data = defaultTraineeData,
   className = "",
 }) => {

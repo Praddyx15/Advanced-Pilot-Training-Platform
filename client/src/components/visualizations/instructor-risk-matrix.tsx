@@ -44,7 +44,10 @@ import {
   Calendar,
   CheckSquare,
   FileText,
-  RefreshCw
+  RefreshCw,
+  CalendarPlus,
+  BookOpen,
+  Moon
 } from "lucide-react";
 
 // 3D Matrix Cube for the risk matrix
@@ -740,7 +743,7 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
               <div className="rounded-lg border overflow-hidden p-4">
                 <h3 className="text-sm font-medium mb-3 flex items-center">
                   <FileText className="h-4 w-4 mr-2" />
-                  Syllabus Coverage
+                  Syllabus Coverage & Competency Gap Analysis
                 </h3>
                 <div className="grid grid-cols-1 gap-3 overflow-y-auto max-h-[380px]">
                   {["Aircraft Systems", "Weather & Planning", "Navigation", "Flight Maneuvers", "Emergency Procedures", "Communications", "Human Factors", "Regulatory Knowledge", "Flight Planning"].map((module, idx) => {
@@ -805,13 +808,15 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                   <div className="rounded-md border p-3 mb-3">
                     <div className="flex justify-between items-center mb-2">
                       <div className="text-sm font-medium">EASA Part-FCL Compliance</div>
-                      <Badge variant="outline" className="border-green-500 text-green-500">
+                      <Badge variant="outline" className="border-green-500 text-green-500 bg-green-50">
                         Compliant
                       </Badge>
                     </div>
-                    <Progress value={92} className="h-2 mb-2" />
-                    <div className="text-xs text-muted-foreground mt-1">
-                      92% of required elements covered in syllabus
+                    <Progress value={92} className="h-2 mb-2" 
+                      style={{ '--progress-indicator-color': '#10b981' } as React.CSSProperties} />
+                    <div className="text-xs text-muted-foreground mt-1 flex justify-between">
+                      <span>92% of required elements covered</span>
+                      <span className="font-medium">35/38 requirements</span>
                     </div>
                   </div>
                   
@@ -827,33 +832,58 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                         ))}
                       </div>
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-xs text-muted-foreground mb-2">
                       Medium risk - 3 high-risk activities identified in current modules
+                    </div>
+                    
+                    <div className="flex gap-2 flex-wrap">
+                      <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                        Night Operations
+                      </Badge>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                        Emergency Procedures
+                      </Badge>
+                      <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200">
+                        Advanced Navigation
+                      </Badge>
                     </div>
                   </div>
                   
                   <div className="rounded-md border p-3">
                     <div className="flex justify-between items-center mb-2">
-                      <div className="text-sm font-medium">Competency Coverage Gaps</div>
+                      <div className="text-sm font-medium">Competency Gap Analysis</div>
+                      <Badge className="bg-red-100 text-red-800 hover:bg-red-100">3 Critical Areas</Badge>
                     </div>
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center">
-                        <div className="text-xs text-muted-foreground">Adverse Weather Ops</div>
+                        <div className="text-xs">
+                          <span className="font-medium">Adverse Weather Ops</span>
+                          <Badge variant="outline" className="text-[10px] ml-1 border-red-200">EASA FCL.050</Badge>
+                        </div>
                         <div className="text-xs font-medium text-destructive">Critical</div>
                       </div>
-                      <Progress value={25} className="h-1.5" />
+                      <Progress value={25} className="h-1.5"
+                        style={{ '--progress-indicator-color': '#ef4444' } as React.CSSProperties} />
                       
                       <div className="flex justify-between items-center mt-2">
-                        <div className="text-xs text-muted-foreground">Abnormal Procedures</div>
+                        <div className="text-xs">
+                          <span className="font-medium">Abnormal Procedures</span>
+                          <Badge variant="outline" className="text-[10px] ml-1 border-amber-200">EASA FCL.025</Badge>
+                        </div>
                         <div className="text-xs font-medium text-amber-500">Medium</div>
                       </div>
-                      <Progress value={65} className="h-1.5" />
+                      <Progress value={65} className="h-1.5"
+                        style={{ '--progress-indicator-color': '#f59e0b' } as React.CSSProperties} />
                       
                       <div className="flex justify-between items-center mt-2">
-                        <div className="text-xs text-muted-foreground">Communication</div>
+                        <div className="text-xs">
+                          <span className="font-medium">Communication</span>
+                          <Badge variant="outline" className="text-[10px] ml-1 border-green-200">EASA FCL.055</Badge>
+                        </div>
                         <div className="text-xs font-medium text-green-500">Low</div>
                       </div>
-                      <Progress value={85} className="h-1.5" />
+                      <Progress value={85} className="h-1.5"
+                        style={{ '--progress-indicator-color': '#10b981' } as React.CSSProperties} />
                     </div>
                   </div>
                 </div>
@@ -861,23 +891,58 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                 <div className="rounded-lg border overflow-hidden p-4">
                   <h3 className="text-sm font-medium mb-3 flex items-center">
                     <Lightbulb className="h-4 w-4 mr-2" />
-                    Improvement Suggestions
+                    Improvement Suggestions & Action Items
                   </h3>
                   
                   <div className="space-y-2 text-xs">
-                    <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
-                      <div className="font-medium text-blue-700 dark:text-blue-300">Add advanced weather scenario training</div>
-                      <div className="text-muted-foreground mt-1">Enhance training for METAR/TAF interpretation under rapidly changing conditions</div>
+                    <div className="p-2 rounded-md bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800">
+                      <div className="font-medium text-red-700 dark:text-red-300 flex justify-between">
+                        <span>Critical: Schedule Emergency Procedures Training</span>
+                        <Badge variant="outline" className="text-[10px] border-red-400">EASA FCL.025</Badge>
+                      </div>
+                      <div className="text-muted-foreground mt-1 mb-2">Current coverage is 35% below industry best practices and regulatory requirements</div>
+                      <div className="flex justify-end">
+                        <Button variant="outline" size="sm" className="h-6 text-xs bg-white border-red-200 text-red-700 hover:bg-red-50 hover:text-red-800">
+                          <CalendarPlus className="h-3 w-3 mr-1" />
+                          Schedule Training
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="p-2 rounded-md bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
-                      <div className="font-medium text-amber-700 dark:text-amber-300">Increase emergency procedures practice</div>
-                      <div className="text-muted-foreground mt-1">Current coverage is 35% below industry best practices</div>
+                      <div className="font-medium text-amber-700 dark:text-amber-300 flex justify-between">
+                        <span>High Priority: Advanced Weather Training</span>
+                        <Badge variant="outline" className="text-[10px] border-amber-400">EASA FCL.050</Badge>
+                      </div>
+                      <div className="text-muted-foreground mt-1 mb-2">Enhance training for METAR/TAF interpretation under rapidly changing conditions</div>
+                      <div className="flex justify-end">
+                        <Button variant="outline" size="sm" className="h-6 text-xs bg-white border-amber-200 text-amber-700 hover:bg-amber-50 hover:text-amber-800">
+                          <BookOpen className="h-3 w-3 mr-1" />
+                          Review Materials
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="p-2 rounded-md bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                      <div className="font-medium text-blue-700 dark:text-blue-300 flex justify-between">
+                        <span>Medium Priority: Night Operations</span>
+                        <Badge variant="outline" className="text-[10px] border-blue-400">EASA FCL.810</Badge>
+                      </div>
+                      <div className="text-muted-foreground mt-1 mb-2">Additional training required to meet minimum night flying requirements</div>
+                      <div className="flex justify-end">
+                        <Button variant="outline" size="sm" className="h-6 text-xs bg-white border-blue-200 text-blue-700 hover:bg-blue-50 hover:text-blue-800">
+                          <Moon className="h-3 w-3 mr-1" />
+                          Assign Night Flight
+                        </Button>
+                      </div>
                     </div>
                     
                     <div className="p-2 rounded-md bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800">
-                      <div className="font-medium text-green-700 dark:text-green-300">Strong navigation training detected</div>
-                      <div className="text-muted-foreground mt-1">Continue emphasis on VOR/NDB procedures which shows high proficiency</div>
+                      <div className="font-medium text-green-700 dark:text-green-300 flex justify-between">
+                        <span>Strength: Navigation Proficiency</span>
+                        <Badge variant="outline" className="text-[10px] border-green-400">Excellent</Badge>
+                      </div>
+                      <div className="text-muted-foreground mt-1">VOR/NDB procedures show high proficiency - consider trainee as peer mentor</div>
                     </div>
                   </div>
                 </div>

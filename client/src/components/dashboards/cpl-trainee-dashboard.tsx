@@ -35,7 +35,7 @@ import {
   Box,
 } from 'lucide-react';
 import { RoleType } from "@shared/risk-assessment-types";
-import { TraineeRiskMatrix } from "@/components/visualizations/trainee-risk-matrix";
+import TraineeRiskMatrix from "@/components/visualizations/trainee-risk-matrix";
 import {
   Table,
   TableBody,

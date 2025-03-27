@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Link } from 'wouter';
 import {
   FileText,
   Download,
@@ -40,6 +41,7 @@ import {
   ArrowUpRight,
   Hash,
   HelpCircle,
+  ChevronLeft,
 } from 'lucide-react';
 
 interface DocumentDetailPageProps {
@@ -195,6 +197,13 @@ export function DocumentDetailPage({ documentId }: DocumentDetailPageProps) {
 
   return (
     <div className="container py-6 max-w-7xl mx-auto">
+      <Link href="/documents" className="mb-4 block">
+        <Button variant="outline" className="gap-2">
+          <ChevronLeft className="h-4 w-4" />
+          Back to Documents
+        </Button>
+      </Link>
+
       <div className="flex flex-col md:flex-row items-start justify-between gap-6 mb-6">
         <div className="flex-1">
           <h1 className="text-3xl font-bold flex items-center gap-2">
