@@ -6,8 +6,6 @@ import {
   Box, 
   Stars, 
   Html,
-  Sphere,
-  Line,
   PerspectiveCamera
 } from "@react-three/drei";
 import * as THREE from "three";
@@ -601,21 +599,23 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                 ))}
                 
                 {/* Connection lines between related sessions */}
-                <Line 
-                  points={[sessionData[0].position, sessionData[4].position]}
-                  color="#6b7280"
-                  lineWidth={1}
-                />
-                <Line 
-                  points={[sessionData[1].position, sessionData[2].position]}
-                  color="#6b7280"
-                  lineWidth={1}
-                />
-                <Line 
-                  points={[sessionData[2].position, sessionData[3].position]}
-                  color="#6b7280"
-                  lineWidth={1}
-                />
+                <group>
+                  <NodeConnection 
+                    start={sessionData[0].position}
+                    end={sessionData[4].position}
+                    color="#6b7280"
+                  />
+                  <NodeConnection 
+                    start={sessionData[1].position}
+                    end={sessionData[2].position}
+                    color="#6b7280"
+                  />
+                  <NodeConnection 
+                    start={sessionData[2].position}
+                    end={sessionData[3].position}
+                    color="#6b7280"
+                  />
+                </group>
               </Canvas>
               
               {selectedSession && (
@@ -1003,36 +1003,44 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                         })}
                         
                         {/* Connecting lines between modules */}
-                        <Line 
-                          points={[[-1, 1, 0], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
-                        <Line 
-                          points={[[1, 1, 0], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
-                        <Line 
-                          points={[[0, 0, 1], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
-                        <Line 
-                          points={[[-1, -1, 0], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
-                        <Line 
-                          points={[[1, -1, 0], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
-                        <Line 
-                          points={[[0, 0, -1], [0, 0, 0]]}
-                          color={new THREE.Color("#6b7280")}
-                          lineWidth={1}
-                        />
+                        <group>
+                          <NodeConnection 
+                            start={[-1, 1, 0]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                          <NodeConnection 
+                            start={[1, 1, 0]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                          <NodeConnection 
+                            start={[0, 0, 1]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                          <NodeConnection 
+                            start={[-1, -1, 0]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                          <NodeConnection 
+                            start={[1, -1, 0]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                          <NodeConnection 
+                            start={[0, 0, -1]}
+                            end={[0, 0, 0]}
+                            color="#6b7280"
+                            thickness={0.03}
+                          />
+                        </group>
                       </>
                     );
                   })()}
@@ -1139,10 +1147,11 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                               </group>
                               
                               {/* Connecting line */}
-                              <Line 
-                                points={[data.position, eval.position]}
-                                color={new THREE.Color("#6b7280")}
-                                lineWidth={1}
+                              <NodeConnection 
+                                start={data.position}
+                                end={eval.position}
+                                color="#6b7280"
+                                thickness={0.03}
                               />
                             </React.Fragment>
                           ))}

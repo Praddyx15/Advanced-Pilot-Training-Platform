@@ -5,8 +5,7 @@ import {
   Text, 
   Box, 
   Stars, 
-  Html,
-  Sphere
+  Html
 } from "@react-three/drei";
 import * as THREE from "three";
 import { RiskMatrixData, RiskMatrixConfig } from "@shared/risk-assessment-types";
