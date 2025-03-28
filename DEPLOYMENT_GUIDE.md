@@ -1,213 +1,244 @@
 # Advanced Pilot Training Platform - Deployment Guide
 
-This guide provides comprehensive instructions for deploying the Advanced Pilot Training Platform to environments outside of Replit, including traditional hosting providers, cloud platforms, and containerized environments.
+This guide provides comprehensive instructions for deploying the Advanced Pilot Training Platform (APTP) to different environments.
 
-## Prerequisites
+## Table of Contents
+- [Replit Deployment](#replit-deployment)
+- [GitHub Deployment](#github-deployment)
+- [Vercel Deployment](#vercel-deployment)
+- [DigitalOcean Deployment](#digitalocean-deployment)
+- [Self-Hosted Deployment](#self-hosted-deployment)
+- [Environment Variables](#environment-variables)
+- [PostgreSQL Database Setup](#postgresql-database-setup)
+- [Troubleshooting](#troubleshooting)
 
-- Node.js v18.x or v20.x LTS
-- PostgreSQL 14+ database
-- Git
-- Basic knowledge of terminal/command line
-- A hosting provider with support for Node.js applications
+## Replit Deployment
 
-## Step 1: Prepare the Environment
+The simplest way to deploy APTP is directly from the Replit environment:
 
-### Database Setup
+1. Open the current Replit project
+2. Click the "Deploy" button in the Replit UI
+3. Follow the prompts to configure your deployment:
+   - Choose a deployment name
+   - Configure custom domain (optional)
+   - Select deployment region
+4. Wait for the deployment to complete
+5. Your application will be available at `https://[deployment-name].replit.app`
 
-1. Create a PostgreSQL database for your application:
+## GitHub Deployment
+
+To deploy APTP to GitHub and prepare for deployment to other platforms:
+
+1. Run the export script to prepare the project:
    ```bash
-   createdb advanced_pilot_training
+   ./export-project.sh
    ```
 
-2. Configure the database connection by setting the `DATABASE_URL` environment variable:
+2. Extract the resulting ZIP file on your local machine:
    ```bash
-   export DATABASE_URL=postgresql://username:password@localhost:5432/advanced_pilot_training
+   unzip export-*.zip
+   cd export-*
    ```
 
-### Clone the Repository
-
-```bash
-git clone https://github.com/your-username/advanced-pilot-training-platform.git
-cd advanced-pilot-training-platform
-```
-
-## Step 2: Apply Replit-Independent Files
-
-The repository includes special files designed for non-Replit environments. You'll need to use these files instead of their Replit-specific counterparts:
-
-1. Replace the Vite configuration:
+3. Initialize a Git repository:
    ```bash
-   cp export-vite.config.ts vite.config.ts
+   git init
+   git add .
+   git commit -m "Initial commit of APTP"
    ```
 
-2. Use the standard WebSocket implementation:
+4. Create a new repository on GitHub and push your code:
    ```bash
-   cp client/src/vite-hmr-fix-standard.ts client/src/vite-hmr-fix.ts
+   git remote add origin https://github.com/your-username/advanced-pilot-training-platform.git
+   git push -u origin main
    ```
 
-3. Use the standard routes file:
+## Vercel Deployment
+
+For deploying to Vercel:
+
+1. Complete the GitHub Deployment steps above
+2. Log in to your Vercel account
+3. Create a new project and select your GitHub repository
+4. Configure the following settings:
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+   - Install Command: `npm install`
+5. Add the necessary environment variables in Vercel's dashboard:
+   - `DATABASE_URL`: Your PostgreSQL connection string
+   - `SESSION_SECRET`: Random string for securing sessions
+   - Any other API keys needed for features
+6. Deploy your application
+7. After deployment, set up the PostgreSQL database:
+   - Connect to Vercel CLI: `vercel login`
+   - Run database migrations: `vercel run npm run db:push`
+
+## DigitalOcean Deployment
+
+For deploying to DigitalOcean App Platform:
+
+1. Complete the GitHub Deployment steps
+2. Log in to your DigitalOcean account
+3. Go to "Apps" and click "Create App"
+4. Connect your GitHub repository
+5. Configure the build settings:
+   - Build Command: `npm run build`
+   - Run Command: `npm start`
+6. Add environment variables from the [Environment Variables](#environment-variables) section
+7. Select an appropriate plan
+8. Deploy your application
+
+## Self-Hosted Deployment
+
+For deploying to your own server:
+
+1. Run the export script as described in GitHub Deployment
+2. Extract the ZIP file on your server:
    ```bash
-   cp server/routes-standard.ts server/routes.ts
+   unzip export-*.zip
+   cd export-*
    ```
 
-4. Remove Replit-specific metadata from HTML files:
+3. Install dependencies:
    ```bash
-   node clean-html.js
-   node remove-replit-metadata.js
+   npm install
    ```
 
-## Step 3: Install Dependencies
+4. Create a `.env` file with the required environment variables (see `.env.example`)
 
-```bash
-npm install
-```
+5. Set up a PostgreSQL database (see [PostgreSQL Database Setup](#postgresql-database-setup))
 
-## Step 4: Set Up Environment Variables
+6. Run database migrations:
+   ```bash
+   npm run db:push
+   ```
 
-Create a `.env` file in the project root with the following variables:
+7. Build the project:
+   ```bash
+   npm run build
+   ```
+
+8. Set up a process manager like PM2:
+   ```bash
+   npm install -g pm2
+   pm2 start npm --name "aptp" -- start
+   pm2 save
+   pm2 startup
+   ```
+
+9. Set up a reverse proxy with Nginx:
+   ```nginx
+   server {
+     listen 80;
+     server_name yourdomain.com;
+
+     location / {
+       proxy_pass http://localhost:3000;
+       proxy_http_version 1.1;
+       proxy_set_header Upgrade $http_upgrade;
+       proxy_set_header Connection 'upgrade';
+       proxy_set_header Host $host;
+       proxy_cache_bypass $http_upgrade;
+     }
+   }
+   ```
+
+10. Set up SSL with Let's Encrypt:
+    ```bash
+    sudo certbot --nginx -d yourdomain.com
+    ```
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
 
 ```
 # Database
-DATABASE_URL=postgresql://username:password@localhost:5432/advanced_pilot_training
+DATABASE_URL=postgresql://username:password@hostname:5432/database_name
 
 # Session
-SESSION_SECRET=your-secure-session-secret
+SESSION_SECRET=your-secure-random-string
 
-# API Keys (if needed)
+# API Keys (as needed)
 XAI_API_KEY=your-xai-api-key
+
+# App Configuration
+NODE_ENV=production
+PORT=3000
 ```
 
-## Step 5: Initialize the Database
+## PostgreSQL Database Setup
 
-```bash
-npm run db:push
-```
+### Local Development
 
-This will create all necessary tables according to your Drizzle schema.
-
-## Step 6: Build the Application
-
-```bash
-npm run build
-```
-
-This generates the production build in the `dist` directory.
-
-## Step 7: Start the Application
-
-### Development Mode
-
-```bash
-npm run dev
-```
-
-### Production Mode
-
-```bash
-npm run start
-```
-
-## Deployment Options
-
-### Option 1: Traditional Node.js Hosting
-
-1. Upload the built application (everything except `node_modules`)
-2. Install dependencies on the server: `npm install --production`
-3. Start the application: `npm run start`
-
-### Option 2: Docker Deployment
-
-A Dockerfile is included for containerized deployment:
-
-1. Build the Docker image:
-   ```bash
-   docker build -t advanced-pilot-training .
+1. Install PostgreSQL on your machine
+2. Create a new database:
+   ```sql
+   CREATE DATABASE advanced_pilot_training;
+   CREATE USER aptp_user WITH PASSWORD 'your_password';
+   GRANT ALL PRIVILEGES ON DATABASE advanced_pilot_training TO aptp_user;
+   ```
+3. Update your `.env` file with the connection string:
+   ```
+   DATABASE_URL=postgresql://aptp_user:your_password@localhost:5432/advanced_pilot_training
    ```
 
-2. Run the container:
-   ```bash
-   docker run -p 3000:3000 -e DATABASE_URL=postgresql://user:password@host:5432/dbname advanced-pilot-training
-   ```
+### Production
 
-### Option 3: Cloud Platform Deployment
+For production, we recommend using a managed PostgreSQL service:
 
-#### Vercel
+#### Neon Database
+1. Create an account at https://neon.tech
+2. Create a new project
+3. Create a new database
+4. Get the connection string from the dashboard
+5. Add it to your environment variables
 
-1. Connect your repository to Vercel
-2. Set the required environment variables in the Vercel dashboard
-3. Deploy using the Vercel dashboard or CLI
-
-#### Railway/Render/Fly.io
-
-These platforms can deploy directly from your repository with minimal configuration:
-
-1. Connect your repository to the platform
-2. Configure environment variables
-3. Deploy using the platform's dashboard or CLI
-
-## WebSocket Configuration
-
-The WebSocket server is configured to run on the same port as the HTTP server with a path of `/ws`. Make sure your hosting provider supports WebSockets.
-
-For clients connecting to the WebSocket server:
-
-```javascript
-const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-const host = window.location.host;
-const wsUrl = `${protocol}//${host}/ws`;
-const socket = new WebSocket(wsUrl);
-```
+#### Supabase
+1. Create an account at https://supabase.com
+2. Create a new project
+3. Go to Project Settings → Database
+4. Get the connection string
+5. Add it to your environment variables
 
 ## Troubleshooting
 
+### WebSocket Connection Issues
+- Ensure your server supports WebSocket connections
+- For Nginx, make sure you have the WebSocket proxy settings:
+  ```nginx
+  proxy_set_header Upgrade $http_upgrade;
+  proxy_set_header Connection 'upgrade';
+  ```
+
 ### Database Connection Issues
+- Verify your PostgreSQL connection string is correct
+- Check that your database user has the correct permissions
+- Ensure your server's firewall allows connections to the database port
 
-- Verify that the `DATABASE_URL` environment variable is set correctly
-- Ensure the database user has the necessary permissions
-- Check if your hosting provider requires SSL for database connections
+### Build Errors
+- Try cleaning the node_modules and reinstalling:
+  ```bash
+  rm -rf node_modules
+  npm install
+  ```
+- Check node version (should be >= 18.0.0):
+  ```bash
+  node -v
+  ```
 
-### WebSocket Connection Failures
+### Runtime Errors
+- Check server logs:
+  ```bash
+  pm2 logs aptp
+  ```
+- Verify environment variables are correctly set
+- Ensure database migrations have been applied
 
-- Verify that your hosting provider supports WebSockets
-- Check that the WebSocket path `/ws` isn't blocked by a proxy
-- Ensure your client is using the correct WebSocket URL
+## Additional Notes
 
-### Missing Environment Variables
-
-- Double-check that all required environment variables are set
-- Some platforms require setting environment variables through their dashboard
-- Secret values should never be committed to your repository
-
-## Maintenance
-
-### Database Migrations
-
-When your Drizzle schema changes, run the migration command:
-
-```bash
-npm run db:push
-```
-
-### Updating the Application
-
-1. Pull the latest changes: `git pull`
-2. Install dependencies: `npm install`
-3. Build the application: `npm run build`
-4. Restart the server: `npm run start`
-
-## Security Considerations
-
-- Always use HTTPS in production
-- Keep your `SESSION_SECRET` secure and unique for each environment
-- Regularly update dependencies: `npm audit fix`
-- Implement rate limiting for API endpoints
-- Set up monitoring and logging
-
-## Support
-
-If you encounter issues during deployment, please:
-
-1. Check the application logs for error messages
-2. Consult the documentation for your hosting provider
-3. Review the troubleshooting section in this guide
-4. Contact our support team at support@advancedpilottraining.com
+- The exported project automatically removes Replit-specific dependencies and configurations
+- The WebSocket implementation is replaced with a standard version that works in any environment
+- The 3D Risk Assessment Matrix visualization will work in modern browsers supporting WebGL
+- For optimal performance, we recommend a server with at least 1 GB RAM
+- Keep your Node.js version up to date (minimum version: 18.0.0)

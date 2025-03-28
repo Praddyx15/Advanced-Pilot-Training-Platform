@@ -1,8 +1,50 @@
 /**
  * Standard WebSocket connection helper for non-Replit environments
- * This is a simplified version of vite-hmr-fix.ts that works in any environment
+ * This is a version that works in any environment and serves as a direct
+ * replacement for the Replit-specific vite-hmr-fix.ts file
  */
 
+// Store the original WebSocket constructor for later use
+const OriginalWebSocket = window.WebSocket;
+
+// Create a patched version of WebSocket that ensures connections work in all environments
+class PatchedWebSocket extends OriginalWebSocket {
+  constructor(url: string | URL, protocols?: string | string[]) {
+    // Convert URL object to string if needed
+    const urlString = url instanceof URL ? url.toString() : url;
+    
+    // Handle Vite HMR WebSocket connection
+    if (urlString.includes('vite-hmr') || urlString.includes('__vite_hmr')) {
+      // Fix potential connection issues with localhost
+      if (urlString.includes('ws://localhost:undefined')) {
+        const fixedUrl = urlString.replace('ws://localhost:undefined', 
+                                          `ws://localhost:${window.location.port}`);
+        super(fixedUrl, protocols);
+      } else {
+        super(urlString, protocols);
+      }
+    } 
+    // Handle application WebSocket connection
+    else if (urlString.includes('/ws')) {
+      // Ensure we're using the correct protocol and host for our app WebSockets
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const host = window.location.host;
+      
+      // Build the proper WebSocket URL
+      const fixedUrl = `${protocol}//${host}/ws`;
+      super(fixedUrl, protocols);
+    }
+    // For all other WebSocket connections, use as-is
+    else {
+      super(urlString, protocols);
+    }
+  }
+}
+
+// Apply the patch by replacing the global WebSocket constructor
+window.WebSocket = PatchedWebSocket;
+
+// Export common WebSocket utilities
 export const socketProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
 export const socketHost = window.location.host;
 export const socketUrl = `${socketProtocol}//${socketHost}/ws`;
@@ -13,9 +55,6 @@ export const socketUrl = `${socketProtocol}//${socketHost}/ws`;
  * on the standard /ws path
  */
 export function connectToWebSocket() {
-  // This function is called in client/src/lib/websocket.ts when creating connections
-  // It offers a standard approach to setting up WebSockets in any environment
-  
   try {
     console.log('[WebSocket] Connecting to', socketUrl);
     const socket = new WebSocket(socketUrl);
@@ -94,3 +133,8 @@ export function setupReconnection(
   
   return connect();
 }
+
+// Debug output to confirm patch is applied
+console.log('[vite-hmr-fix-standard] WebSocket patch applied for non-Replit environment');
+
+export default {};

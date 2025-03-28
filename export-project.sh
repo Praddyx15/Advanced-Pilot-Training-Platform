@@ -94,17 +94,35 @@ EOL
 echo "📦 Creating production package.json..."
 node -e "
 const pkg = require('./package.json');
-// Remove dev-only scripts
+
+// Remove Replit-specific dependencies
+if (pkg.dependencies) {
+  const replitDeps = Object.keys(pkg.dependencies).filter(dep => dep.startsWith('@replit/'));
+  replitDeps.forEach(dep => delete pkg.dependencies[dep]);
+  console.log('  ✅ Removed Replit dependencies: ' + replitDeps.join(', '));
+}
+
+// Remove Replit-specific dev dependencies
+if (pkg.devDependencies) {
+  const replitDevDeps = Object.keys(pkg.devDependencies).filter(dep => dep.startsWith('@replit/'));
+  replitDevDeps.forEach(dep => delete pkg.devDependencies[dep]);
+  console.log('  ✅ Removed Replit dev dependencies: ' + replitDevDeps.join(', '));
+}
+
+// Handle scripts
 const prodScripts = {
   'start': pkg.scripts.start || 'node dist/server/index.js',
   'build': pkg.scripts.build || 'npm run build:server && npm run build:client',
   'build:client': pkg.scripts['build:client'] || 'vite build',
   'build:server': pkg.scripts['build:server'] || 'tsc -p tsconfig.build.json',
-  'db:push': pkg.scripts['db:push'] || 'drizzle-kit push:pg'
+  'db:push': pkg.scripts['db:push'] || 'drizzle-kit push:pg',
+  'dev': 'tsx server/index.ts'
 };
 pkg.scripts = prodScripts;
+
 // Add engines
 pkg.engines = { 'node': '>=18.0.0' };
+
 // Add repository
 if (!pkg.repository) {
   pkg.repository = {
@@ -112,6 +130,7 @@ if (!pkg.repository) {
     'url': 'https://github.com/your-username/advanced-pilot-training-platform.git'
   };
 }
+
 // Write modified package.json
 require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
 "
