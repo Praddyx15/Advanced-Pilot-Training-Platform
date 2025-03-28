@@ -28,8 +28,8 @@ import {
   BarChart4,
   PieChart,
   Lightbulb,
-  Dices,
-  Clock
+  Clock,
+  Dices
 } from "lucide-react";
 
 // Progress node in the 3D visualization
@@ -61,8 +61,9 @@ const ProgressNode = ({
   });
   
   return (
-    <group position={position}>
-      <Sphere ref={nodeRef} args={[baseSize, 16, 16]}>
+    <group position={[position[0], position[1], position[2]]}>
+      <mesh ref={nodeRef}>
+        <sphereGeometry args={[baseSize, 16, 16]} />
         <meshStandardMaterial 
           color={color}
           roughness={0.3}
@@ -70,8 +71,8 @@ const ProgressNode = ({
           emissive={color}
           emissiveIntensity={0.4}
         />
-      </Sphere>
-      <Html position={[0, baseSize * 1.5, 0]} center>
+      </mesh>
+      <Html position-y={baseSize * 1.5} center>
         <div className="bg-background/80 backdrop-blur-sm p-1.5 rounded-md text-center whitespace-nowrap">
           <div className="text-xs font-medium">{label}</div>
           <div className="text-xs text-muted-foreground">{progress}%</div>
@@ -110,7 +111,9 @@ const NodeConnection = ({
   
   return (
     <mesh
-      position={[midX, midY, midZ]}
+      position-x={midX}
+      position-y={midY}
+      position-z={midZ}
       rotation={[rotX, 0, rotZ - Math.PI / 2]}
     >
       <cylinderGeometry args={[thickness, thickness, distance, 8]} />
