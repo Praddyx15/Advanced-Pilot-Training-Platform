@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-// REMOVED REPLIT IMPORT;
+import runtimeErrorOverlay from '@replit/vite-plugin-runtime-error-modal';
 import path, { dirname } from "path";
-// REMOVED REPLIT IMPORT;
+import themePlugin from '@replit/vite-plugin-shadcn-theme-json';
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +14,7 @@ export default defineConfig({
     runtimeErrorOverlay(),
     themePlugin(),
     ...(process.env.NODE_ENV !== "production" &&
-    undefined !== undefined
+    true
       ? [
           await import("@replit/vite-plugin-cartographer").then((m) =>
             m.cartographer(),
