@@ -287,7 +287,7 @@ const TraineeRiskMatrix: React.FC<TraineeRiskMatrixProps> = ({
         </div>
         
         <div className="relative h-[450px] w-full rounded-lg border overflow-hidden">
-          <Canvas camera={{ position: [0, 0, 10], fov: 60 }}>
+          <Canvas camera={{ position: [0, 0, 10], fov: 60 }} dpr={[1, 2]}>
             <ambientLight intensity={0.5} />
             <pointLight position={[10, 10, 10]} intensity={1} />
             <directionalLight position={[5, 5, 5]} intensity={0.5} />

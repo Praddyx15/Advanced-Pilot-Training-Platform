@@ -219,7 +219,8 @@ const SessionPoint: React.FC<{
   
   return (
     <group position={position} onClick={onClick}>
-      <Sphere ref={ref} args={[size, 16, 16]}>
+      <mesh ref={ref}>
+        <sphereGeometry args={[size, 16, 16]} />
         <meshStandardMaterial 
           color={color}
           emissive={color}
@@ -227,7 +228,7 @@ const SessionPoint: React.FC<{
           transparent
           opacity={0.8}
         />
-      </Sphere>
+      </mesh>
       <Html position={[0, size * 1.5, 0]} center>
         <div className="bg-background/80 backdrop-blur-sm p-1.5 rounded-md text-center whitespace-nowrap">
           <div className="text-xs font-medium">{label}</div>
@@ -569,7 +570,7 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
             </div>
             
             <div className="relative h-[450px] w-full rounded-lg border overflow-hidden">
-              <Canvas camera={{ position: [0, 0, 10], fov: 60 }}>
+              <Canvas camera={{ position: [0, 0, 10], fov: 60 }} dpr={[1, 2]}>
                 <ambientLight intensity={0.5} />
                 <pointLight position={[10, 10, 10]} intensity={1} />
                 <directionalLight position={[5, 5, 5]} intensity={0.5} />
@@ -983,13 +984,14 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                           
                           return (
                             <group key={idx} position={module.position}>
-                              <Sphere args={[size, 16, 16]}>
+                              <mesh>
+                                <sphereGeometry args={[size, 16, 16]} />
                                 <meshStandardMaterial 
                                   color={color}
                                   emissive={color}
                                   emissiveIntensity={0.3}
                                 />
-                              </Sphere>
+                              </mesh>
                               <Html position={[0, size * 1.5, 0]} center>
                                 <div className="bg-background/80 backdrop-blur-sm p-1 rounded-md text-center whitespace-nowrap">
                                   <div className="text-xs font-medium">{module.name}</div>
@@ -1003,32 +1005,32 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                         {/* Connecting lines between modules */}
                         <Line 
                           points={[[-1, 1, 0], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                         <Line 
                           points={[[1, 1, 0], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                         <Line 
                           points={[[0, 0, 1], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                         <Line 
                           points={[[-1, -1, 0], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                         <Line 
                           points={[[1, -1, 0], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                         <Line 
                           points={[[0, 0, -1], [0, 0, 0]]}
-                          color="#6b7280"
+                          color={new THREE.Color("#6b7280")}
                           lineWidth={1}
                         />
                       </>
@@ -1101,13 +1103,14 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                         <React.Fragment key={idx}>
                           {/* Trainee node */}
                           <group position={data.position}>
-                            <Sphere args={[0.3, 16, 16]}>
+                            <mesh>
+                              <sphereGeometry args={[0.3, 16, 16]} />
                               <meshStandardMaterial 
                                 color={getRiskColor(Math.max(0, 100 - data.progress))}
                                 emissive={getRiskColor(Math.max(0, 100 - data.progress))}
                                 emissiveIntensity={0.3}
                               />
-                            </Sphere>
+                            </mesh>
                             <Html position={[0, 0.5, 0]} center>
                               <div className="bg-background/80 backdrop-blur-sm p-1 rounded-md text-center whitespace-nowrap">
                                 <div className="text-xs font-medium">{data.name}</div>
@@ -1119,13 +1122,14 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                           {data.evaluations.map((eval, evalIdx) => (
                             <React.Fragment key={`${idx}-${evalIdx}`}>
                               <group position={eval.position}>
-                                <Sphere args={[0.15, 16, 16]}>
+                                <mesh>
+                                  <sphereGeometry args={[0.15, 16, 16]} />
                                   <meshStandardMaterial 
                                     color={getRiskColor(Math.max(0, 100 - eval.score))}
                                     transparent
                                     opacity={0.8}
                                   />
-                                </Sphere>
+                                </mesh>
                                 <Html position={[0, 0.3, 0]} center>
                                   <div className="bg-background/80 backdrop-blur-sm p-0.5 rounded-md text-center">
                                     <div className="text-[10px]">{eval.name}</div>
@@ -1137,7 +1141,7 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                               {/* Connecting line */}
                               <Line 
                                 points={[data.position, eval.position]}
-                                color="#6b7280"
+                                color={new THREE.Color("#6b7280")}
                                 lineWidth={1}
                               />
                             </React.Fragment>
