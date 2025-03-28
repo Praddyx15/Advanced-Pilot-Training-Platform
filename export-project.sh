@@ -1,102 +1,166 @@
 #!/bin/bash
 
-# Script to prepare the project for export from Replit
-# This script:
-# 1. Creates a copy of the project
-# 2. Removes Replit-specific dependencies and configurations
-# 3. Adds standard configurations for deployment elsewhere
+# Advanced Pilot Training Platform - Export Script
+# This script prepares the project for deployment outside of Replit
+# by replacing Replit-specific files with standard versions
 
-echo "Preparing project for export from Replit..."
+echo "🚀 Advanced Pilot Training Platform - Export Preparation"
+echo "==========================================================="
 
-# Create an export directory
-EXPORT_DIR="./export-project"
+# Create export directory
+EXPORT_DIR="export-$(date +%Y%m%d-%H%M%S)"
+echo "📁 Creating export directory: $EXPORT_DIR"
 mkdir -p $EXPORT_DIR
 
-# Copy all project files except node_modules, .git, and the export directory itself
-echo "Copying project files..."
-rsync -av --progress ./ $EXPORT_DIR \
-  --exclude node_modules \
-  --exclude .git \
-  --exclude export-project \
-  --exclude .replit \
-  --exclude replit.nix
+# Copy all project files to export directory
+echo "📋 Copying project files..."
+rsync -av --exclude node_modules --exclude .git --exclude $EXPORT_DIR . $EXPORT_DIR/
 
-# Enter the export directory
+# Replace Replit-specific files with standard versions
+echo "🔄 Replacing Replit-specific files with standard versions..."
 cd $EXPORT_DIR
 
-# Replace vite.config.ts with the export version
-echo "Updating Vite configuration..."
-cp export-vite.config.ts vite.config.ts
-
-# Replace the Replit-specific WebSocket fix with the standard version
-echo "Updating WebSocket fix..."
-cp client/src/vite-hmr-fix-standard.ts client/src/vite-hmr-fix.ts
-
-# Update package.json to remove Replit-specific dependencies
-echo "Updating package.json..."
-# Use jq to manipulate the package.json if available
-if command -v jq > /dev/null; then
-  # Remove Replit-specific dependencies
-  jq 'del(.dependencies."@replit/vite-plugin-shadcn-theme-json")' package.json > temp.json && mv temp.json package.json
-  jq 'del(.dependencies."@replit/vite-plugin-runtime-error-modal")' package.json > temp.json && mv temp.json package.json
-  jq 'del(.dependencies."@replit/vite-plugin-cartographer")' package.json > temp.json && mv temp.json package.json
+# Replace Vite configuration
+if [ -f "export-vite.config.ts" ]; then
+  echo "  ✅ Replacing vite.config.ts"
+  cp export-vite.config.ts vite.config.ts
 else
-  echo "Warning: jq not available. Manual editing of package.json required to remove Replit dependencies."
-  echo "Please remove @replit/vite-plugin-shadcn-theme-json, @replit/vite-plugin-runtime-error-modal, and @replit/vite-plugin-cartographer from dependencies."
+  echo "  ❌ export-vite.config.ts not found"
 fi
 
-# Create a standard theme.json if it doesn't exist
-if [ ! -f theme.json ]; then
-  echo "Creating standard theme.json..."
-  echo '{
-  "primary": "#6366f1",
-  "variant": "vibrant",
-  "appearance": "system",
-  "radius": 0.5
-}' > theme.json
+# Replace WebSocket implementation
+if [ -f "client/src/vite-hmr-fix-standard.ts" ]; then
+  echo "  ✅ Replacing WebSocket implementation"
+  cp client/src/vite-hmr-fix-standard.ts client/src/vite-hmr-fix.ts
+else
+  echo "  ❌ client/src/vite-hmr-fix-standard.ts not found"
 fi
 
-# Remove Replit-specific files
-rm -f .replit replit.nix export-vite.config.ts export-project.sh
+# Replace routes file
+if [ -f "server/routes-standard.ts" ]; then
+  echo "  ✅ Replacing routes implementation"
+  cp server/routes-standard.ts server/routes.ts
+else
+  echo "  ❌ server/routes-standard.ts not found"
+fi
 
-# Create a README for deployment instructions
-echo "Creating deployment instructions..."
-echo "# Advanced Pilot Training Platform
+# Clean HTML files
+echo "🧹 Cleaning Replit metadata from HTML files..."
+if [ -f "clean-html.js" ]; then
+  node clean-html.js
+  echo "  ✅ Cleaned HTML files"
+else
+  echo "  ❌ clean-html.js not found"
+fi
 
-This is the exported version of the Advanced Pilot Training Platform from Replit, prepared for deployment to other environments.
+if [ -f "clean-index.js" ]; then
+  node clean-index.js
+  echo "  ✅ Cleaned index.html"
+else
+  echo "  ❌ clean-index.js not found"
+fi
 
-## Deployment Instructions
+if [ -f "remove-replit-metadata.js" ]; then
+  node remove-replit-metadata.js
+  echo "  ✅ Removed Replit metadata from all files"
+else
+  echo "  ❌ remove-replit-metadata.js not found"
+fi
 
-1. Install dependencies:
-   \`\`\`
-   npm install
-   \`\`\`
+# Remove export-specific files
+echo "🗑️  Removing export-specific files..."
+rm -f export-vite.config.ts
+rm -f client/src/vite-hmr-fix-standard.ts
+rm -f server/routes-standard.ts
+rm -f clean-html.js
+rm -f clean-index.js
+rm -f remove-replit-metadata.js
+rm -f export-project.sh
 
-2. Start the development server:
-   \`\`\`
-   npm run dev
-   \`\`\`
+# Create .env file template
+echo "📝 Creating .env.example file..."
+cat > .env.example << EOL
+# Database
+DATABASE_URL=postgresql://username:password@localhost:5432/advanced_pilot_training
 
-3. Build for production:
-   \`\`\`
-   npm run build
-   \`\`\`
+# Session
+SESSION_SECRET=your-secure-session-secret
 
-4. Start the production server:
-   \`\`\`
-   npm start
-   \`\`\`
+# API Keys (if needed)
+XAI_API_KEY=your-xai-api-key
+EOL
 
-## Configuration
+# Create production package.json
+echo "📦 Creating production package.json..."
+node -e "
+const pkg = require('./package.json');
+// Remove dev-only scripts
+const prodScripts = {
+  'start': pkg.scripts.start || 'node dist/server/index.js',
+  'build': pkg.scripts.build || 'npm run build:server && npm run build:client',
+  'build:client': pkg.scripts['build:client'] || 'vite build',
+  'build:server': pkg.scripts['build:server'] || 'tsc -p tsconfig.build.json',
+  'db:push': pkg.scripts['db:push'] || 'drizzle-kit push:pg'
+};
+pkg.scripts = prodScripts;
+// Add engines
+pkg.engines = { 'node': '>=18.0.0' };
+// Add repository
+if (!pkg.repository) {
+  pkg.repository = {
+    'type': 'git',
+    'url': 'https://github.com/your-username/advanced-pilot-training-platform.git'
+  };
+}
+// Write modified package.json
+require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+"
 
-- Database: Make sure to set the DATABASE_URL environment variable to point to your PostgreSQL database.
-- Environment variables: Copy the .env.local file and update values as needed for your deployment environment.
+# Create production README.md
+echo "📄 Creating production README.md..."
+cat > README.md << EOL
+# Advanced Pilot Training Platform
 
-## Important Note
+A cutting-edge aviation training platform leveraging advanced educational technologies to create an adaptive, personalized learning experience for aspiring pilots.
 
-This version has been modified to remove Replit-specific dependencies and configurations. If you encounter any issues,
-please check the WebSocket configuration in client/src/vite-hmr-fix.ts and the Vite configuration in vite.config.ts.
-" > README.export.md
+## Features
 
-echo "Project prepared for export at $EXPORT_DIR"
-echo "Please review the code and make any necessary adjustments before deploying."
+- Comprehensive training management system
+- 3D risk assessment matrix visualizations
+- Document processing and OCR capabilities
+- AI-powered syllabus generator
+- Knowledge graph visualization
+- Role-specific dashboards
+- Real-time collaboration via WebSockets
+
+## Quick Start
+
+1. Clone the repository
+2. Install dependencies: \`npm install\`
+3. Set up environment variables (see \`.env.example\`)
+4. Initialize database: \`npm run db:push\`
+5. Start the application: \`npm run dev\`
+
+## Deployment
+
+See [DEPLOYMENT_GUIDE.md](DEPLOYMENT_GUIDE.md) for detailed deployment instructions.
+
+## License
+
+Copyright © 2025 Advanced Pilot Training. All rights reserved.
+EOL
+
+# Create a ZIP archive
+echo "📦 Creating ZIP archive..."
+cd ..
+zip -r $EXPORT_DIR.zip $EXPORT_DIR
+
+echo "==========================================================="
+echo "✅ Export completed successfully!"
+echo "📁 Export directory: $EXPORT_DIR"
+echo "📦 ZIP archive: $EXPORT_DIR.zip"
+echo "🔍 Next steps:"
+echo "  1. Copy the ZIP archive to your deployment environment"
+echo "  2. Extract the archive: unzip $EXPORT_DIR.zip"
+echo "  3. Follow the instructions in DEPLOYMENT_GUIDE.md"
+echo "==========================================================="

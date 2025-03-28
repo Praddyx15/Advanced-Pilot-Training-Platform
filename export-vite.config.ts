@@ -9,6 +9,7 @@ const __dirname = dirname(__filename);
 export default defineConfig({
   plugins: [
     react(),
+    // Non-Replit environment doesn't need Replit-specific plugins
   ],
   resolve: {
     alias: {

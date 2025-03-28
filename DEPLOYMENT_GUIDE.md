@@ -1,154 +1,213 @@
 # Advanced Pilot Training Platform - Deployment Guide
 
-This guide provides instructions for deploying the Advanced Pilot Training Platform outside of Replit.
+This guide provides comprehensive instructions for deploying the Advanced Pilot Training Platform to environments outside of Replit, including traditional hosting providers, cloud platforms, and containerized environments.
 
 ## Prerequisites
 
-- Node.js 18+ and npm
-- PostgreSQL database
+- Node.js v18.x or v20.x LTS
+- PostgreSQL 14+ database
 - Git
 - Basic knowledge of terminal/command line
+- A hosting provider with support for Node.js applications
 
-## Export Process
+## Step 1: Prepare the Environment
 
-1. Run the export script (from within Replit):
-   ```
-   chmod +x export-project.sh
-   ./export-project.sh
-   ```
+### Database Setup
 
-2. Download the exported project from the `export-project` directory.
-
-## Deployment Steps
-
-### Local Development
-
-1. Install dependencies:
-   ```
-   npm install
+1. Create a PostgreSQL database for your application:
+   ```bash
+   createdb advanced_pilot_training
    ```
 
-2. Set up environment variables (create a `.env` file):
-   ```
-   DATABASE_URL=postgresql://username:password@hostname:port/database
-   SESSION_SECRET=your-secure-random-string
-   ```
-
-3. Run database migrations:
-   ```
-   npm run db:push
+2. Configure the database connection by setting the `DATABASE_URL` environment variable:
+   ```bash
+   export DATABASE_URL=postgresql://username:password@localhost:5432/advanced_pilot_training
    ```
 
-4. Start the development server:
-   ```
-   npm run dev
-   ```
+### Clone the Repository
 
-5. Access the application at http://localhost:3000
+```bash
+git clone https://github.com/your-username/advanced-pilot-training-platform.git
+cd advanced-pilot-training-platform
+```
 
-### Production Deployment
+## Step 2: Apply Replit-Independent Files
 
-#### Option 1: Traditional Hosting
+The repository includes special files designed for non-Replit environments. You'll need to use these files instead of their Replit-specific counterparts:
 
-1. Build the application:
-   ```
-   npm run build
-   ```
-
-2. Start the production server:
-   ```
-   npm start
+1. Replace the Vite configuration:
+   ```bash
+   cp export-vite.config.ts vite.config.ts
    ```
 
-#### Option 2: Docker Deployment
-
-1. Create a Dockerfile in the project root:
-   ```dockerfile
-   FROM node:18-alpine as builder
-
-   WORKDIR /app
-   COPY package*.json ./
-   RUN npm ci
-   COPY . .
-   RUN npm run build
-
-   FROM node:18-alpine
-
-   WORKDIR /app
-   COPY --from=builder /app/package*.json ./
-   COPY --from=builder /app/dist ./dist
-   COPY --from=builder /app/node_modules ./node_modules
-
-   ENV NODE_ENV=production
-   EXPOSE 3000
-
-   CMD ["npm", "start"]
+2. Use the standard WebSocket implementation:
+   ```bash
+   cp client/src/vite-hmr-fix-standard.ts client/src/vite-hmr-fix.ts
    ```
 
-2. Build and run the Docker container:
+3. Use the standard routes file:
+   ```bash
+   cp server/routes-standard.ts server/routes.ts
    ```
+
+4. Remove Replit-specific metadata from HTML files:
+   ```bash
+   node clean-html.js
+   node remove-replit-metadata.js
+   ```
+
+## Step 3: Install Dependencies
+
+```bash
+npm install
+```
+
+## Step 4: Set Up Environment Variables
+
+Create a `.env` file in the project root with the following variables:
+
+```
+# Database
+DATABASE_URL=postgresql://username:password@localhost:5432/advanced_pilot_training
+
+# Session
+SESSION_SECRET=your-secure-session-secret
+
+# API Keys (if needed)
+XAI_API_KEY=your-xai-api-key
+```
+
+## Step 5: Initialize the Database
+
+```bash
+npm run db:push
+```
+
+This will create all necessary tables according to your Drizzle schema.
+
+## Step 6: Build the Application
+
+```bash
+npm run build
+```
+
+This generates the production build in the `dist` directory.
+
+## Step 7: Start the Application
+
+### Development Mode
+
+```bash
+npm run dev
+```
+
+### Production Mode
+
+```bash
+npm run start
+```
+
+## Deployment Options
+
+### Option 1: Traditional Node.js Hosting
+
+1. Upload the built application (everything except `node_modules`)
+2. Install dependencies on the server: `npm install --production`
+3. Start the application: `npm run start`
+
+### Option 2: Docker Deployment
+
+A Dockerfile is included for containerized deployment:
+
+1. Build the Docker image:
+   ```bash
    docker build -t advanced-pilot-training .
-   docker run -p 3000:3000 --env-file .env advanced-pilot-training
    ```
 
-#### Option 3: Platform as a Service (Render, Railway, etc.)
+2. Run the container:
+   ```bash
+   docker run -p 3000:3000 -e DATABASE_URL=postgresql://user:password@host:5432/dbname advanced-pilot-training
+   ```
 
-1. Connect your Git repository to the platform
-2. Configure the build settings:
-   - Build command: `npm install && npm run build`
-   - Start command: `npm start`
-3. Set environment variables (DATABASE_URL, SESSION_SECRET, etc.)
-4. Deploy the application
+### Option 3: Cloud Platform Deployment
 
-## Common Issues and Solutions
+#### Vercel
 
-### WebSocket Connection Problems
+1. Connect your repository to Vercel
+2. Set the required environment variables in the Vercel dashboard
+3. Deploy using the Vercel dashboard or CLI
 
-If you encounter WebSocket connection issues:
+#### Railway/Render/Fly.io
 
-1. Check that the WebSocket server is properly set up in `server/routes-standard.ts`
-2. Ensure the client is connecting to the correct WebSocket URL in `client/src/vite-hmr-fix-standard.ts`
-3. Verify that your hosting provider supports WebSockets
+These platforms can deploy directly from your repository with minimal configuration:
 
-### THREE.js Visualization Issues
+1. Connect your repository to the platform
+2. Configure environment variables
+3. Deploy using the platform's dashboard or CLI
 
-The 3D visualizations use THREE.js and React Three Fiber. If you encounter rendering issues:
+## WebSocket Configuration
 
-1. Make sure the browser supports WebGL
-2. Check browser console for errors related to THREE.js
-3. The application has fallback mechanisms for when 3D rendering fails, but you can further customize these in the visualization components
+The WebSocket server is configured to run on the same port as the HTTP server with a path of `/ws`. Make sure your hosting provider supports WebSockets.
+
+For clients connecting to the WebSocket server:
+
+```javascript
+const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+const host = window.location.host;
+const wsUrl = `${protocol}//${host}/ws`;
+const socket = new WebSocket(wsUrl);
+```
+
+## Troubleshooting
 
 ### Database Connection Issues
 
-1. Verify your DATABASE_URL is correct
-2. Ensure the PostgreSQL server is running and accessible
-3. Check firewall settings if connecting to a remote database
+- Verify that the `DATABASE_URL` environment variable is set correctly
+- Ensure the database user has the necessary permissions
+- Check if your hosting provider requires SSL for database connections
 
-## Customization
+### WebSocket Connection Failures
 
-### Styling and Theme
+- Verify that your hosting provider supports WebSockets
+- Check that the WebSocket path `/ws` isn't blocked by a proxy
+- Ensure your client is using the correct WebSocket URL
 
-The application uses Tailwind CSS with ShadCN UI components. You can customize the theme in:
+### Missing Environment Variables
 
-1. The `theme.json` file at the root
-2. Tailwind configuration in `tailwind.config.ts`
+- Double-check that all required environment variables are set
+- Some platforms require setting environment variables through their dashboard
+- Secret values should never be committed to your repository
 
-### Adding Features
+## Maintenance
 
-The application is structured as follows:
+### Database Migrations
 
-- `client/src` - Frontend code
-  - `components` - UI components
-  - `hooks` - React hooks
-  - `lib` - Utility functions
-  - `pages` - Page components
-- `server` - Backend code
-- `shared` - Shared types and utilities
+When your Drizzle schema changes, run the migration command:
 
-Follow the existing patterns when adding new features. Use the standard development practices for React and Express applications.
+```bash
+npm run db:push
+```
 
-## Conclusion
+### Updating the Application
 
-This guide provides the basics for deploying the Advanced Pilot Training Platform. For more detailed information, refer to the documentation specific to your chosen deployment platform.
+1. Pull the latest changes: `git pull`
+2. Install dependencies: `npm install`
+3. Build the application: `npm run build`
+4. Restart the server: `npm run start`
 
-For questions or support, contact the development team.
+## Security Considerations
+
+- Always use HTTPS in production
+- Keep your `SESSION_SECRET` secure and unique for each environment
+- Regularly update dependencies: `npm audit fix`
+- Implement rate limiting for API endpoints
+- Set up monitoring and logging
+
+## Support
+
+If you encounter issues during deployment, please:
+
+1. Check the application logs for error messages
+2. Consult the documentation for your hosting provider
+3. Review the troubleshooting section in this guide
+4. Contact our support team at support@advancedpilottraining.com
