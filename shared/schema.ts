@@ -179,8 +179,10 @@ export const documents = pgTable("documents", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   fileName: text("file_name"),
-  tags: text("tags"),
+  tags: text("tags").array(),
   currentVersionId: integer("current_version_id"),
+  createKnowledgeGraph: boolean("create_knowledge_graph").default(false),
+  processingStatus: text("processing_status").default('pending'), // pending, processing, complete, error
 });
 
 export const insertDocumentSchema = createInsertSchema(documents).pick({
@@ -197,6 +199,8 @@ export const insertDocumentSchema = createInsertSchema(documents).pick({
   metadata: true,
   fileName: true,
   tags: true,
+  createKnowledgeGraph: true,
+  processingStatus: true,
 });
 
 // Document content (extracted data) schema
@@ -413,19 +417,22 @@ export const insertNotificationSchema = createInsertSchema(notifications).pick({
 
 // Knowledge Graph - Nodes
 export const knowledgeGraphNodes = pgTable("knowledge_graph_nodes", {
-  id: serial("id").primaryKey(),
-  nodeType: text("node_type").notNull(), // 'concept', 'competency', 'regulation', 'lesson', etc.
-  content: text("content").notNull(),
-  metadata: jsonb("metadata"),
-  documentId: integer("document_id"), // Source document if applicable
+  id: text("id").primaryKey(), // Using string ID for better compatibility with the provided code
+  label: text("label").notNull(), // Display name of the concept
+  category: text("category").notNull(), // Category (e.g., flight_operations, aircraft_systems)
+  description: text("description"), // Description or context
+  importance: real("importance").default(0.5).notNull(), // Importance score between 0-1
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),  // Source document
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
 export const insertKnowledgeGraphNodeSchema = createInsertSchema(knowledgeGraphNodes).pick({
-  nodeType: true,
-  content: true,
-  metadata: true,
+  id: true,
+  label: true,
+  category: true,
+  description: true,
+  importance: true,
   documentId: true,
   createdAt: true,
   updatedAt: true,
@@ -434,20 +441,20 @@ export const insertKnowledgeGraphNodeSchema = createInsertSchema(knowledgeGraphN
 // Knowledge Graph - Edges (Relationships)
 export const knowledgeGraphEdges = pgTable("knowledge_graph_edges", {
   id: serial("id").primaryKey(),
-  sourceNodeId: integer("source_node_id").notNull(),
-  targetNodeId: integer("target_node_id").notNull(),
-  relationship: text("relationship").notNull(), // 'prerequisite', 'builds_on', 'references', etc.
-  weight: real("weight").default(1.0), // Relationship strength/relevance
-  metadata: jsonb("metadata"),
+  sourceId: text("source_id").notNull(), // References string ID in nodes table
+  targetId: text("target_id").notNull(), // References string ID in nodes table
+  type: text("type").notNull(), // Relationship type: 'prerequisite', 'related', 'part_of', etc.
+  strength: real("strength").default(1.0), // Relationship strength (0-1)
+  documentId: integer("document_id").notNull().references(() => documents.id, { onDelete: 'cascade' }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 export const insertKnowledgeGraphEdgeSchema = createInsertSchema(knowledgeGraphEdges).pick({
-  sourceNodeId: true,
-  targetNodeId: true,
-  relationship: true,
-  weight: true,
-  metadata: true,
+  sourceId: true,
+  targetId: true,
+  type: true,
+  strength: true,
+  documentId: true,
   createdAt: true,
 });
 

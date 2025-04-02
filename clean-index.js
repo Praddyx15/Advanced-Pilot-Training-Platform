@@ -1,40 +1,72 @@
 /**
- * Special HTML cleaner specifically for the client/index.html file
- * This handles the critical data-replit-metadata issue seen in the login page screenshot
+ * Specialized HTML cleaner for client/index.html
+ * 
+ * This script specifically targets the client/index.html file to remove Replit-specific
+ * metadata and configurations, ensuring it works correctly outside of Replit.
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
+const cheerio = require('cheerio');
 
-// Path to the client/index.html file
-const indexHtmlPath = path.join(__dirname, 'client', 'index.html');
+// Path to the index.html file
+const indexPath = path.join(process.cwd(), 'client', 'index.html');
 
-try {
-  console.log(`Processing index.html at: ${indexHtmlPath}`);
-  
-  // Check if the file exists
-  if (!fs.existsSync(indexHtmlPath)) {
-    console.error(`❌ File not found: ${indexHtmlPath}`);
-    process.exit(1);
+async function cleanIndexHtml() {
+  try {
+    console.log(`Processing index.html at: ${indexPath}`);
+    
+    // Read the HTML file
+    const html = await fs.readFile(indexPath, 'utf8');
+    
+    // Load HTML into cheerio
+    const $ = cheerio.load(html);
+    
+    // Remove Replit-specific attributes
+    $('[data-replit-metadata]').removeAttr('data-replit-metadata');
+    $('[data-replit-environment]').removeAttr('data-replit-environment');
+    $('[data-replit-host]').removeAttr('data-replit-host');
+    $('[data-replit-id]').removeAttr('data-replit-id');
+    
+    // Remove Replit-specific script tags
+    $('script[src*="replit"]').remove();
+    $('script:contains("replit")').remove();
+    
+    // Remove Replit-specific link tags
+    $('link[href*="replit"]').remove();
+    
+    // Fix base href if needed
+    if ($('base').length === 0) {
+      $('head').prepend('<base href="/" />');
+    }
+    
+    // Fix viewport meta tag if needed
+    if ($('meta[name="viewport"]').length === 0) {
+      $('head').append('<meta name="viewport" content="width=device-width, initial-scale=1.0" />');
+    }
+    
+    // Add standard favicon if not present
+    if ($('link[rel="icon"]').length === 0) {
+      $('head').append('<link rel="icon" type="image/png" href="/favicon.png" />');
+    }
+    
+    // Clean up the HTML
+    let cleanedHtml = $.html();
+    
+    // Remove Replit-specific comments
+    cleanedHtml = cleanedHtml.replace(/<!--.*replit.*-->/gi, '');
+    
+    // Replace hard-coded Replit URLs
+    cleanedHtml = cleanedHtml.replace(/https:\/\/[a-z0-9-]+\.replit\.app/g, '');
+    cleanedHtml = cleanedHtml.replace(/https:\/\/[a-z0-9-]+\.replit\.dev/g, '');
+    
+    // Write the cleaned HTML back to the file
+    await fs.writeFile(indexPath, cleanedHtml, 'utf8');
+    console.log(`✓ Successfully cleaned: ${indexPath}`);
+  } catch (error) {
+    console.error(`❌ Error processing index.html:`, error);
   }
-  
-  // Read the file content
-  let html = fs.readFileSync(indexHtmlPath, 'utf8');
-  
-  // Remove the data-replit-* attributes with regex
-  html = html.replace(/data-replit-[a-zA-Z0-9-]+="[^"]*"/g, '');
-  
-  // Remove any Replit-specific script tags
-  html = html.replace(/<script[^>]*replit[^>]*>[\s\S]*?<\/script>/g, '');
-  
-  // Remove metadata JSON objects containing Replit data
-  html = html.replace(/window\.REPLIT_DATA\s*=\s*{[\s\S]*?};/g, '');
-  
-  // Write the cleaned file
-  fs.writeFileSync(indexHtmlPath, html);
-  
-  console.log(`✅ Successfully cleaned index.html file`);
-} catch (error) {
-  console.error(`❌ Error processing index.html:`, error);
-  process.exit(1);
 }
+
+// Run the cleaning function
+cleanIndexHtml();

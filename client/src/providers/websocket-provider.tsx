@@ -1,94 +1,203 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { useToast } from '@/hooks/use-toast';
-import useWebSocket from '@/hooks/use-websocket';
-import { WebSocketStatus } from '@/lib/websocket';
+import React, { createContext, useEffect, useState, useContext, useCallback, ReactNode } from 'react';
+import { WebSocketClient, ConnectionStatus } from '@/lib/websocket';
+import { useAuth } from '@/hooks/use-auth';
+import { toast } from '@/hooks/use-toast';
 
-// WebSocket connection status context
+// Define the notification types
+export interface Notification {
+  id: string;
+  type: 'info' | 'warning' | 'success' | 'error';
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  link?: string;
+  data?: any;
+}
+
+// Define the WebSocket context
 interface WebSocketContextType {
   isConnected: boolean;
-  status: WebSocketStatus;
-  connectionAttempts: number;
+  connectionStatus: ConnectionStatus;
+  notifications: Notification[];
+  unreadCount: number;
+  // Methods
+  sendMessage: (type: string, payload: any, channel?: string) => boolean;
+  markAsRead: (id: string) => void;
+  markAllAsRead: () => void;
+  clearNotifications: () => void;
 }
 
-const WebSocketContext = createContext<WebSocketContextType | null>(null);
+const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
-// Hook to use WebSocket context
-export const useWebSocketStatus = () => {
-  const context = useContext(WebSocketContext);
-  if (!context) {
-    throw new Error('useWebSocketStatus must be used within a WebSocketProvider');
-  }
-  return context;
-};
-
-// Toast messages for different connection states
-const CONNECTION_MESSAGES = {
-  [WebSocketStatus.CONNECTED]: { 
-    title: 'Connected',
-    description: 'Real-time connection established',
-    variant: 'default' as const
-  },
-  [WebSocketStatus.DISCONNECTED]: { 
-    title: 'Disconnected',
-    description: 'Real-time connection lost. Trying to reconnect...',
-    variant: 'destructive' as const 
-  },
-  [WebSocketStatus.RECONNECTING]: { 
-    title: 'Reconnecting',
-    description: 'Attempting to restore real-time connection...',
-    variant: 'warning' as const
-  },
-  [WebSocketStatus.FAILED]: { 
-    title: 'Connection Failed',
-    description: 'Unable to establish real-time connection. Some features may be limited.',
-    variant: 'destructive' as const
-  }
-};
-
+// WebSocket Provider Props
 interface WebSocketProviderProps {
-  children: React.ReactNode;
-  showToasts?: boolean;
+  children: ReactNode;
 }
 
-export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ 
-  children,
-  showToasts = true
-}) => {
-  const { toast } = useToast();
-  const { status, isConnected } = useWebSocket(true);
-  const [connectionAttempts, setConnectionAttempts] = useState(0);
-  const [prevStatus, setPrevStatus] = useState<WebSocketStatus | null>(null);
-
-  // Track connection attempts and show toast messages on status changes
+export const WebSocketProvider: React.FC<WebSocketProviderProps> = ({ children }) => {
+  const { user } = useAuth();
+  const [client, setClient] = useState<WebSocketClient | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<ConnectionStatus>(ConnectionStatus.CLOSED);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  // Initialize WebSocket client
   useEffect(() => {
-    if (status !== prevStatus) {
-      // Update connection attempts counter
-      if (status === WebSocketStatus.RECONNECTING) {
-        setConnectionAttempts(prev => prev + 1);
-      } else if (status === WebSocketStatus.CONNECTED) {
-        setConnectionAttempts(0);
+    // Determine WebSocket URL
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    const wsClient = new WebSocketClient({
+      url: wsUrl,
+      reconnect: true,
+      autoConnect: true,
+      debug: true,
+    });
+    
+    // Set up status change handler
+    const statusUnsubscribe = wsClient.onStatusChange((status) => {
+      setConnectionStatus(status);
+      setIsConnected(status === ConnectionStatus.OPEN);
+    });
+    
+    // Set up message handlers
+    const notificationUnsubscribe = wsClient.on('notification', (notification: Notification) => {
+      handleNotification(notification);
+    });
+    
+    // Set up channel subscriptions
+    if (user) {
+      wsClient.subscribe('general');
+      wsClient.subscribe(`user:${user.id}`);
+      if (user.role) {
+        wsClient.subscribe(`role:${user.role}`);
       }
-
-      // Show toast message on significant changes
-      if (showToasts && (
-          (status === WebSocketStatus.CONNECTED && prevStatus !== null) ||  // Connected after initial load
-          status === WebSocketStatus.FAILED ||
-          (status === WebSocketStatus.DISCONNECTED && prevStatus === WebSocketStatus.CONNECTED) // Only on actual disconnection
-        )) {
-        const message = CONNECTION_MESSAGES[status];
-        toast(message);
+      if (user.organizationType) {
+        wsClient.subscribe(`org:${user.organizationType}`);
       }
-
-      // Update previous status
-      setPrevStatus(status);
     }
-  }, [status, prevStatus, toast, showToasts]);
-
+    
+    // Store the client
+    setClient(wsClient);
+    
+    // Clean up on unmount
+    return () => {
+      statusUnsubscribe();
+      notificationUnsubscribe();
+      wsClient.destroy();
+    };
+  }, [user]); // Recreate when user changes
+  
+  // Update auth token when user changes
+  useEffect(() => {
+    if (client && user) {
+      // You might need to get an actual WebSocket token here
+      // For now, just using user.id as identifier
+      client.setAuthToken(user.id.toString());
+    }
+  }, [client, user]);
+  
+  // Handle new notifications
+  const handleNotification = useCallback((notification: Notification) => {
+    // Add notification to state (at the beginning of the array)
+    setNotifications(prev => [
+      {
+        ...notification,
+        timestamp: notification.timestamp || new Date().toISOString(),
+        read: false
+      },
+      ...prev
+    ]);
+    
+    // Show toast for the notification
+    toast({
+      title: notification.title,
+      description: notification.message,
+      variant: notification.type === 'error' ? 'destructive' : 'default',
+    });
+  }, []);
+  
+  // Method to send a WebSocket message
+  const sendMessage = useCallback((type: string, payload: any, channel?: string) => {
+    if (!client) return false;
+    
+    return client.send({
+      type,
+      payload,
+      channel
+    });
+  }, [client]);
+  
+  // Method to mark a notification as read
+  const markAsRead = useCallback((id: string) => {
+    setNotifications(prev => 
+      prev.map(notification => 
+        notification.id === id 
+          ? { ...notification, read: true } 
+          : notification
+      )
+    );
+  }, []);
+  
+  // Method to mark all notifications as read
+  const markAllAsRead = useCallback(() => {
+    setNotifications(prev => 
+      prev.map(notification => ({ ...notification, read: true }))
+    );
+  }, []);
+  
+  // Method to clear all notifications
+  const clearNotifications = useCallback(() => {
+    setNotifications([]);
+  }, []);
+  
+  // Calculate unread count
+  const unreadCount = notifications.filter(n => !n.read).length;
+  
+  // Create context value
+  const contextValue: WebSocketContextType = {
+    isConnected,
+    connectionStatus,
+    notifications,
+    unreadCount,
+    sendMessage,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  };
+  
   return (
-    <WebSocketContext.Provider value={{ isConnected, status, connectionAttempts }}>
+    <WebSocketContext.Provider value={contextValue}>
       {children}
     </WebSocketContext.Provider>
   );
 };
 
-export default WebSocketProvider;
+// Custom hook to use WebSocket context
+export const useWebSocket = () => {
+  const context = useContext(WebSocketContext);
+  if (context === undefined) {
+    throw new Error('useWebSocket must be used within a WebSocketProvider');
+  }
+  return context;
+};
+
+// Export a separate hook for accessing and manipulating notifications
+export const useNotifications = () => {
+  const { 
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    clearNotifications 
+  } = useWebSocket();
+  
+  return {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  };
+};

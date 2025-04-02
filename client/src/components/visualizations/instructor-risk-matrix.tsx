@@ -6,7 +6,8 @@ import {
   Box, 
   Stars, 
   Html,
-  PerspectiveCamera
+  PerspectiveCamera,
+  Cylinder
 } from "@react-three/drei";
 import * as THREE from "three";
 import { RiskMatrixData, RiskMatrixConfig } from "@shared/risk-assessment-types";
@@ -84,14 +85,10 @@ const MatrixCube: React.FC<{
               position={position}
               onClick={() => onCellClick(x, y, z, value)}
             >
-              <meshStandardMaterial 
+              <meshBasicMaterial 
                 color={colorMap(value)}
                 transparent
                 opacity={isHighlighted ? 1 : 0.7}
-                roughness={0.3}
-                metalness={0.5}
-                emissive={colorMap(value)}
-                emissiveIntensity={isHighlighted ? 0.5 : 0.1}
               />
             </Box>
           );
@@ -196,6 +193,44 @@ const AxisLabels: React.FC<{ size: number }> = ({ size }) => {
   );
 };
 
+// Connection line between nodes
+const NodeConnection = ({ 
+  start, 
+  end, 
+  thickness = 0.05,
+  color = "#888888"
+}: { 
+  start: [number, number, number]; 
+  end: [number, number, number]; 
+  thickness?: number;
+  color?: string;
+}) => {
+  // Calculate the midpoint
+  const midX = (start[0] + end[0]) / 2;
+  const midY = (start[1] + end[1]) / 2;
+  const midZ = (start[2] + end[2]) / 2;
+  
+  // Calculate the distance between points
+  const dx = end[0] - start[0];
+  const dy = end[1] - start[1];
+  const dz = end[2] - start[2];
+  const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  
+  // Calculate the rotation to align the cylinder with the line
+  const rotX = Math.atan2(Math.sqrt(dx * dx + dz * dz), dy);
+  const rotZ = Math.atan2(dz, dx);
+  
+  return (
+    <mesh
+      position={[midX, midY, midZ]}
+      rotation={[rotX, 0, rotZ - Math.PI / 2]}
+    >
+      <cylinderGeometry args={[thickness, thickness, distance, 8]} />
+      <meshBasicMaterial color={color} transparent opacity={0.7} />
+    </mesh>
+  );
+};
+
 // Session point for visualization
 const SessionPoint: React.FC<{
   position: [number, number, number];
@@ -219,10 +254,8 @@ const SessionPoint: React.FC<{
     <group position={position} onClick={onClick}>
       <mesh ref={ref}>
         <sphereGeometry args={[size, 16, 16]} />
-        <meshStandardMaterial 
+        <meshBasicMaterial 
           color={color}
-          emissive={color}
-          emissiveIntensity={0.3}
           transparent
           opacity={0.8}
         />
@@ -986,10 +1019,10 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                             <group key={idx} position={module.position}>
                               <mesh>
                                 <sphereGeometry args={[size, 16, 16]} />
-                                <meshStandardMaterial 
+                                <meshBasicMaterial 
                                   color={color}
-                                  emissive={color}
-                                  emissiveIntensity={0.3}
+                                  transparent
+                                  opacity={0.8}
                                 />
                               </mesh>
                               <Html position={[0, size * 1.5, 0]} center>
@@ -1113,10 +1146,10 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                           <group position={data.position}>
                             <mesh>
                               <sphereGeometry args={[0.3, 16, 16]} />
-                              <meshStandardMaterial 
+                              <meshBasicMaterial 
                                 color={getRiskColor(Math.max(0, 100 - data.progress))}
-                                emissive={getRiskColor(Math.max(0, 100 - data.progress))}
-                                emissiveIntensity={0.3}
+                                transparent
+                                opacity={0.8}
                               />
                             </mesh>
                             <Html position={[0, 0.5, 0]} center>
@@ -1132,7 +1165,7 @@ export const InstructorRiskMatrix: React.FC<InstructorRiskMatrixProps> = ({
                               <group position={eval.position}>
                                 <mesh>
                                   <sphereGeometry args={[0.15, 16, 16]} />
-                                  <meshStandardMaterial 
+                                  <meshBasicMaterial 
                                     color={getRiskColor(Math.max(0, 100 - eval.score))}
                                     transparent
                                     opacity={0.8}

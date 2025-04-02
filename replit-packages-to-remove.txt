@@ -1,18 +1,18 @@
-# Replit-specific packages to remove when exporting
-# This file is used as a reference when preparing the project for export
+# List of Replit-specific packages to remove during export
+# These packages are either specific to Replit or are not needed for standard deployment environments
 
-# Vite Plugins
+# Replit plugins and packages
 @replit/vite-plugin-cartographer
 @replit/vite-plugin-runtime-error-modal
 @replit/vite-plugin-shadcn-theme-json
-
-# Other Replit-specific packages (to check if used)
-@replit/node-fetch
 @replit/database
-@replit/repl-auth
 
-# Notes for Export Process:
-# 1. The export-project.sh script removes these automatically
-# 2. Make sure to replace any code using these packages with standard alternatives
-# 3. For the Vite plugins, the export-vite.config.ts file already excludes them
-# 4. If adding new Replit-specific dependencies, update this list
+# Replit-specific tooling
+@replit/node-fetch
+@replit/crosis
+@replit/replit-url-parser
+
+# Other Replit-specific items that might exist in older projects
+replit-node-proxy
+replit-db
+replit-storage-api

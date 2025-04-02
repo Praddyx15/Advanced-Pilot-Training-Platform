@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { 
   OrbitControls, 
   Text, 
   Box, 
   Stars, 
-  Html
+  Html,
+  Cylinder
 } from "@react-three/drei";
 import * as THREE from "three";
 import { RiskMatrixData, RiskMatrixConfig } from "@shared/risk-assessment-types";
@@ -63,12 +64,10 @@ const ProgressNode = ({
     <group position={[position[0], position[1], position[2]]}>
       <mesh ref={nodeRef}>
         <sphereGeometry args={[baseSize, 16, 16]} />
-        <meshStandardMaterial 
+        <meshBasicMaterial 
           color={color}
-          roughness={0.3}
-          metalness={0.6}
-          emissive={color}
-          emissiveIntensity={0.4}
+          transparent
+          opacity={0.8}
         />
       </mesh>
       <Html position-y={baseSize * 1.5} center>
@@ -110,13 +109,11 @@ const NodeConnection = ({
   
   return (
     <mesh
-      position-x={midX}
-      position-y={midY}
-      position-z={midZ}
+      position={[midX, midY, midZ]}
       rotation={[rotX, 0, rotZ - Math.PI / 2]}
     >
       <cylinderGeometry args={[thickness, thickness, distance, 8]} />
-      <meshStandardMaterial color={color} transparent opacity={0.7} />
+      <meshBasicMaterial color={color} transparent opacity={0.7} />
     </mesh>
   );
 };

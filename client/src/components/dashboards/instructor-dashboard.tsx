@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'wouter';
 import { apiRequest } from '@/lib/queryClient';
+import { TrainingSession } from '../../types/training';
 import {
   Card,
   CardContent,
@@ -10,199 +10,267 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { SessionScheduler } from '@/components/scheduling/session-scheduler';
+import { CalendarView } from '@/components/scheduling/calendar-view';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { 
-  CalendarDays, 
+import {
   Loader2,
-  Users,
-  CheckCircle,
-  Clock,
-  User,
-  Play,
-  ChevronRight,
   PieChart,
-  BarChart,
+  Users,
+  CalendarClock,
+  Clock,
+  BookOpen,
+  FileCheck,
+  UserCheck,
+  BookMarked,
+  CheckCircle2,
+  XCircle,
+  CalendarDays,
+  FileText,
+  Clipboard,
+  Award,
+  Plane,
+  Calendar,
 } from 'lucide-react';
 import {
-  PieChart as RechartsPieChart,
-  Pie,
-  Cell,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  BarChart as RechartsBarChart,
-  Bar,
-  XAxis,
-  YAxis,
-} from 'recharts';
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import InstructorRiskMatrix2D from '@/components/visualizations/instructor-risk-matrix-2d';
+import { PerformanceAnalytics } from '@/components/analytics/performance-analytics';
+import { ComplianceChecker } from '@/components/compliance/compliance-checker';
+import { KnowledgeGraphVisualizer } from '@/components/knowledge-graph/knowledge-graph-visualizer';
+
+// Type definitions for data
+interface InstructorProfile {
+  firstName: string;
+  lastName: string;
+  id: string;
+  department: string;
+  role: string;
+  trainees: number;
+  coursesAssigned: number;
+  sessionsCompleted: number;
+  assessmentsGraded: number;
+  upcomingSessions: number;
+}
+
+interface TraineeItem {
+  id: string;
+  name: string;
+  program: string;
+  progress: number;
+  status: string;
+  lastSession: string;
+  nextSession: string | null;
+}
+
+interface UpcomingSession {
+  id: string;
+  title: string;
+  date: string;
+  time: string;
+  type: string;
+  trainees: string[];
+  location: string;
+  status: string;
+}
+
+interface PendingTask {
+  id: string;
+  task: string;
+  type: string;
+  dueDate: string;
+  priority: string;
+  traineeId?: string;
+  traineeName?: string;
+}
 
 export function InstructorDashboard() {
-  const { data: instructorProfile, isLoading: isProfileLoading } = useQuery({
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
+  // Fetch instructor profile data 
+  const { data: instructorData, isLoading: isInstructorLoading } = useQuery({
     queryKey: ['/api/instructor/profile'],
     queryFn: async () => {
       try {
         const response = await apiRequest('GET', '/api/instructor/profile');
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        console.error('Error fetching instructor profile:', error);
         return {
-          id: 1,
-          name: "Sarah Phillips",
-          qualification: "A320 Type Rating Instructor",
-          assignment: "Bay Assignment: 1 & 2",
-          todaySessions: 2,
-          activeTrainees: 8,
-          pendingGradesheets: 3,
-          teachingHours: 68,
-          totalMonthlyHours: 80
+          firstName: "Sarah",
+          lastName: "Martinez",
+          id: "INS1234",
+          department: "Flight Training",
+          role: "Senior Flight Instructor",
+          trainees: 16,
+          coursesAssigned: 5,
+          sessionsCompleted: 83,
+          assessmentsGraded: 57,
+          upcomingSessions: 8,
+          certifications: ["CPL", "ATPL", "Flight Instructor Rating", "Multi-Engine Rating"],
+          specializations: ["Commercial Pilot Training", "Emergency Procedures"]
         };
       }
     },
   });
 
-  // Fetch today's FFS sessions
-  const { data: todaysSessions, isLoading: isSessionsLoading } = useQuery({
-    queryKey: ['/api/instructor/today-sessions'],
+  // Fetch trainee list
+  const { data: trainees, isLoading: isTraineesLoading } = useQuery({
+    queryKey: ['/api/instructor/trainees'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/instructor/today-sessions');
+        const response = await apiRequest('GET', '/api/instructor/trainees');
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        console.error('Error fetching trainees:', error);
         return [
           {
-            id: 1,
-            name: "A320 FFS - Normal Procedures",
-            trainee: "James Davis",
-            trainingRecord: "TR-2025-03",
-            bay: "Bay 2",
-            duration: "4 hours",
-            phase: "Phase 2",
-            time: "14:00-18:00",
-            status: "upcoming"
+            id: "ST1001",
+            name: "Emma Johnson",
+            program: "ATPL",
+            progress: 78,
+            status: "on-track",
+            lastSession: "Mar 28, 2025",
+            nextSession: "Apr 1, 2025"
           },
           {
-            id: 2,
-            name: "A320 FFS - LOFT Scenario 3",
-            trainee: "Emily Wilson",
-            trainingRecord: "TR-2025-01",
-            bay: "Bay 1",
-            duration: "4 hours",
-            phase: "Phase 3",
-            time: "19:00-23:00",
-            status: "upcoming"
+            id: "ST1002",
+            name: "Michael Wilson",
+            program: "ATPL",
+            progress: 68,
+            status: "at-risk",
+            lastSession: "Mar 27, 2025",
+            nextSession: "Mar 31, 2025"
+          },
+          {
+            id: "ST1003",
+            name: "Sarah Lee",
+            program: "CPL",
+            progress: 92,
+            status: "excellent",
+            lastSession: "Mar 29, 2025",
+            nextSession: "Apr 3, 2025"
+          },
+          {
+            id: "ST1004",
+            name: "Robert Chen",
+            program: "PPL",
+            progress: 45,
+            status: "needs-attention",
+            lastSession: "Mar 25, 2025",
+            nextSession: "Mar 30, 2025"
           }
         ];
       }
     },
   });
 
-  // Fetch pending gradesheets
-  const { data: pendingGradesheets, isLoading: isGradesheetsLoading } = useQuery({
-    queryKey: ['/api/instructor/pending-gradesheets'],
+  // Fetch upcoming sessions
+  const { data: upcomingSessions, isLoading: isSessionsLoading } = useQuery({
+    queryKey: ['/api/instructor/upcoming-sessions'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/instructor/pending-gradesheets');
+        const response = await apiRequest('GET', '/api/instructor/upcoming-sessions');
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        console.error('Error fetching upcoming sessions:', error);
         return [
           {
-            id: 1,
-            trainee: "Michael Johnson",
-            session: "A320 FFS Phase 2",
-            date: "Mar 21, 2025"
+            id: "SES1001",
+            title: "B737 Simulator Training",
+            date: "Today",
+            time: "14:00-17:00",
+            type: "simulator",
+            trainees: ["ST1001", "ST1002"],
+            location: "Simulator Bay 3",
+            status: "confirmed"
           },
           {
-            id: 2,
-            trainee: "David Lee",
-            session: "A320 FFS Phase 3",
-            date: "Mar 21, 2025"
+            id: "SES1002",
+            title: "Emergency Procedures",
+            date: "Tomorrow",
+            time: "09:00-12:00",
+            type: "classroom",
+            trainees: ["ST1001", "ST1002", "ST1003", "ST1004"],
+            location: "Room 201",
+            status: "confirmed"
+          },
+          {
+            id: "SES1003",
+            title: "Cross-Country Planning",
+            date: "Apr 2",
+            time: "13:00-15:00",
+            type: "briefing",
+            trainees: ["ST1003"],
+            location: "Briefing Room 2",
+            status: "pending"
           }
         ];
       }
     },
   });
 
-  // Fetch trainee performance overview
-  const { data: traineesPerformance, isLoading: isTraineesLoading } = useQuery({
-    queryKey: ['/api/instructor/trainees-performance'],
+  // Fetch pending tasks
+  const { data: pendingTasks, isLoading: isTasksLoading } = useQuery({
+    queryKey: ['/api/instructor/pending-tasks'],
     queryFn: async () => {
       try {
-        const response = await apiRequest('GET', '/api/instructor/trainees-performance');
+        const response = await apiRequest('GET', '/api/instructor/pending-tasks');
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        console.error('Error fetching pending tasks:', error);
         return [
-          { id: 1, name: "James Davis", program: "A320 TR", progress: 54, status: "On Track" },
-          { id: 2, name: "Emily Wilson", program: "A320 TR", progress: 82, status: "On Track" },
-          { id: 3, name: "Michael Johnson", program: "A320 TR", progress: 90, status: "Attention" },
-          { id: 4, name: "David Lee", program: "A320 TR", progress: 75, status: "On Track" },
-          { id: 5, name: "Sandra Martinez", program: "A320 TR", progress: 70, status: "On Track" }
+          {
+            id: "TASK1001",
+            task: "Grade Navigation Test",
+            type: "assessment",
+            dueDate: "Today",
+            priority: "high",
+            traineeId: "ST1002",
+            traineeName: "Michael Wilson"
+          },
+          {
+            id: "TASK1002",
+            task: "Review Flight Plan",
+            type: "review",
+            dueDate: "Today",
+            priority: "medium",
+            traineeId: "ST1003",
+            traineeName: "Sarah Lee"
+          },
+          {
+            id: "TASK1003",
+            task: "Prepare Lesson Plan",
+            type: "preparation",
+            dueDate: "Tomorrow",
+            priority: "medium",
+            traineeId: null,
+            traineeName: null
+          },
+          {
+            id: "TASK1004",
+            task: "Complete Progress Report",
+            type: "administrative",
+            dueDate: "Apr 3",
+            priority: "low",
+            traineeId: "ST1004",
+            traineeName: "Robert Chen"
+          }
         ];
       }
     },
   });
 
-  // Fetch weekly schedule
-  const { data: weeklySchedule, isLoading: isWeeklyScheduleLoading } = useQuery({
-    queryKey: ['/api/instructor/weekly-schedule'],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest('GET', '/api/instructor/weekly-schedule');
-        return await response.json();
-      } catch (error) {
-        // Return mock data for development
-        const currentDate = new Date();
-        const startOfWeek = new Date(currentDate);
-        startOfWeek.setDate(currentDate.getDate() - currentDate.getDay() + 1); // Get Monday
-
-        const weekDays = Array.from({ length: 7 }, (_, i) => {
-          const day = new Date(startOfWeek);
-          day.setDate(startOfWeek.getDate() + i);
-          return {
-            date: day.toISOString(),
-            dayNumber: day.getDate(),
-            slots: []
-          };
-        });
-
-        // Add some schedule slots
-        weekDays[0].slots.push({ id: 1, type: "AM", time: "08:00-12:00" });
-        weekDays[1].slots.push({ id: 2, type: "PM", time: "13:00-17:00" });
-        weekDays[3].slots.push({ id: 3, type: "AM", time: "09:00-13:00" });
-        weekDays[4].slots.push({ id: 4, type: "PM", time: "14:00-18:00" });
-        weekDays[4].slots.push({ id: 5, type: "PM", time: "19:00-23:00" });
-        weekDays[6].slots.push({ id: 6, type: "OFF", time: "Day Off" });
-
-        return weekDays;
-      }
-    },
-  });
-
-  // Fetch assessment ratings data
-  const { data: assessmentRatings, isLoading: isAssessmentRatingsLoading } = useQuery({
-    queryKey: ['/api/instructor/assessment-ratings'],
-    queryFn: async () => {
-      try {
-        const response = await apiRequest('GET', '/api/instructor/assessment-ratings');
-        return await response.json();
-      } catch (error) {
-        // Return mock data for development
-        return [
-          { name: "Excellent", count: 15, color: "#10b981" },
-          { name: "Satisfactory", count: 42, color: "#3b82f6" },
-          { name: "Unsatisfactory", count: 8, color: "#f97316" },
-          { name: "Needs Improvement", count: 12, color: "#f59e0b" },
-        ];
-      }
-    },
-  });
-
-  // Loading states
-  if (isProfileLoading || isSessionsLoading || isGradesheetsLoading || isTraineesLoading || isWeeklyScheduleLoading || isAssessmentRatingsLoading) {
+  // Loading state
+  if (isInstructorLoading || isTraineesLoading || isSessionsLoading || isTasksLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
@@ -210,303 +278,229 @@ export function InstructorDashboard() {
     );
   }
 
-  const today = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  // Status badge color helper
+  const getStatusColor = (status: string) => {
+    switch(status) {
+      case 'on-track': return 'bg-blue-600';
+      case 'excellent': return 'bg-green-600';
+      case 'at-risk': return 'bg-amber-500';
+      case 'needs-attention': return 'bg-red-500';
+      case 'confirmed': return 'bg-green-600';
+      case 'pending': return 'bg-blue-600';
+      case 'high': return 'bg-red-500';
+      case 'medium': return 'bg-amber-500';
+      case 'low': return 'bg-blue-600';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  // Get icon for session type
+  const getSessionTypeIcon = (type: string) => {
+    switch(type) {
+      case 'simulator': return <PieChart className="h-4 w-4" />;
+      case 'classroom': return <Users className="h-4 w-4" />;
+      case 'briefing': return <FileText className="h-4 w-4" />;
+      case 'flight': return <Plane className="h-4 w-4" />;
+      default: return <Calendar className="h-4 w-4" />;
+    }
+  };
+
+  // Get icon for task type
+  const getTaskTypeIcon = (type: string) => {
+    switch(type) {
+      case 'assessment': return <FileCheck className="h-4 w-4" />;
+      case 'review': return <BookOpen className="h-4 w-4" />;
+      case 'preparation': return <Clipboard className="h-4 w-4" />;
+      case 'administrative': return <FileText className="h-4 w-4" />;
+      default: return <BookMarked className="h-4 w-4" />;
+    }
+  };
 
   return (
-    <div>
-      <div className="space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold">Instructor Dashboard</h1>
-            <p className="text-sm text-muted-foreground">
-              {instructorProfile?.qualification} • {instructorProfile?.assignment}
-            </p>
-          </div>
-          <div className="flex items-center mt-4 md:mt-0">
-            <p className="text-sm text-muted-foreground">{today}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {/* Today's Schedule */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Today's Schedule</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{instructorProfile?.todaySessions}</div>
-                <div className="w-10 h-5 rounded bg-teal-100 text-teal-800 text-xs font-medium flex items-center justify-center">
-                  On Duty
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">sessions</p>
-              <Progress 
-                value={100} 
-                className="h-1.5 mt-2 bg-teal-100" 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Active Trainees */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active Trainees</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{instructorProfile?.activeTrainees}</div>
-                <Users className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">trainees</p>
-              <Progress 
-                value={75} 
-                className="h-1.5 mt-2" 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Pending Gradesheets */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Pending Gradesheets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{instructorProfile?.pendingGradesheets}</div>
-                <div className="w-14 h-5 rounded bg-amber-100 text-amber-800 text-xs font-medium flex items-center justify-center">
-                  Due within 24h
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">to complete</p>
-              <Progress 
-                value={40} 
-                className="h-1.5 mt-2 bg-amber-100" 
-              />
-            </CardContent>
-          </Card>
-
-          {/* Teaching Hours */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Teaching Hours</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{instructorProfile?.teachingHours}</div>
-                <Clock className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">/ {instructorProfile?.totalMonthlyHours} hrs</p>
-              <Progress 
-                value={(instructorProfile?.teachingHours / instructorProfile?.totalMonthlyHours) * 100} 
-                className="h-1.5 mt-2" 
-              />
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Today's FFS Sessions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Today's FFS Sessions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {todaysSessions?.map((session, index) => (
-                  <div key={index} className="p-4 border border-border rounded-lg relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-teal-500 before:rounded-l-lg">
-                    <div className="flex justify-between mb-2">
-                      <h3 className="font-medium">{session.name}</h3>
-                      <Badge variant="secondary" className="text-xs">{session.time}</Badge>
-                    </div>
-                    <div className="text-sm text-muted-foreground mb-2">
-                      Trainee: {session.trainee} • {session.trainingRecord}
-                    </div>
-                    <div className="text-sm text-muted-foreground mb-3">
-                      {session.bay} • {session.duration} • {session.phase}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      className="bg-teal-500 hover:bg-teal-600"
-                    >
-                      {session.time.split('-')[0] < new Date().toLocaleTimeString('en-US', { hour: '2-digit', hour12: false }) ? 'Start Session' : 'Upcoming'}
-                      <Play className="ml-2 h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Trainee Performance Overview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Trainee Performance Overview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead>
-                    <tr className="text-left text-xs text-muted-foreground border-b">
-                      <th className="pb-2 font-medium">Name</th>
-                      <th className="pb-2 font-medium">Program</th>
-                      <th className="pb-2 font-medium">Progress</th>
-                      <th className="pb-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {traineesPerformance?.map((trainee, index) => (
-                      <tr key={index} className="border-b hover:bg-muted/50">
-                        <td className="py-3 text-sm font-medium">{trainee.name}</td>
-                        <td className="py-3 text-sm">{trainee.program}</td>
-                        <td className="py-3">
-                          <div className="flex items-center">
-                            <Progress 
-                              value={trainee.progress} 
-                              className="h-1.5 w-16 mr-2" 
-                            />
-                            <span className="text-xs">{trainee.progress}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3">
-                          <Badge 
-                            variant={trainee.status === 'Attention' ? 'destructive' : 'default'}
-                            className={`${trainee.status === 'On Track' ? 'bg-teal-500 hover:bg-teal-600' : ''}`}
-                          >
-                            {trainee.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-          
-          {/* Assessment Ratings */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Assessment Ratings Distribution</CardTitle>
-              <CardDescription>Overview of all trainee assessment ratings</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center">
-              <div className="h-64 w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <RechartsPieChart>
-                    <Pie
-                      data={assessmentRatings}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="count"
-                      nameKey="name"
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                    >
-                      {assessmentRatings?.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value, name) => [`${value} assessments`, name]}
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                        borderRadius: '0.5rem',
-                        border: '1px solid #e2e8f0',
-                        boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
-                      }}
-                    />
-                    <Legend />
-                  </RechartsPieChart>
-                </ResponsiveContainer>
-              </div>
-            </CardContent>
-            <CardFooter className="flex justify-center">
-              <Button variant="outline" className="w-full md:w-auto">
-                View Detailed Assessment Report
-                <ChevronRight className="ml-2 h-4 w-4" />
-              </Button>
-            </CardFooter>
-          </Card>
-
-          {/* Pending Gradesheets */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Pending Gradesheets</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {pendingGradesheets?.map((gradesheet, index) => (
-                  <div key={index} className="p-4 border border-border rounded-lg relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-amber-500 before:rounded-l-lg">
-                    <div className="flex justify-between mb-2">
-                      <h3 className="font-medium">{gradesheet.trainee} - {gradesheet.session}</h3>
-                    </div>
-                    <div className="text-sm text-muted-foreground mb-3">
-                      Session Date: {gradesheet.date}
-                    </div>
-                    <Button 
-                      size="sm" 
-                      className="w-full justify-center"
-                    >
-                      Complete
-                      <CheckCircle className="ml-2 h-3 w-3" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Weekly Schedule Preview */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Weekly Schedule Preview</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-7 gap-2 text-center mb-2">
-                <div className="text-xs font-medium">Mon</div>
-                <div className="text-xs font-medium">Tue</div>
-                <div className="text-xs font-medium">Wed</div>
-                <div className="text-xs font-medium">Thu</div>
-                <div className="text-xs font-medium">Fri</div>
-                <div className="text-xs font-medium">Sat</div>
-                <div className="text-xs font-medium">Sun</div>
-              </div>
-              <div className="grid grid-cols-7 gap-2 text-center mb-4">
-                {weeklySchedule?.map((day, index) => (
-                  <div key={index} className="text-xs">
-                    {day.dayNumber}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-2">
-                {weeklySchedule?.map((day, index) => (
-                  <div key={index} className="min-h-14 text-xs">
-                    {day.slots.map((slot, slotIndex) => (
-                      <div 
-                        key={slotIndex} 
-                        className={`mb-1 p-1 rounded text-center ${
-                          slot.type === 'AM' ? 'bg-blue-100 text-blue-700' : 
-                          slot.type === 'PM' ? 'bg-teal-100 text-teal-700' : 
-                          'bg-amber-100 text-amber-700'
-                        }`}
-                      >
-                        {slot.type}
+    <div className="container py-6">
+      {/* Header with instructor info */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Instructor Dashboard</h1>
+        <p className="text-muted-foreground">
+          {instructorData.department} • {instructorData.role} • ID: {instructorData.id}
+        </p>
+      </div>
+      
+      {/* Stats overview */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Assigned Trainees</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <UserCheck className="h-5 w-5 text-primary mr-2" />
+              <div className="text-3xl font-bold">{instructorData.trainees}</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Courses</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <BookOpen className="h-5 w-5 text-primary mr-2" />
+              <div className="text-3xl font-bold">{instructorData.coursesAssigned}</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Sessions Completed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <CheckCircle2 className="h-5 w-5 text-primary mr-2" />
+              <div className="text-3xl font-bold">{instructorData.sessionsCompleted}</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Assessments Graded</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <Award className="h-5 w-5 text-primary mr-2" />
+              <div className="text-3xl font-bold">{instructorData.assessmentsGraded}</div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm">Upcoming Sessions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center">
+              <CalendarDays className="h-5 w-5 text-primary mr-2" />
+              <div className="text-3xl font-bold">{instructorData.upcomingSessions}</div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* Trainees Status and Pending Tasks */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Trainees Status */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Trainee Status</CardTitle>
+            <CardDescription>Overview of your assigned trainees</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Program</TableHead>
+                  <TableHead>Progress</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {trainees.map((trainee: TraineeItem) => (
+                  <TableRow key={trainee.id}>
+                    <TableCell className="font-medium">{trainee.name}</TableCell>
+                    <TableCell>{trainee.program}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Progress value={trainee.progress} className="w-20 h-2" />
+                        <span className="text-xs">{trainee.progress}%</span>
                       </div>
-                    ))}
-                  </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(trainee.status)}>
+                        {trainee.status.split('-').map(word => 
+                          word.charAt(0).toUpperCase() + word.slice(1)
+                        ).join(' ')}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+        
+        {/* Pending Tasks */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Tasks</CardTitle>
+            <CardDescription>Tasks requiring your attention</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {pendingTasks.map((task: PendingTask) => (
+                <div key={task.id} className="flex items-start gap-4 p-3 rounded-lg border bg-card">
+                  <div className={`flex items-center justify-center size-8 rounded-full ${
+                    task.priority === 'high' ? 'bg-red-100 text-red-600' :
+                    task.priority === 'medium' ? 'bg-amber-100 text-amber-600' :
+                    'bg-blue-100 text-blue-600'
+                  }`}>
+                    {getTaskTypeIcon(task.type)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <h3 className="font-medium">{task.task}</h3>
+                      <Badge className={getStatusColor(task.priority)}>
+                        {task.priority.charAt(0).toUpperCase() + task.priority.slice(1)}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {task.traineeName && <>Trainee: {task.traineeName} • </>}
+                      Due: {task.dueDate}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      
+      {/* 2D Risk Assessment Matrix */}
+      <div className="mb-6">
+        <InstructorRiskMatrix2D className="w-full" />
+      </div>
+      
+      {/* Upcoming Sessions and Scheduling */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold mb-4">Session Management</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <CalendarView 
+            sessions={upcomingSessions || []} 
+            onSelectSession={(session: TrainingSession) => {
+              // Logic to handle session selection
+              console.log("Selected session:", session);
+            }}
+          />
+          <SessionScheduler variant="instructor" />
         </div>
+      </div>
+      
+      {/* Performance Analytics */}
+      <div className="mb-6">
+        <PerformanceAnalytics variant="instructor" />
+      </div>
+      
+      {/* Knowledge Graph */}
+      <div className="mb-6">
+        <KnowledgeGraphVisualizer variant="compact" defaultLayout="radial" />
+      </div>
+      
+      {/* Compliance Checker */}
+      <div className="mb-6">
+        <ComplianceChecker variant="compact" />
       </div>
     </div>
   );

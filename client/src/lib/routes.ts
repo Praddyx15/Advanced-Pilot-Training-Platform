@@ -146,6 +146,7 @@ export const getNavigationItems = (userRole?: string) => {
         { name: 'Performance Metrics', path: ROUTES.AIRLINE.PERFORMANCE_METRICS, icon: 'trending-up' },
         { name: 'Risk Assessment', path: ROUTES.COMPLIANCE, icon: 'shield' },
         { name: 'Analytics', path: ROUTES.ANALYTICS, icon: 'bar-chart-2' },
+        { name: 'Knowledge Graph', path: ROUTES.KNOWLEDGE_GRAPH, icon: 'git-branch' },
       ];
       
     case RoleType.ATO:
@@ -158,6 +159,7 @@ export const getNavigationItems = (userRole?: string) => {
         { name: 'Compliance', path: ROUTES.ATO.COMPLIANCE, icon: 'shield-check' },
         { name: 'Program Management', path: ROUTES.ATO.PROGRAM_MANAGEMENT, icon: 'settings' },
         { name: 'Syllabus Generator', path: ROUTES.SYLLABUS_GENERATOR, icon: 'cpu' },
+        { name: 'Knowledge Graph', path: ROUTES.KNOWLEDGE_GRAPH, icon: 'git-branch' },
         { name: 'Risk Assessment', path: ROUTES.COMPLIANCE, icon: 'shield' },
       ];
       

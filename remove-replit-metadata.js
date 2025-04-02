@@ -1,126 +1,150 @@
 /**
- * Script to remove all Replit-specific metadata from HTML and JavaScript files
- * This script targets data-replit-* attributes and any other Replit-specific markers
- * To run: node remove-replit-metadata.js
+ * Script to remove Replit-specific code from all files
+ * 
+ * This script traverses your project and removes all Replit-specific code,
+ * making the project suitable for deployment outside Replit.
+ * 
+ * Usage:
+ *   node remove-replit-metadata.js [directory]
  */
 
-const fs = require('fs');
+const fs = require('fs').promises;
 const path = require('path');
 
-// File extensions to process
-const EXTENSIONS_TO_PROCESS = ['.html', '.js', '.jsx', '.ts', '.tsx', '.css', '.json'];
+// Exclude directories
+const EXCLUDE_DIRS = ['node_modules', '.git', 'dist', 'build'];
 
-// Text patterns to remove or replace
-const PATTERNS = [
-  // HTML attributes
-  { regex: /data-replit-[a-zA-Z0-9-]+="[^"]*"/g, replacement: '' },
+// File extensions to process
+const EXTENSIONS = ['.js', '.jsx', '.ts', '.tsx', '.html', '.css'];
+
+// Patterns to replace
+const REPLIT_PATTERNS = [
+  // Data attributes
+  { regex: /data-replit-[a-z-]+="[^"]*"/g, replacement: '' },
   
-  // JavaScript object references
-  { regex: /window\.REPLIT_DATA\s*=\s*{[\s\S]*?};/g, replacement: '' },
-  { regex: /REPLIT_DATA\.[a-zA-Z0-9_.]+/g, replacement: 'null' },
+  // Import statements
+  { regex: /import\s+.*?from\s+['"]@replit\/.*?['"]/g, replacement: '// Import removed: Replit-specific' },
   
-  // Replit.com URLs
-  { regex: /(["'])https?:\/\/replit\.com[^"']*\1/g, replacement: '$1#$1' },
-  { regex: /(["'])https?:\/\/\w+\.replit\.app[^"']*\1/g, replacement: '$1#$1' },
+  // Require statements
+  { regex: /(?:const|let|var)\s+.*?\s*=\s*require\s*\(\s*['"]@replit\/.*?['"]\s*\)/g, replacement: '// Require removed: Replit-specific' },
   
-  // Import statements for Replit packages
-  { regex: /import .*? from ["']@replit\/.*?["'];?\n?/g, replacement: '' },
-  { regex: /require\(["']@replit\/.*?["']\);?\n?/g, replacement: '' },
+  // Replit URLs
+  { regex: /https:\/\/[a-z0-9-]+\.replit\.(app|dev)/g, replacement: '' },
   
-  // Replit-specific environment variables
-  { regex: /process\.env\.REPLIT_[A-Z_]+/g, replacement: 'undefined' },
-  { regex: /import\.meta\.env\.REPLIT_[A-Z_]+/g, replacement: 'undefined' },
+  // Replit-specific Vite plugins
+  { regex: /@replit\/vite-plugin-[a-z-]+/g, replacement: '/* Replit plugin removed */' },
   
-  // Plugin registrations
-  { regex: /replitPlugin\s*\([\s\S]*?\),?/g, replacement: '' },
-  { regex: /@replit\/.*?Plugin\s*\([\s\S]*?\),?/g, replacement: '' }
+  // Replit environment variables
+  { regex: /process\.env\.REPLIT_[A-Z_]+/g, replacement: 'undefined /* Replit env removed */' },
+  
+  // Replit-specific HTML meta tags
+  { regex: /<meta.*?data-replit.*?>/g, replacement: '' },
+  
+  // Replit-specific script tags
+  { regex: /<script.*?replit.*?<\/script>/g, replacement: '' },
+  
+  // Replit-specific comments
+  { regex: /\/\/\s*Replit.*$/gm, replacement: '' },
+  { regex: /\/\*\s*Replit[\s\S]*?\*\//g, replacement: '' },
+  
+  // Replit code blocks
+  { regex: /if\s*\(\s*process\.env\.REPLIT\s*\)\s*\{[\s\S]*?\}/g, replacement: '/* Replit-specific block removed */' },
+  { regex: /if\s*\(\s*typeof\s+Replit\s*!==\s*['"]undefined['"]\s*\)\s*\{[\s\S]*?\}/g, replacement: '/* Replit-specific block removed */' },
 ];
 
 /**
- * Find all files with specified extensions in a directory recursively
- * @param {string} dir - Directory to search
- * @returns {string[]} Array of file paths
+ * Process a single file to remove Replit-specific code
+ * @param {string} filePath - Path to the file
  */
-function findFiles(dir) {
-  let results = [];
-  
-  const list = fs.readdirSync(dir);
-  
-  for (const file of list) {
-    // Skip node_modules and .git directories
-    if (file === 'node_modules' || file === '.git' || file.startsWith('.')) {
-      continue;
+async function processFile(filePath) {
+  try {
+    // Read the file
+    const content = await fs.readFile(filePath, 'utf8');
+    
+    // Apply all replacement patterns
+    let newContent = content;
+    let hasChanges = false;
+    
+    for (const pattern of REPLIT_PATTERNS) {
+      const replacedContent = newContent.replace(pattern.regex, pattern.replacement);
+      
+      if (replacedContent !== newContent) {
+        hasChanges = true;
+        newContent = replacedContent;
+      }
     }
     
-    const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
-    
-    if (stat.isDirectory()) {
-      // Recursively search subdirectories
-      results = results.concat(findFiles(filePath));
-    } else if (EXTENSIONS_TO_PROCESS.includes(path.extname(file).toLowerCase())) {
-      // Add files with matching extensions to results
-      results.push(filePath);
+    // Only write back if changes were made
+    if (hasChanges) {
+      await fs.writeFile(filePath, newContent, 'utf8');
+      console.log(`Cleaned: ${filePath}`);
     }
+  } catch (error) {
+    console.error(`Error processing ${filePath}:`, error);
+  }
+}
+
+/**
+ * Find all matching files in a directory recursively
+ * @param {string} dir - Directory to search
+ * @returns {Promise<string[]>} Array of file paths
+ */
+async function findFiles(dir) {
+  const results = [];
+  
+  try {
+    const files = await fs.readdir(dir);
+    
+    for (const file of files) {
+      const filePath = path.join(dir, file);
+      const stat = await fs.stat(filePath);
+      
+      if (stat.isDirectory()) {
+        // Skip excluded directories
+        if (EXCLUDE_DIRS.includes(file)) {
+          continue;
+        }
+        
+        // Recursively process subdirectories
+        const subDirFiles = await findFiles(filePath);
+        results.push(...subDirFiles);
+      } else {
+        // Check if the file has a matching extension
+        const ext = path.extname(file).toLowerCase();
+        if (EXTENSIONS.includes(ext)) {
+          results.push(filePath);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(`Error reading directory ${dir}:`, error);
   }
   
   return results;
 }
 
 /**
- * Process a single file to remove Replit-specific code
- * @param {string} filePath - Path to the file
- */
-function processFile(filePath) {
-  try {
-    console.log(`Processing: ${filePath}`);
-    
-    // Read the file content
-    let content = fs.readFileSync(filePath, 'utf8');
-    let originalContent = content;
-    
-    // Apply all patterns
-    for (const pattern of PATTERNS) {
-      content = content.replace(pattern.regex, pattern.replacement);
-    }
-    
-    // Only write the file if changes were made
-    if (content !== originalContent) {
-      fs.writeFileSync(filePath, content);
-      console.log(`✅ Updated: ${filePath}`);
-    } else {
-      console.log(`ℹ️ No changes needed: ${filePath}`);
-    }
-  } catch (error) {
-    console.error(`❌ Error processing ${filePath}:`, error.message);
-  }
-}
-
-/**
  * Main function to clean all files
+ * @param {string} directory - Directory to process
  */
-function main() {
-  console.log('🧹 Starting Replit metadata removal process...');
-  
-  // Find all files to process
-  const files = findFiles('.');
-  console.log(`Found ${files.length} files to process`);
-  
-  // Process each file
-  let processed = 0;
-  for (const filePath of files) {
-    processFile(filePath);
-    processed++;
+async function cleanFiles(directory) {
+  try {
+    // Find all matching files
+    const files = await findFiles(directory);
+    console.log(`Found ${files.length} files to process`);
     
-    // Show progress every 100 files
-    if (processed % 100 === 0) {
-      console.log(`Progress: ${processed}/${files.length} files (${Math.round(processed/files.length*100)}%)`);
+    // Process each file
+    for (const filePath of files) {
+      await processFile(filePath);
     }
+    
+    console.log('File cleaning completed successfully!');
+  } catch (error) {
+    console.error('Error cleaning files:', error);
+    process.exit(1);
   }
-  
-  console.log('✅ Replit metadata removal process completed successfully');
-  console.log(`Processed ${processed} files total`);
 }
 
-// Run the main function
-main();
+// Get directory from command line argument or use current directory
+const directory = process.argv[2] || process.cwd();
+cleanFiles(directory);

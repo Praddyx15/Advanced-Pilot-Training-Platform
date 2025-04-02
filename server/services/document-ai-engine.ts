@@ -9,18 +9,18 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as util from 'util';
 import { removeStopwords } from 'stopword';
-import * as nlp from 'compromise';
+import nlp from 'compromise';
 import compromiseParagraphs from 'compromise-paragraphs';
 import Storage from 'node-storage';
 import { RegulatoryReference, GeneratedSyllabus, ExtractedModule, ExtractedLesson, ExtractedCompetency, SyllabusGenerationOptions } from '@shared/syllabus-types';
 import { logger } from '../core/logger';
 
 // Use compromise plugins
-// With newer compromise versions, plugins work differently
-// Just importing the plugin is enough as it auto-registers
-// This is a no-op but keeping for documentation purposes
+// Make sure to register the plugin explicitly
+nlp.extend(compromiseParagraphs);
+// But we try to extend it anyway for older versions compatibility
 try {
-  // @ts-ignore
+  // @ts-ignore - this is only for older compromise versions
   if (typeof nlp.extend === 'function') {
     // @ts-ignore
     nlp.extend(compromiseParagraphs);
@@ -145,16 +145,24 @@ export class DocumentAIEngine {
 
   /**
    * Extract text from PDF
-   * Note: This is a simplified implementation
    */
   private async extractFromPdf(filePath: string): Promise<string> {
     try {
-      // Simplified implementation for now
-      // In a real implementation, use pdfjs-dist or pdf-parse
-      return `Sample PDF text extracted from ${filePath}. In a real implementation, this would contain the actual PDF content.`;
+      // Dynamic import pdf-parse
+      const pdfParse = await import('pdf-parse').then(module => module.default);
+      
+      // Read the file
+      const dataBuffer = fs.readFileSync(filePath);
+      
+      // Parse PDF
+      const pdfData = await pdfParse(dataBuffer);
+      
+      // Return the text content
+      return pdfData.text || '';
     } catch (error) {
       logger.error(`PDF extraction error: ${error instanceof Error ? error.message : String(error)}`);
-      return '';
+      // Return meaningful information instead of empty string on failure
+      return `[Error extracting PDF: ${error instanceof Error ? error.message : String(error)}]`;
     }
   }
 
@@ -163,12 +171,17 @@ export class DocumentAIEngine {
    */
   private async extractFromDocx(filePath: string): Promise<string> {
     try {
-      // Simplified implementation for now
-      // In a real implementation, use mammoth
-      return `Sample DOCX text extracted from ${filePath}. In a real implementation, this would contain the actual document content.`;
+      // Dynamic import mammoth
+      const mammoth = await import('mammoth').then(module => module.default);
+      
+      // Extract text from the document
+      const result = await mammoth.extractRawText({ path: filePath });
+      
+      return result.value || '';
     } catch (error) {
       logger.error(`DOCX extraction error: ${error instanceof Error ? error.message : String(error)}`);
-      return '';
+      // Return meaningful information instead of empty string on failure
+      return `[Error extracting DOCX: ${error instanceof Error ? error.message : String(error)}]`;
     }
   }
 
@@ -177,12 +190,35 @@ export class DocumentAIEngine {
    */
   private async extractFromExcel(filePath: string): Promise<string> {
     try {
-      // Simplified implementation for now
-      // In a real implementation, use xlsx
-      return `Sample Excel text extracted from ${filePath}. In a real implementation, this would contain the actual spreadsheet content.`;
+      // Dynamic import xlsx
+      const XLSX = await import('xlsx').then(module => module.default);
+      
+      // Read the workbook
+      const workbook = XLSX.readFile(filePath);
+      let text = '';
+      
+      // Process each sheet
+      for (const sheetName of workbook.SheetNames) {
+        // Add sheet name as a heading
+        text += `\n## ${sheetName}\n\n`;
+        
+        // Get sheet data as JSON
+        const sheet = workbook.Sheets[sheetName];
+        const sheetData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+        
+        // Convert sheet data to text
+        for (const row of sheetData) {
+          if (Array.isArray(row) && row.length > 0) {
+            text += row.join('\t') + '\n';
+          }
+        }
+      }
+      
+      return text;
     } catch (error) {
       logger.error(`Excel extraction error: ${error instanceof Error ? error.message : String(error)}`);
-      return '';
+      // Return meaningful information instead of empty string on failure
+      return `[Error extracting Excel: ${error instanceof Error ? error.message : String(error)}]`;
     }
   }
 
@@ -198,7 +234,9 @@ export class DocumentAIEngine {
     let paragraphs: any[] = [];
     try {
       // Default to empty array if this fails
-      paragraphs = nlp(text).paragraphs().json() || [];
+      const doc = nlp(text);
+      // @ts-ignore - paragraphs() is provided by the plugin
+      paragraphs = doc.paragraphs().json() || [];
     } catch (error) {
       console.warn('Error extracting paragraphs with compromise', error);
     }
@@ -448,7 +486,15 @@ export class DocumentAIEngine {
    * Count paragraphs in text
    */
   private countParagraphs(text: string): number {
-    return (nlp(text) as any).paragraphs().length;
+    try {
+      const doc = nlp(text);
+      // @ts-ignore - paragraphs() is provided by the plugin
+      return doc.paragraphs().length;
+    } catch (error) {
+      console.warn('Error counting paragraphs with compromise', error);
+      // Fallback: split by double newlines (simple paragraph detection)
+      return text.split(/\n\s*\n/).filter(p => p.trim().length > 0).length;
+    }
   }
 
   /**
@@ -668,7 +714,18 @@ export class DocumentAIEngine {
     const modules: ExtractedModule[] = [];
     
     // Extract paragraphs
-    const paragraphs = (nlp(text) as any).paragraphs().json();
+    let paragraphs: any[] = [];
+    try {
+      const doc = nlp(text);
+      // @ts-ignore - paragraphs() is provided by the plugin
+      paragraphs = doc.paragraphs().json() || [];
+    } catch (error) {
+      console.warn('Error extracting paragraphs for module generation', error);
+      // Fallback: split by double newlines (simple paragraph detection)
+      paragraphs = text.split(/\n\s*\n/)
+        .filter(p => p.trim().length > 0)
+        .map(p => ({ text: p }));
+    }
     
     // Map to collect topics
     const topicMap = new Map<string, string[]>();

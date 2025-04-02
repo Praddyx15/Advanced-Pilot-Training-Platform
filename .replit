@@ -15,8 +15,24 @@ localPort = 3000
 externalPort = 3000
 
 [[ports]]
+localPort = 4000
+externalPort = 3002
+
+[[ports]]
 localPort = 5000
 externalPort = 80
+
+[[ports]]
+localPort = 5001
+externalPort = 3003
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 24678
+externalPort = 3001
 
 [workflows]
 runButton = "Restart Full Application"

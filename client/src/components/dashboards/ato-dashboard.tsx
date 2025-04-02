@@ -10,6 +10,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { SessionScheduler } from '@/components/scheduling/session-scheduler';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -440,6 +441,25 @@ export function ATODashboard() {
                   </div>
                 ))}
               </div>
+            </CardContent>
+          </Card>
+        </div>
+        
+        {/* Session Scheduler Component */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Training Session Scheduler</CardTitle>
+              <CardDescription>Manage and schedule training sessions for all programs</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SessionScheduler 
+                variant="ato" 
+                initialTab="upcoming" 
+                onSuccess={() => {
+                  // Optionally refresh dashboard data when sessions are updated
+                }}
+              />
             </CardContent>
           </Card>
         </div>

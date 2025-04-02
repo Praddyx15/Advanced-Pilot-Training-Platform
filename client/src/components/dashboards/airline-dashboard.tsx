@@ -10,6 +10,7 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { SessionScheduler } from '@/components/scheduling/session-scheduler';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,6 +53,10 @@ import {
 } from 'recharts';
 
 export function AirlineDashboard() {
+  const [activeView, setActiveView] = useState('overview');
+  const [selectedProgram, setSelectedProgram] = useState('All Programs');
+  const [dateRange, setDateRange] = useState("Q1 2025");
+
   // Fetch airline profile and data
   const { data: airlineData, isLoading: isAirlineLoading } = useQuery({
     queryKey: ['/api/airline/profile'],
@@ -60,17 +65,23 @@ export function AirlineDashboard() {
         const response = await apiRequest('GET', '/api/airline/profile');
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        // Return sample data for development
         return {
           name: "SkyWings Airlines",
-          fleetSize: 42,
-          activeTrainingPrograms: 8,
-          totalTrainees: 164,
-          activeTrainees: 78,
-          completedTrainings: 912,
-          overallComplianceRate: 94.8,
-          regulatoryAuthorities: ["EASA", "FAA"],
-          nextAuditDate: "2025-05-15"
+          logo: "/assets/skyways-logo.png",
+          fleetSize: 54,
+          aircraftTypes: ["A320", "B737", "B777", "E175"],
+          operationalBases: ["LHR", "MAN", "EDI", "DUB"],
+          activeTrainingPrograms: 12,
+          totalTrainees: 264,
+          activeTrainees: 128,
+          completedTrainings: 1045,
+          overallComplianceRate: 96.2,
+          regulatoryAuthorities: ["EASA", "FAA", "UK CAA"],
+          nextAuditDate: "2025-05-15",
+          safetyScore: 92,
+          operationalReadiness: 94,
+          trainingEffectiveness: 88
         };
       }
     },
@@ -578,6 +589,30 @@ export function AirlineDashboard() {
                 </Link>
               </Button>
             </CardFooter>
+          </Card>
+        </div>
+        
+        {/* Training Session Scheduler */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <CalendarClock className="h-5 w-5 mr-2 text-blue-600" />
+                Flight Crew Training Scheduler
+              </CardTitle>
+              <CardDescription>
+                Manage and schedule training sessions for flight crew members
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SessionScheduler 
+                variant="airline" 
+                initialTab="upcoming" 
+                onSuccess={() => {
+                  // Optionally refresh dashboard data when sessions are updated
+                }}
+              />
+            </CardContent>
           </Card>
         </div>
       </div>

@@ -1,41 +1,8 @@
-/**
- * Standard routes file for deployment outside of Replit
- * Uses the standard WebSocket implementation
- */
-
 import { Express } from "express";
-import { createServer, Server } from "http";
+import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { setupAuth } from "./auth";
 import { storage } from "./storage";
-import { z } from "zod";
-import * as syllabusGenerator from "./services/syllabus-generator";
-import * as templateManager from "./services/syllabus-template-manager";
-import { 
-  registerDocumentRoutes,
-  registerSessionRoutes,
-  registerSyllabusRoutes,
-  registerKnowledgeGraphRoutes,
-  registerTrainingRoutes,
-  registerAssessmentRoutes,
-  registerResourceRoutes,
-  registerNotificationRoutes,
-  registerFlightRecordRoutes,
-  registerAchievementRoutes,
-  registerOcrRoutes,
-  registerDocumentAnalysisRoutes,
-  registerScheduleRoutes,
-  setupThemeRoutes,
-  riskAssessmentRouter,
-  registerTraineeRoutes
-} from "./routes/index";
-import { apiVersioning } from "./api/api-versioning";
-import { setupApiDocs } from "./api/api-docs";
-import v1Router from "./api/v1-router";
-import { logger } from "./core";
-
-// Global WebSocket clients map
-let wsClients = new Map<string, WebSocket>();
 
 /**
  * Register all routes and set up the HTTP server with WebSocket support
@@ -44,153 +11,126 @@ let wsClients = new Map<string, WebSocket>();
  * @returns HTTP Server instance
  */
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Set up authentication routes and middleware
+  // Set up authentication routes (/api/register, /api/login, /api/logout, /api/user)
   setupAuth(app);
-  
-  // Set up API versioning
-  apiVersioning.registerVersion({
-    version: 'v1',
-    status: 'stable',
-    releaseDate: new Date('2025-03-22'),
-    router: v1Router
+
+  // Standard HTTP routes
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
-  
-  // Apply API versioning middleware
-  apiVersioning.applyVersioning(app);
-  
-  // Set up Swagger API documentation
-  setupApiDocs(app);
-  
-  // Log API setup
-  logger.info('API versioning and documentation initialized');
 
-  // Initialize with seed data if no users exist
-  const seedDatabase = async () => {
-    const users = await storage.getAllUsers();
-    if (users.length === 0) {
-      // TODO: Initialize with seed data here if needed
-    }
-  };
+  app.get("/api/version", (req, res) => {
+    res.json({ version: "1.0.0", environment: process.env.NODE_ENV });
+  });
 
-  seedDatabase();
-  
-  // Register all routes from dedicated route files
-  registerDocumentRoutes(app);
-  registerSessionRoutes(app);
-  registerSyllabusRoutes(app);
-  registerKnowledgeGraphRoutes(app);
-  registerTrainingRoutes(app);
-  registerAssessmentRoutes(app);
-  registerResourceRoutes(app);
-  registerNotificationRoutes(app);
-  registerFlightRecordRoutes(app);
-  registerAchievementRoutes(app);
-  registerOcrRoutes(app);
-  registerDocumentAnalysisRoutes(app);
-  registerScheduleRoutes(app);
-  setupThemeRoutes(app);
-  registerTraineeRoutes(app);
-  
-  // Risk Assessment API
-  app.use('/api/risk-assessments', riskAssessmentRouter);
-  
   // Create HTTP server
   const httpServer = createServer(app);
-  
-  // Set up WebSocket server
-  const wss = new WebSocketServer({ 
+
+  // Add WebSocket server
+  const wss = new WebSocketServer({
     server: httpServer,
-    path: '/ws'
+    path: process.env.WS_PATH || "/ws",
   });
-  
+
   // WebSocket connection handling
-  wss.on('connection', (ws: WebSocket) => {
-    logger.info('WebSocket client connected');
-    
-    // Generate client ID
-    const clientId = Math.random().toString(36).substring(2, 15);
-    wsClients.set(clientId, ws);
-    
-    // Send welcome message
-    ws.send(JSON.stringify({
-      type: 'connection',
-      message: 'Connected to APTP WebSocket Server',
-      timestamp: new Date().toISOString(),
-      clientId
-    }));
-    
-    // Handle incoming messages
-    ws.addEventListener('message', (event) => {
-      try {
-        const data = JSON.parse(event.data.toString());
-        
-        // Handle message based on type
-        switch (data.type) {
-          case 'ping':
-            ws.send(JSON.stringify({
-              type: 'pong',
-              timestamp: new Date().toISOString()
-            }));
-            break;
-            
-          case 'subscribe':
-            // Handle subscription requests
-            logger.info(`WebSocket client ${clientId} subscribed to: ${data.channel}`);
-            ws.send(JSON.stringify({
-              type: 'subscription_confirm',
-              channel: data.channel,
-              timestamp: new Date().toISOString()
-            }));
-            break;
-            
-          default:
-            logger.warn(`Received unknown WebSocket message type: ${data.type}`);
-        }
-      } catch (error) {
-        logger.error('Error processing WebSocket message', { context: { error } });
-      }
-    });
-    
-    // Handle client disconnection
-    ws.addEventListener('close', () => {
-      logger.info(`WebSocket client disconnected: ${clientId}`);
-      wsClients.delete(clientId);
-    });
-    
-    // Handle errors
-    ws.addEventListener('error', (error) => {
-      logger.error('WebSocket error', { context: { error, clientId } });
-      wsClients.delete(clientId);
-    });
-    
-    // Send ping every 30 seconds to keep connection alive
+  wss.on("connection", (ws: WebSocket) => {
+    console.log("[INFO] WebSocket client connected");
+
+    // Setup ping-pong to keep connection alive
     const pingInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ 
-          type: 'ping', 
-          timestamp: new Date().toISOString() 
-        }));
-      } else {
-        clearInterval(pingInterval);
+        ws.ping();
       }
     }, 30000);
-  });
-  
-  // Set up the broadcast notification function for global use
-  (globalThis as any).broadcastNotification = (channel: string, data: any) => {
-    const message = JSON.stringify({
-      type: 'notification',
-      channel,
-      data,
-      timestamp: new Date().toISOString()
+
+    // Send welcome message
+    ws.send(JSON.stringify({
+      type: "connection",
+      message: "Connected to Advanced Pilot Training Platform",
+      timestamp: new Date().toISOString(),
+    }));
+
+    // Message handler
+    ws.on("message", async (message: string) => {
+      try {
+        const data = JSON.parse(message.toString());
+        console.log(`[INFO] WebSocket message received: ${data.type}`);
+
+        // Handle different message types
+        switch (data.type) {
+          case "ping":
+            ws.send(JSON.stringify({
+              type: "pong",
+              timestamp: new Date().toISOString(),
+            }));
+            break;
+
+          case "subscribe":
+            // Handle channel subscriptions here
+            ws.send(JSON.stringify({
+              type: "subscription_ack",
+              channel: data.channel,
+              timestamp: new Date().toISOString(),
+            }));
+            break;
+
+          // Add more message type handlers as needed
+
+          default:
+            ws.send(JSON.stringify({
+              type: "error",
+              message: `Unknown message type: ${data.type}`,
+              timestamp: new Date().toISOString(),
+            }));
+            break;
+        }
+      } catch (error) {
+        console.error("[ERROR] WebSocket message processing error:", error);
+        
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: "error",
+            message: "Failed to process message",
+            error: (error as Error).message,
+            timestamp: new Date().toISOString(),
+          }));
+        }
+      }
     });
+
+    // Connection close handler
+    ws.on("close", () => {
+      console.log("[INFO] WebSocket client disconnected");
+      clearInterval(pingInterval);
+    });
+
+    // Error handler
+    ws.on("error", (error) => {
+      console.error("[ERROR] WebSocket error:", error);
+      clearInterval(pingInterval);
+    });
+  });
+
+  // Broadcast function for sending messages to all connected clients
+  (wss as any).broadcast = function broadcast(data: any) {
+    const message = typeof data === "string" ? data : JSON.stringify(data);
     
-    wsClients.forEach((client) => {
+    wss.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
       }
     });
   };
-  
+
+  // Attach broadcast function to global scope for use in other modules
+  global.broadcast = (wss as any).broadcast;
+
+  // Add more routes here
+
   return httpServer;
+}
+
+// Define global broadcast function
+declare global {
+  var broadcast: (data: any) => void;
 }

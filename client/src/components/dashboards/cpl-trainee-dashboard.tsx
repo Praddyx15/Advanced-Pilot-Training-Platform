@@ -10,6 +10,9 @@ import {
   CardTitle,
   CardFooter,
 } from "@/components/ui/card";
+import { SessionScheduler } from '@/components/scheduling/session-scheduler';
+import { CalendarView } from '@/components/scheduling/calendar-view';
+import { TrainingSession } from '../../types/training';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,9 +36,10 @@ import {
   PieChart,
   Dices,
   Box,
+  Network,
 } from 'lucide-react';
 import { RoleType } from "@shared/risk-assessment-types";
-import TraineeRiskMatrix from "@/components/visualizations/trainee-risk-matrix";
+import TraineeRiskMatrix2D from "@/components/visualizations/trainee-risk-matrix-2d";
 import {
   Table,
   TableBody,
@@ -343,36 +347,40 @@ export function CPLTraineeDashboard() {
       
       {/* Upcoming Schedule and Performance Analytics */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* Upcoming Schedule */}
-        <Card>
-          <CardHeader>
-            <CardTitle>My Upcoming Schedule</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Activity</TableHead>
-                  <TableHead>Date & Time</TableHead>
-                  <TableHead>Status</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {upcomingSchedule.map((item: ScheduleItem, index: number) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.activity}</TableCell>
-                    <TableCell>{item.date}, {item.time}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(item.status)}>
-                        {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+        {/* Upcoming Schedule with Session Scheduler and Calendar View */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Training Schedule</h2>
+          
+          {/* Convert upcomingSchedule to TrainingSession format for CalendarView */}
+          <CalendarView 
+            sessions={(upcomingSchedule || []).map((schedule: ScheduleItem, index: number) => ({
+              id: `session-${index}`,
+              title: schedule.activity,
+              date: schedule.date === 'Today' 
+                ? new Date().toISOString().split('T')[0] 
+                : schedule.date === 'Tomorrow'
+                ? new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0]
+                : `2025-${schedule.date.replace('Mar ', '03-')}`,
+              startTime: schedule.time.split('-')[0],
+              endTime: schedule.time.split('-')[1],
+              location: 'Training Center',
+              type: schedule.activity.toLowerCase().includes('simulator') 
+                ? 'simulator' 
+                : schedule.activity.toLowerCase().includes('flight') 
+                ? 'flight'
+                : schedule.activity.toLowerCase().includes('emergency') 
+                ? 'briefing'
+                : 'classroom',
+              trainees: ['current-user'],
+              instructorId: 'INS1234',
+              status: schedule.status
+            }))}
+            onSelectSession={(session: TrainingSession) => {
+              console.log("Selected session:", session);
+              // Handle session selection, e.g., show details
+            }}
+          />
+        </div>
         
         {/* Performance Analytics */}
         <Card>
@@ -404,48 +412,23 @@ export function CPLTraineeDashboard() {
         </Card>
       </div>
       
-      {/* 3D Risk Matrix Visualization */}
+      {/* 2D Risk Assessment Matrix */}
       <div className="mb-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Risk Assessment Matrix</CardTitle>
-              <CardDescription>Interactive 3D visualization of your safety performance</CardDescription>
-            </div>
-            <Box className="h-6 w-6 text-primary" />
-          </CardHeader>
-          <CardContent className="pt-0">
-            {/* Wrap in an error boundary div */}
-            <div className="relative">
-              <div className="w-full">
-                {(() => {
-                  try {
-                    return <TraineeRiskMatrix className="w-full" />;
-                  } catch (error) {
-                    console.error("Error rendering 3D Risk Matrix:", error);
-                    return (
-                      <div className="p-6 text-center border border-yellow-200 bg-yellow-50 rounded-md">
-                        <AlertCircle className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
-                        <h3 className="font-medium text-yellow-800">3D Visualization Issue</h3>
-                        <p className="text-sm text-yellow-700 mt-1">
-                          Unable to load the 3D risk matrix. This may be due to browser compatibility issues.
-                        </p>
-                      </div>
-                    );
-                  }
-                })()}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <TraineeRiskMatrix2D className="w-full" />
       </div>
       
       {/* Recommended Resources, Feedback and Goals */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Recommended Resources */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recommended Resources</CardTitle>
+            <Button variant="outline" asChild size="sm">
+              <Link href="/knowledge-graph">
+                <Network className="h-4 w-4 mr-2" />
+                Knowledge Graph
+              </Link>
+            </Button>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

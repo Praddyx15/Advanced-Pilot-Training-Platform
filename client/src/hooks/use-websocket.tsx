@@ -1,121 +1,107 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import websocketClient, { WebSocketStatus, WebSocketTopic, WebSocketHandler } from '@/lib/websocket';
+import { useEffect, useState, useCallback } from 'react';
+import { useWebSocket as useWebSocketContext, Notification as WebSocketNotification } from '@/providers/websocket-provider';
+import { ConnectionStatus } from '@/lib/websocket';
 
 /**
- * React hook for using the WebSocket client
- * @param autoConnect Whether to connect automatically
- * @returns WebSocket utilities
+ * Custom hook for using WebSockets in components
+ * 
+ * @param options Configuration options for the WebSocket hook
+ * @returns WebSocket state and methods
  */
-export function useWebSocket(autoConnect: boolean = true) {
-  const [status, setStatus] = useState<WebSocketStatus>(websocketClient.getStatus());
-  const [isConnected, setIsConnected] = useState<boolean>(websocketClient.isConnected());
-
-  // Connect to WebSocket
-  const connect = useCallback(() => {
-    websocketClient.connect();
-  }, []);
-
-  // Disconnect from WebSocket
-  const disconnect = useCallback(() => {
-    websocketClient.disconnect();
-  }, []);
-
-  // Reconnect to WebSocket
-  const reconnect = useCallback(() => {
-    websocketClient.disconnect();
-    setTimeout(() => websocketClient.connect(), 500);
-  }, []);
-
-  // Subscribe to a WebSocket topic
-  const subscribe = useCallback((topic: WebSocketTopic, handler?: WebSocketHandler) => {
-    if (handler) {
-      // Original behavior with handler
-      websocketClient.subscribe(topic, handler);
-      
-      // Return unsubscribe function
-      return () => {
-        websocketClient.unsubscribe(topic, handler);
-      };
-    } else {
-      // Simple subscription without handler for the tester component
-      const dummyHandler = (data: any) => {
-        console.log(`[WebSocket] Received message on topic ${topic}:`, data);
-      };
-      websocketClient.subscribe(topic, dummyHandler);
-    }
-  }, []);
-
-  // Unsubscribe from a WebSocket topic
-  const unsubscribe = useCallback((topic: WebSocketTopic) => {
-    // This is a simplified version for the tester component
-    // It's not perfect as it doesn't know which handler to unsubscribe,
-    // but works for testing purposes
-    const dummyHandler = () => {};
-    websocketClient.unsubscribe(topic, dummyHandler);
-  }, []);
-
-  // Send a WebSocket message
-  const send = useCallback((type: string, data?: any) => {
-    websocketClient.send(type, data);
-  }, []);
-
-  // Update status when WebSocket status changes
-  useEffect(() => {
-    const handleStatusChange = (newStatus: WebSocketStatus) => {
-      setStatus(newStatus);
-      setIsConnected(websocketClient.isConnected());
-    };
-    
-    websocketClient.onStatusChange(handleStatusChange);
-    
-    return () => {
-      websocketClient.offStatusChange(handleStatusChange);
-    };
-  }, []);
-
-  // Auto-connect if requested
-  useEffect(() => {
-    if (autoConnect && status === WebSocketStatus.DISCONNECTED) {
-      connect();
-    }
-    
-    // Don't disconnect on unmount - WebSocket is a singleton
-  }, [autoConnect, connect, status]);
-
-  // Return WebSocket utilities
-  return useMemo(() => ({
-    status,
+export function useWebSocket(options?: {
+  onOpen?: () => void;
+  onClose?: () => void;
+  onError?: (error: any) => void;
+  onNotification?: (notification: WebSocketNotification) => void;
+}) {
+  const {
     isConnected,
-    connected: isConnected, // Alias for the tester component
-    connect,
-    disconnect,
-    reconnect,
-    subscribe,
-    unsubscribe,
-    send
-  }), [status, isConnected, connect, disconnect, reconnect, subscribe, unsubscribe, send]);
-}
-
-/**
- * React hook for subscribing to a WebSocket topic
- * @param topic Topic to subscribe to
- * @param handler Function to handle incoming messages
- * @param deps Dependencies for handler
- */
-export function useWebSocketSubscription<T = any>(
-  topic: WebSocketTopic,
-  handler: (data: T) => void,
-  deps: React.DependencyList = []
-) {
-  const { subscribe } = useWebSocket();
+    connectionStatus,
+    notifications,
+    unreadCount,
+    sendMessage,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  } = useWebSocketContext();
   
+  // Handle connection status changes
   useEffect(() => {
-    const wrappedHandler = (data: T) => {
-      handler(data);
-    };
+    if (connectionStatus === ConnectionStatus.OPEN && options?.onOpen) {
+      options.onOpen();
+    } else if (
+      (connectionStatus === ConnectionStatus.CLOSED || 
+       connectionStatus === ConnectionStatus.ERROR) && 
+      options?.onClose
+    ) {
+      options.onClose();
+    }
     
-    return subscribe(topic, wrappedHandler);
-  }, [topic, subscribe, ...deps]);
+    if (connectionStatus === ConnectionStatus.ERROR && options?.onError) {
+      options.onError({ message: 'WebSocket connection error' });
+    }
+  }, [connectionStatus, options]);
+  
+  // Handle new notifications
+  useEffect(() => {
+    if (notifications.length > 0 && options?.onNotification) {
+      // Find unread notifications and call the handler for each one
+      const unreadNotifications = notifications.filter(n => !n.read);
+      unreadNotifications.forEach(notification => {
+        // Explicitly cast to WebSocketNotification to avoid type issues
+        options.onNotification?.(notification as WebSocketNotification);
+      });
+    }
+  }, [notifications, options]);
+  
+  /**
+   * Send a notification to a specific user or channel
+   */
+  const sendNotification = useCallback((
+    params: {
+      title: string;
+      message: string;
+      type?: 'info' | 'warning' | 'success' | 'error';
+      userId?: number | string;
+      role?: string;
+      organization?: string;
+      link?: string;
+      data?: any;
+    }
+  ) => {
+    const { title, message, type = 'info', userId, role, organization, link, data } = params;
+    let channel = 'general';
+    
+    // Determine the appropriate channel
+    if (userId) {
+      channel = `user:${userId}`;
+    } else if (role) {
+      channel = `role:${role}`;
+    } else if (organization) {
+      channel = `org:${organization}`;
+    }
+    
+    return sendMessage('notification', {
+      id: Date.now().toString(),
+      type,
+      title,
+      message,
+      timestamp: new Date().toISOString(),
+      read: false,
+      link,
+      data,
+    }, channel);
+  }, [sendMessage]);
+  
+  return {
+    isConnected,
+    connectionStatus,
+    notifications,
+    unreadCount,
+    sendMessage,
+    sendNotification,
+    markAsRead,
+    markAllAsRead,
+    clearNotifications,
+  };
 }
-
-export default useWebSocket;

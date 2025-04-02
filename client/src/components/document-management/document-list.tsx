@@ -1,11 +1,5 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useToast } from '@/hooks/use-toast';
 import {
   Table,
   TableBody,
@@ -13,15 +7,10 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu';
-import {
+  Card,
+  Button,
+  Input,
+  Badge,
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -30,227 +19,62 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { 
-  File, FileText, FileSpreadsheet, PresentationIcon, FileArchive, 
-  Search, MoreVertical, Eye, ArrowUpDown, Download, Trash2, Clock, 
-  Filter, CheckCircle2, BookOpenCheck, BookOpen, Brain, 
-  CalendarDays, FilePlus2, FileSearch, BarChart3, Database, Loader2
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { UploadedDocument } from './document-uploader';
-import { cn } from '@/lib/utils';
-import { apiRequest, queryClient } from '@/lib/queryClient';
+} from '@/components/ui';
+import { Search, FileText, Trash2, Eye, SortAsc, SortDesc, ArrowDownUp } from 'lucide-react';
+import DocumentService from '@/services/document-service';
+import { useToast } from '@/hooks/use-toast';
+import { DocumentProcessingStatus } from '@shared/document-types';
 
-export function DocumentList() {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<keyof UploadedDocument>('createdAt');
+export interface DocumentListProps {
+  onViewDocument?: (documentId: number) => void;
+}
+
+const DocumentList: React.FC<DocumentListProps> = ({ onViewDocument }) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
-  const [statusFilter, setStatusFilter] = useState<string | null>(null);
-  const [documentToDelete, setDocumentToDelete] = useState<UploadedDocument | null>(null);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [activeDocument, setActiveDocument] = useState<UploadedDocument | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [documentToDelete, setDocumentToDelete] = useState<number | null>(null);
+  
   const { toast } = useToast();
 
   // Fetch documents
-  const { data: documents, isLoading, error } = useQuery<UploadedDocument[]>({
-    queryKey: ['/api/documents'],
-    // Use default fetcher
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ['/api/documents', { page, pageSize, searchTerm, sortBy, sortOrder }],
+    queryFn: () => DocumentService.getAllDocuments({
+      page,
+      limit: pageSize,
+      search: searchTerm,
+      sortBy,
+      sortOrder
+    })
   });
-  
+
   // Delete document mutation
   const deleteMutation = useMutation({
-    mutationFn: async (documentId: number) => {
-      const response = await apiRequest(
-        'DELETE',
-        `/api/documents/${documentId}`
-      );
-      return await response.json();
-    },
+    mutationFn: (id: number) => DocumentService.deleteDocument(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
       toast({
-        title: "Document deleted",
-        description: "The document has been permanently deleted.",
-        variant: "default",
+        title: 'Document deleted',
+        description: 'The document has been successfully deleted.',
+        variant: 'default',
       });
-      setShowDeleteConfirm(false);
-      setDocumentToDelete(null);
+      setDeleteDialogOpen(false);
     },
     onError: (error: Error) => {
       toast({
-        title: "Error",
-        description: `Failed to delete document: ${error.message}`,
-        variant: "destructive",
+        title: 'Delete failed',
+        description: error.message,
+        variant: 'destructive',
       });
+      setDeleteDialogOpen(false);
     }
   });
-  
-  // Extract data from document mutation
-  const extractDataMutation = useMutation({
-    mutationFn: async (documentId: number) => {
-      const response = await apiRequest(
-        'POST',
-        `/api/documents/${documentId}/extract`
-      );
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/documents'] });
-      toast({
-        title: "Data extraction complete",
-        description: "Document data has been successfully extracted.",
-        variant: "default",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Extraction failed",
-        description: `Failed to extract data: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Generate session plan mutation
-  const generateSessionPlanMutation = useMutation({
-    mutationFn: async (documentId: number) => {
-      const response = await apiRequest(
-        'POST',
-        `/api/documents/${documentId}/generate-session-plan`
-      );
-      return await response.json();
-    },
-    onSuccess: (data) => {
-      toast({
-        title: "Session plan generated",
-        description: "A new training session plan has been created from the document.",
-        variant: "default",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Generation failed",
-        description: `Failed to generate session plan: ${error.message}`,
-        variant: "destructive",
-      });
-    }
-  });
-  
-  // Handler for document download
-  const handleDownload = (document: UploadedDocument) => {
-    toast({
-      title: "Download started",
-      description: `Downloading ${document.fileName}...`,
-    });
-    
-    // Create download link
-    const downloadLink = `/api/documents/${document.id}/download`;
-    const link = window.document.createElement('a');
-    link.href = downloadLink;
-    link.setAttribute('download', document.fileName);
-    window.document.body.appendChild(link);
-    link.click();
-    window.document.body.removeChild(link);
-  };
-  
-  // Confirmation for document deletion
-  const confirmDelete = (document: UploadedDocument) => {
-    setDocumentToDelete(document);
-    setShowDeleteConfirm(true);
-  };
-  
-  // View document details
-  const viewDocumentDetails = (document: UploadedDocument) => {
-    // Redirect to document detail page
-    window.location.href = `/documents/${document.id}`;
-  };
 
-  // Define file type icons
-  const fileIcons: Record<string, React.ReactNode> = {
-    pdf: <FileText className="h-5 w-5 text-red-500" />,
-    docx: <File className="h-5 w-5 text-blue-500" />,
-    xlsx: <FileSpreadsheet className="h-5 w-5 text-green-500" />,
-    pptx: <PresentationIcon className="h-5 w-5 text-orange-500" />,
-    txt: <FileText className="h-5 w-5 text-gray-500" />,
-    default: <FileArchive className="h-5 w-5 text-gray-500" />
-  };
-
-  // Get the appropriate icon for a file type
-  const getFileIcon = (fileType: string) => {
-    const type = fileType.toLowerCase().replace('.', '');
-    return fileIcons[type] || fileIcons.default;
-  };
-
-  // Format file size
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  // Format date
-  const formatDate = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'MMM d, yyyy, h:mm a');
-    } catch (e) {
-      return dateString;
-    }
-  };
-
-  // Sort and filter documents
-  const getSortedAndFilteredDocuments = () => {
-    if (!documents) return [];
-    
-    let filteredDocs = [...documents];
-    
-    // Apply search filter
-    if (searchQuery.trim() !== '') {
-      const query = searchQuery.toLowerCase();
-      filteredDocs = filteredDocs.filter(doc => 
-        doc.title.toLowerCase().includes(query) || 
-        doc.fileName.toLowerCase().includes(query)
-      );
-    }
-    
-    // Apply status filter
-    if (statusFilter) {
-      filteredDocs = filteredDocs.filter(doc => {
-        if (statusFilter === 'processed') return doc.isProcessed;
-        if (statusFilter === 'pending') return !doc.isProcessed;
-        return true;
-      });
-    }
-    
-    // Sort
-    return filteredDocs.sort((a, b) => {
-      const aValue = a[sortBy];
-      const bValue = b[sortBy];
-      
-      if (typeof aValue === 'string' && typeof bValue === 'string') {
-        return sortOrder === 'asc' 
-          ? aValue.localeCompare(bValue) 
-          : bValue.localeCompare(aValue);
-      }
-      
-      // Handle dates
-      if (sortBy === 'createdAt' || sortBy === 'updatedAt') {
-        const aDate = new Date(a[sortBy] as string).getTime();
-        const bDate = new Date(b[sortBy] as string).getTime();
-        return sortOrder === 'asc' ? aDate - bDate : bDate - aDate;
-      }
-      
-      // Handle numbers
-      return sortOrder === 'asc' 
-        ? (aValue as number) - (bValue as number) 
-        : (bValue as number) - (aValue as number);
-    });
-  };
-
-  // Handle sort click
-  const handleSort = (column: keyof UploadedDocument) => {
+  // Handle column sorting
+  const toggleSort = (column: string) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     } else {
@@ -259,314 +83,190 @@ export function DocumentList() {
     }
   };
 
-  // Handle status filter
-  const handleStatusFilter = (status: string | null) => {
-    setStatusFilter(status === statusFilter ? null : status);
+  // Get sort icon
+  const getSortIcon = (column: string) => {
+    if (sortBy !== column) {
+      return <ArrowDownUp className="ml-1 h-4 w-4" />;
+    }
+    return sortOrder === 'asc' ? 
+      <SortAsc className="ml-1 h-4 w-4" /> : 
+      <SortDesc className="ml-1 h-4 w-4" />;
   };
 
-  // Render loading state
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Documents</CardTitle>
-          <CardDescription>Your uploaded training documents and manuals</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex justify-between mb-4">
-            <Skeleton className="h-10 w-64" />
-            <Skeleton className="h-10 w-32" />
-          </div>
-          <div className="rounded-md border">
-            <div className="p-2">
-              <Skeleton className="h-10 w-full" />
-            </div>
-            {Array(5).fill(0).map((_, i) => (
-              <div key={i} className="p-2 border-t">
-                <Skeleton className="h-16 w-full" />
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Handle document deletion
+  const confirmDelete = (id: number) => {
+    setDocumentToDelete(id);
+    setDeleteDialogOpen(true);
+  };
 
-  // Render error state
-  if (error) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-destructive">Error loading documents</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p>There was an error loading your documents. Please try again later.</p>
-          <pre className="bg-muted p-2 rounded mt-2 text-xs">{(error as Error).message}</pre>
-        </CardContent>
-      </Card>
-    );
-  }
+  const handleDelete = () => {
+    if (documentToDelete) {
+      deleteMutation.mutate(documentToDelete);
+    }
+  };
 
-  const sortedDocuments = getSortedAndFilteredDocuments();
+  // Get status badge
+  const getStatusBadge = (status: DocumentProcessingStatus) => {
+    switch (status) {
+      case DocumentProcessingStatus.pending:
+        return <Badge variant="outline">Pending</Badge>;
+      case DocumentProcessingStatus.processing:
+        return <Badge variant="secondary">Processing</Badge>;
+      case DocumentProcessingStatus.complete:
+        return <Badge variant="default">Complete</Badge>;
+      case DocumentProcessingStatus.error:
+        return <Badge variant="destructive">Error</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
 
   return (
-    <Card>
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+    <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Documents</h3>
+        <div className="relative w-64">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search documents..."
+            className="pl-8"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <Card>
+        {isLoading ? (
+          <div className="p-8 text-center">Loading documents...</div>
+        ) : isError ? (
+          <div className="p-8 text-center text-red-500">
+            Error loading documents: {error.message}
+          </div>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[40%] cursor-pointer" onClick={() => toggleSort('title')}>
+                  <div className="flex items-center">
+                    Document {getSortIcon('title')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('fileSize')}>
+                  <div className="flex items-center">
+                    Size {getSortIcon('fileSize')}
+                  </div>
+                </TableHead>
+                <TableHead className="cursor-pointer" onClick={() => toggleSort('createdAt')}>
+                  <div className="flex items-center">
+                    Uploaded {getSortIcon('createdAt')}
+                  </div>
+                </TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.documents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center py-8">
+                    No documents found. Upload a document to get started.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data?.documents.map((doc) => (
+                  <TableRow key={doc.id}>
+                    <TableCell className="flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-blue-500" />
+                      <div>
+                        <div className="font-medium">{doc.title}</div>
+                        {doc.description && (
+                          <div className="text-sm text-muted-foreground truncate max-w-md">
+                            {doc.description}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      {(doc.fileSize / (1024 * 1024)).toFixed(2)} MB
+                    </TableCell>
+                    <TableCell>
+                      {new Date(doc.createdAt).toLocaleDateString()}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(doc.processingStatus)}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onViewDocument && onViewDocument(doc.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700"
+                          onClick={() => confirmDelete(doc.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        )}
+
+        {data && data.total > pageSize && (
+          <div className="flex items-center justify-between px-4 py-2 border-t">
+            <div>
+              Showing {((page - 1) * pageSize) + 1} to {Math.min(page * pageSize, data.total)} of {data.total} documents
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page * pageSize >= data.total}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure you want to delete this document?</AlertDialogTitle>
+            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete{" "}
-              <span className="font-semibold">{documentToDelete?.title}</span> and all its extracted data.
+              Are you sure you want to delete this document? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (documentToDelete) {
-                  deleteMutation.mutate(documentToDelete.id);
-                }
-              }}
-              className="bg-destructive hover:bg-destructive/90"
-              disabled={deleteMutation.isPending}
-            >
-              {deleteMutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                "Delete"
-              )}
+            <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      <CardHeader>
-        <CardTitle>Documents</CardTitle>
-        <CardDescription>Your uploaded training documents and manuals</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4 mb-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Search documents..."
-              className="pl-8"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </div>
-          
-          <div className="flex space-x-2">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  <Filter className="mr-2 h-4 w-4" />
-                  Status
-                  {statusFilter && (
-                    <Badge variant="secondary" className="ml-2">
-                      {statusFilter}
-                    </Badge>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40">
-                <DropdownMenuItem onClick={() => handleStatusFilter('processed')}>
-                  <CheckCircle2 className="mr-2 h-4 w-4 text-green-500" />
-                  Processed
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleStatusFilter('pending')}>
-                  <Clock className="mr-2 h-4 w-4 text-amber-500" />
-                  Pending
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-        
-        {documents && documents.length === 0 ? (
-          <div className="text-center p-8 border rounded-md">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No documents found</h3>
-            <p className="text-muted-foreground mt-2">
-              Upload your first document to get started.
-            </p>
-          </div>
-        ) : sortedDocuments.length === 0 ? (
-          <div className="text-center p-8 border rounded-md">
-            <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium">No matching documents</h3>
-            <p className="text-muted-foreground mt-2">
-              Try adjusting your search or filters to find what you're looking for.
-            </p>
-          </div>
-        ) : (
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12"></TableHead>
-                  <TableHead className="min-w-[200px]">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('title')}
-                      className="-ml-4 h-8 font-medium"
-                    >
-                      Document
-                      {sortBy === 'title' && (
-                        <ArrowUpDown className={cn(
-                          "ml-2 h-4 w-4",
-                          sortOrder === 'asc' ? "rotate-0" : "rotate-180"
-                        )} />
-                      )}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="hidden md:table-cell">Type</TableHead>
-                  <TableHead className="hidden sm:table-cell">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('fileSize')}
-                      className="-ml-3 h-8 font-medium"
-                    >
-                      Size
-                      {sortBy === 'fileSize' && (
-                        <ArrowUpDown className={cn(
-                          "ml-2 h-4 w-4",
-                          sortOrder === 'asc' ? "rotate-0" : "rotate-180"
-                        )} />
-                      )}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="hidden lg:table-cell">Status</TableHead>
-                  <TableHead className="hidden md:table-cell">
-                    <Button 
-                      variant="ghost" 
-                      onClick={() => handleSort('createdAt')}
-                      className="-ml-3 h-8 font-medium"
-                    >
-                      Uploaded
-                      {sortBy === 'createdAt' && (
-                        <ArrowUpDown className={cn(
-                          "ml-2 h-4 w-4",
-                          sortOrder === 'asc' ? "rotate-0" : "rotate-180"
-                        )} />
-                      )}
-                    </Button>
-                  </TableHead>
-                  <TableHead className="w-12"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedDocuments.map((doc) => (
-                  <TableRow key={doc.id}>
-                    <TableCell>
-                      <div className="flex justify-center">
-                        {getFileIcon(doc.fileType)}
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <div className="truncate max-w-[200px] sm:max-w-[300px]">
-                        {doc.title}
-                      </div>
-                      <div className="text-xs text-muted-foreground truncate max-w-[200px] sm:max-w-[300px]">
-                        {doc.fileName}
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {doc.fileType.toUpperCase().replace('.', '')}
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {formatFileSize(doc.fileSize)}
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {doc.isProcessed ? (
-                        <Badge variant="outline" className="bg-green-50 dark:bg-green-950 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800">
-                          <CheckCircle2 className="mr-1 h-3 w-3" />
-                          Processed
-                        </Badge>
-                      ) : doc.processingStatus === 'processing' ? (
-                        <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
-                          <Clock className="mr-1 h-3 w-3 animate-pulse" />
-                          Processing
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800">
-                          <Clock className="mr-1 h-3 w-3" />
-                          Pending
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell text-muted-foreground text-sm">
-                      {formatDate(doc.createdAt)}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => viewDocumentDetails(doc)}>
-                            <Eye className="mr-2 h-4 w-4" />
-                            View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownload(doc)}>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setActiveDocument(doc);
-                              extractDataMutation.mutate(doc.id);
-                            }}
-                            disabled={doc.isProcessed || extractDataMutation.isPending}
-                          >
-                            <FileSearch className="mr-2 h-4 w-4" />
-                            Extract Data
-                            {extractDataMutation.isPending && doc.id === activeDocument?.id && (
-                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => {
-                              setActiveDocument(doc);
-                              generateSessionPlanMutation.mutate(doc.id);
-                            }}
-                            disabled={!doc.isProcessed || generateSessionPlanMutation.isPending}
-                          >
-                            <CalendarDays className="mr-2 h-4 w-4" />
-                            Generate Session Plan
-                            {generateSessionPlanMutation.isPending && doc.id === activeDocument?.id && (
-                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem 
-                            onClick={() => confirmDelete(doc)}
-                            className="text-destructive"
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Delete
-                            {deleteMutation.isPending && doc.id === documentToDelete?.id && (
-                              <Loader2 className="ml-2 h-3 w-3 animate-spin" />
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    </div>
   );
-}
+};
+
+export default DocumentList;

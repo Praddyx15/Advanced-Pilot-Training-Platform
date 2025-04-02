@@ -8,10 +8,16 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+  CardFooter,
 } from "@/components/ui/card";
+import { SessionScheduler } from '@/components/scheduling/session-scheduler';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { KnowledgeGraphVisualizer } from '@/components/knowledge-graph/knowledge-graph-visualizer';
+import { ComplianceChecker } from '@/components/compliance/compliance-checker';
+import AdminRiskMatrix2D from '@/components/visualizations/admin-risk-matrix-2d';
 import { 
   Loader2,
   Users,
@@ -21,6 +27,11 @@ import {
   Plane,
   BookOpen,
   CheckCircle2,
+  Network,
+  Shield,
+  AlertTriangle,
+  FileCheck,
+  ChevronRight,
 } from 'lucide-react';
 import {
   Select,
@@ -32,8 +43,11 @@ import {
 
 export function AdminDashboard() {
   const [dateRange, setDateRange] = useState("January 1, 2025 - March 22, 2025");
+  const [activeTab, setActiveTab] = useState("overview");
+  const [complianceView, setComplianceView] = useState("regulatory");
+  const [knowledgeGraphTab, setKnowledgeGraphTab] = useState("syllabus");
 
-  // Fetch training overview data
+  // Fetch admin dashboard overview data
   const { data: overviewData, isLoading: isOverviewLoading } = useQuery({
     queryKey: ['/api/admin/training-overview', dateRange],
     queryFn: async () => {
@@ -41,10 +55,10 @@ export function AdminDashboard() {
         const response = await apiRequest('GET', `/api/admin/training-overview?dateRange=${encodeURIComponent(dateRange)}`);
         return await response.json();
       } catch (error) {
-        // Return mock data for development
+        // Return sample data for development
         return {
           activeStudents: {
-            count: 128,
+            count: 328,
             change: 12,
             period: "%"
           },
@@ -187,6 +201,44 @@ export function AdminDashboard() {
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
           <div>
             <h1 className="text-2xl font-bold">Training Overview Dashboard</h1>
+            <div className="flex items-center space-x-4 mt-2">
+              <Button 
+                variant={activeTab === 'overview' ? 'default' : 'outline'} 
+                size="sm"
+                className="text-xs"
+                onClick={() => setActiveTab('overview')}
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                Training Overview
+              </Button>
+              <Button 
+                variant={activeTab === 'compliance' ? 'default' : 'outline'} 
+                size="sm"
+                className="text-xs" 
+                onClick={() => setActiveTab('compliance')}
+              >
+                <Shield className="w-4 h-4 mr-2" />
+                Compliance
+              </Button>
+              <Button 
+                variant={activeTab === 'knowledge' ? 'default' : 'outline'} 
+                size="sm"
+                className="text-xs" 
+                onClick={() => setActiveTab('knowledge')}
+              >
+                <Network className="w-4 h-4 mr-2" />
+                Knowledge Graph
+              </Button>
+              <Button 
+                variant={activeTab === 'risk' ? 'default' : 'outline'} 
+                size="sm"
+                className="text-xs" 
+                onClick={() => setActiveTab('risk')}
+              >
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Risk Assessment
+              </Button>
+            </div>
           </div>
           <div className="flex items-center mt-4 md:mt-0">
             <Select value={dateRange} onValueChange={setDateRange}>
@@ -203,210 +255,237 @@ export function AdminDashboard() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {/* Active Students */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Active Students</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold">{overviewData?.activeStudents.count}</div>
-                <Badge className="bg-teal-500">
-                  <ArrowUp className="h-3 w-3 mr-1"/>
-                  {overviewData?.activeStudents.change}%
-                </Badge>
-              </div>
-              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-teal-500 rounded-full" 
-                  style={{ width: '75%' }}
-                ></div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Completion Rate */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold">{overviewData?.completionRate.percentage}%</div>
-                <Badge className="bg-teal-500">
-                  <ArrowUp className="h-3 w-3 mr-1"/>
-                  {overviewData?.completionRate.change}%
-                </Badge>
-              </div>
-              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-teal-500 rounded-full" 
-                  style={{ width: `${overviewData?.completionRate.percentage}%` }}
-                ></div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Resource Utilization */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Resource Utilization</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <div className="text-3xl font-bold">{overviewData?.resourceUtilization.percentage}%</div>
-                <Badge className="bg-teal-500">
-                  <ArrowUp className="h-3 w-3 mr-1"/>
-                  {overviewData?.resourceUtilization.change}%
-                </Badge>
-              </div>
-              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-teal-500 rounded-full" 
-                  style={{ width: `${overviewData?.resourceUtilization.percentage}%` }}
-                ></div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Compliance Status */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-teal-500">{overviewData?.complianceStatus}</div>
-              <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-teal-500 rounded-full" 
-                  style={{ width: '85%' }}
-                ></div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Training Progress by Program */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Training Progress by Program</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="h-48 flex items-end space-x-6">
-                {programsProgress?.map((program, i) => (
-                  <div key={i} className="flex flex-col items-center flex-1">
+        {activeTab === 'overview' && (
+          <>
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+              {/* Active Students */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active Students</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-3xl font-bold">{overviewData?.activeStudents.count}</div>
+                    <Badge className="bg-teal-500">
+                      <ArrowUp className="h-3 w-3 mr-1"/>
+                      {overviewData?.activeStudents.change}%
+                    </Badge>
+                  </div>
+                  <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
                     <div 
-                      className="w-full bg-teal-500 rounded-t-sm mt-auto"
-                      style={{ height: `${program.progress * 0.6}%` }}
+                      className="h-full bg-teal-500 rounded-full" 
+                      style={{ width: '75%' }}
                     ></div>
-                    <span className="text-xs font-medium mt-2">{program.name}</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Instructor Availability */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Instructor Availability</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-6 gap-2">
-                {instructorAvailability?.map((day, index) => (
-                  <div key={index} className="flex flex-col">
-                    <div className="text-xs font-medium text-center mb-1">{day.day}</div>
-                    <div className="relative h-32 bg-gray-100 rounded">
-                      {day.slots.map((slot, slotIndex) => {
-                        const startHour = parseInt(slot.start.split(':')[0]);
-                        const endHour = parseInt(slot.end.split(':')[0]);
-                        const startPosition = ((startHour - 8) / 12) * 100;
-                        const duration = (endHour - startHour) / 12 * 100;
-                        
-                        return (
-                          <div 
-                            key={slotIndex}
-                            className="absolute left-0 right-0 bg-teal-300"
-                            style={{
-                              top: `${startPosition}%`,
-                              height: `${duration}%`
-                            }}
-                          ></div>
-                        );
-                      })}
-                    </div>
+              {/* Completion Rate */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Completion Rate</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-3xl font-bold">{overviewData?.completionRate.percentage}%</div>
+                    <Badge className="bg-teal-500">
+                      <ArrowUp className="h-3 w-3 mr-1"/>
+                      {overviewData?.completionRate.change}%
+                    </Badge>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                  <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-teal-500 rounded-full" 
+                      style={{ width: `${overviewData?.completionRate.percentage}%` }}
+                    ></div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          {/* Upcoming Training Sessions */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Upcoming Training Sessions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {upcomingSessions?.map((session, index) => (
-                  <div key={index} className="flex gap-3 border-b pb-4">
-                    <div className="size-10 bg-teal-100 rounded-md flex items-center justify-center flex-shrink-0">
-                      {session.aircraft ? (
-                        <Plane className="h-5 w-5 text-teal-600" />
-                      ) : (
-                        <BookOpen className="h-5 w-5 text-teal-600" />
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-medium">{session.title}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {session.student} (ID: {session.studentId})
-                      </p>
-                      <div className="flex justify-between mt-1">
-                        <p className="text-xs text-muted-foreground">
-                          Instructor: {session.instructor}
-                        </p>
-                        <p className="text-xs">
-                          {session.time}
-                        </p>
+              {/* Resource Utilization */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Resource Utilization</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <div className="text-3xl font-bold">{overviewData?.resourceUtilization.percentage}%</div>
+                    <Badge className="bg-teal-500">
+                      <ArrowUp className="h-3 w-3 mr-1"/>
+                      {overviewData?.resourceUtilization.change}%
+                    </Badge>
+                  </div>
+                  <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-teal-500 rounded-full" 
+                      style={{ width: `${overviewData?.resourceUtilization.percentage}%` }}
+                    ></div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Compliance Status */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Compliance Status</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-bold text-teal-500">{overviewData?.complianceStatus}</div>
+                  <div className="h-1.5 mt-2 bg-teal-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-teal-500 rounded-full" 
+                      style={{ width: '85%' }}
+                    ></div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Training Progress by Program */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Training Progress by Program</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-48 flex items-end space-x-6">
+                    {programsProgress?.map((program: { name: string; progress: number }, i: number) => (
+                      <div key={i} className="flex flex-col items-center flex-1">
+                        <div 
+                          className="w-full bg-teal-500 rounded-t-sm mt-auto"
+                          style={{ height: `${program.progress * 0.6}%` }}
+                        ></div>
+                        <span className="text-xs font-medium mt-2">{program.name}</span>
                       </div>
-                      <p className="text-xs text-muted-foreground">
-                        {session.aircraft || session.simulator}
-                      </p>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Resource Utilization */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Resource Utilization</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {resourceUtilization?.map((resource, index) => (
-                  <div key={index} className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm">{resource.type}</span>
-                      <span className="text-sm">{resource.utilization}%</span>
-                    </div>
-                    <div className="h-2 bg-teal-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-teal-500 rounded-full" 
-                        style={{ width: `${resource.utilization}%` }}
-                      ></div>
-                    </div>
+              {/* Instructor Availability */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Instructor Availability</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-6 gap-2">
+                    {instructorAvailability?.map((day: { day: string; slots: Array<{ start: string; end: string }> }, index: number) => (
+                      <div key={index} className="flex flex-col">
+                        <div className="text-xs font-medium text-center mb-1">{day.day}</div>
+                        <div className="relative h-32 bg-gray-100 rounded">
+                          {day.slots.map((slot: { start: string; end: string }, slotIndex: number) => {
+                            const startHour = parseInt(slot.start.split(':')[0]);
+                            const endHour = parseInt(slot.end.split(':')[0]);
+                            const startPosition = ((startHour - 8) / 12) * 100;
+                            const duration = (endHour - startHour) / 12 * 100;
+                            
+                            return (
+                              <div 
+                                key={slotIndex}
+                                className="absolute left-0 right-0 bg-teal-300"
+                                style={{
+                                  top: `${startPosition}%`,
+                                  height: `${duration}%`
+                                }}
+                              ></div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                </CardContent>
+              </Card>
+
+              {/* Training Sessions Scheduler */}
+              <SessionScheduler variant="admin" />
+
+              {/* Resource Utilization */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Resource Utilization</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {resourceUtilization?.map((resource: { type: string; utilization: number }, index: number) => (
+                      <div key={index} className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm">{resource.type}</span>
+                          <span className="text-sm">{resource.utilization}%</span>
+                        </div>
+                        <div className="h-2 bg-teal-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-teal-500 rounded-full" 
+                            style={{ width: `${resource.utilization}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
+
+        {activeTab === 'compliance' && (
+          <div className="space-y-6">
+            <ComplianceChecker viewMode={complianceView} />
+          </div>
+        )}
+
+        {activeTab === 'knowledge' && (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader className="border-b mb-4">
+                <CardTitle>Knowledge Graph Visualizer</CardTitle>
+                <CardDescription>
+                  Explore training syllabus, skills, and regulatory relationships visually
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-[600px]">
+                  <KnowledgeGraphVisualizer initialView={knowledgeGraphTab} />
+                </div>
+              </CardContent>
+              <CardFooter className="border-t pt-4 flex justify-between">
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setKnowledgeGraphTab('syllabus')}
+                  className={knowledgeGraphTab === 'syllabus' ? 'bg-muted' : ''}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Syllabus View
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setKnowledgeGraphTab('skills')}
+                  className={knowledgeGraphTab === 'skills' ? 'bg-muted' : ''}
+                >
+                  <Network className="w-4 h-4 mr-2" />
+                  Skills Network
+                </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setKnowledgeGraphTab('regulatory')}
+                  className={knowledgeGraphTab === 'regulatory' ? 'bg-muted' : ''}
+                >
+                  <FileCheck className="w-4 h-4 mr-2" />
+                  Regulatory Mapping
+                </Button>
+              </CardFooter>
+            </Card>
+          </div>
+        )}
+
+        {activeTab === 'risk' && (
+          <div className="space-y-6">
+            <AdminRiskMatrix2D className="h-full" />
+          </div>
+        )}
       </div>
     </div>
   );

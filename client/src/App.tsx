@@ -1,94 +1,89 @@
-import { QueryClientProvider } from "@tanstack/react-query";
-import { Switch, Route } from "wouter";
-import { Toaster } from "@/components/ui/toaster";
-import { queryClient } from "./lib/queryClient";
-import NotFound from "@/pages/not-found";
-import HomePage from "@/pages/home-page";
-import AuthPage from "@/pages/auth-page";
-import SyllabusGeneratorPage from "@/pages/syllabus-generator-page";
-import KnowledgeGraphPage from "@/pages/knowledge-graph-page";
-import AnalyticsDashboardPage from "@/pages/analytics-dashboard";
-import SessionReplayPage from "@/pages/session-replay-page";
-import AchievementsPage from "@/pages/achievements-page";
-import DocumentsPage from "@/pages/documents-page";
-import DocumentProcessorPage from "@/pages/document-processor-page";
-import CompliancePage from "@/pages/compliance-page";
-import TestNotificationPage from "@/pages/test-notification-page";
-import TrainingProgramsPage from "@/pages/training-programs-page";
-import HelpPage from "@/pages/help-page";
-import AssessmentsPage from "@/pages/assessments-page";
-import AssessmentGradingPage from "@/pages/assessment-grading-page";
-import TraineePerformancePage from "@/pages/trainee-performance-page";
-import SchedulePage from "@/pages/schedule-page";
-import MessagingPage from "@/pages/messaging-page";
-import ResourcesPage from "@/pages/resources-page";
-import WebSocketTestPage from "@/pages/websocket-test-page";
-import { ProtectedRoute } from "./lib/protected-route";
-import { AuthProvider } from "./hooks/use-auth";
-import { AppProvider } from "./contexts/app-context";
-import { ThemeProvider } from "./contexts/theme-context";
-import { NotificationProvider } from "./components/notification/notification-provider";
-import WebSocketProvider from "@/providers/websocket-provider";
-import { useEffect } from "react";
-import websocketClient from "@/lib/websocket";
+/**
+ * Main application component with routing and global providers
+ */
 
-// Initialize WebSocket connection on app startup
-function WebSocketInitializer() {
-  useEffect(() => {
-    websocketClient.connect();
-    return () => {
-      websocketClient.disconnect();
-    };
-  }, []);
-  
-  return null;
-}
+import { Switch, Route, useLocation } from 'wouter';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from './lib/query-client';
+import { AuthProvider } from './hooks/use-auth';
+import { ProtectedRoute } from './components/auth/protected-route';
+import { Toaster } from './components/ui/toaster';
 
-function AppRouter() {
-  return (
-    <Switch>
-      <ProtectedRoute path="/" component={HomePage} />
-      <ProtectedRoute path="/syllabus-generator" component={SyllabusGeneratorPage} />
-      <ProtectedRoute path="/knowledge-graph" component={KnowledgeGraphPage} />
-      <ProtectedRoute path="/analytics" component={AnalyticsDashboardPage} />
-      <ProtectedRoute path="/session-replay" component={SessionReplayPage} />
-      <ProtectedRoute path="/achievements" component={AchievementsPage} />
-      <ProtectedRoute path="/documents" component={DocumentsPage} />
-      <ProtectedRoute path="/document-processor" component={DocumentProcessorPage} />
-      <ProtectedRoute path="/compliance" component={CompliancePage} />
-      <ProtectedRoute path="/training-programs" component={TrainingProgramsPage} />
-      <ProtectedRoute path="/test-notification" component={TestNotificationPage} />
-      <ProtectedRoute path="/help" component={HelpPage} />
-      <ProtectedRoute path="/assessments" component={AssessmentsPage} />
-      <ProtectedRoute path="/assessments/:id/grade" component={AssessmentGradingPage} />
-      <ProtectedRoute path="/trainee-performance" component={TraineePerformancePage} />
-      <ProtectedRoute path="/trainee-performance/:id" component={TraineePerformancePage} />
-      <ProtectedRoute path="/schedule" component={SchedulePage} />
-      <ProtectedRoute path="/messaging" component={MessagingPage} />
-      <ProtectedRoute path="/resources" component={ResourcesPage} />
-      <ProtectedRoute path="/websocket-test" component={WebSocketTestPage} />
-      <Route path="/auth" component={AuthPage} />
-      <Route component={NotFound} />
-    </Switch>
-  );
-}
+// Pages
+import HomePage from './pages/home-page';
+import AuthPage from './pages/auth-page';
+import NotFound from './pages/not-found';
+import DocumentManagementPage from './pages/document-management-page';
+import DocumentUploadPage from './pages/document-upload-page';
+import DocumentDetailPage from './pages/document-detail-page';
+import KnowledgeGraphPage from './pages/knowledge-graph-page';
+
+// Layout components
+import { MainLayout } from './components/layout/main-layout';
 
 function App() {
+  const [location] = useLocation();
+  
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <WebSocketProvider>
-          <WebSocketInitializer />
-          <AuthProvider>
-            <AppProvider>
-              <NotificationProvider>
-                <AppRouter />
-                <Toaster />
-              </NotificationProvider>
-            </AppProvider>
-          </AuthProvider>
-        </WebSocketProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <div className="min-h-screen bg-background text-foreground">
+          <Switch>
+            <Route path="/auth">
+              <AuthPage />
+            </Route>
+            
+            <Route path="/">
+              <MainLayout>
+                <ProtectedRoute>
+                  <HomePage />
+                </ProtectedRoute>
+              </MainLayout>
+            </Route>
+            
+            <Route path="/documents">
+              <MainLayout>
+                <ProtectedRoute>
+                  <DocumentManagementPage />
+                </ProtectedRoute>
+              </MainLayout>
+            </Route>
+            
+            <Route path="/documents/upload">
+              <MainLayout>
+                <ProtectedRoute>
+                  <DocumentUploadPage />
+                </ProtectedRoute>
+              </MainLayout>
+            </Route>
+            
+            <Route path="/documents/:id">
+              {(params) => (
+                <MainLayout>
+                  <ProtectedRoute>
+                    <DocumentDetailPage id={params.id} />
+                  </ProtectedRoute>
+                </MainLayout>
+              )}
+            </Route>
+            
+            <Route path="/knowledge-graphs/:id">
+              {(params) => (
+                <MainLayout>
+                  <ProtectedRoute>
+                    <KnowledgeGraphPage id={params.id} />
+                  </ProtectedRoute>
+                </MainLayout>
+              )}
+            </Route>
+            
+            <Route>
+              <NotFound />
+            </Route>
+          </Switch>
+        </div>
+        <Toaster />
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

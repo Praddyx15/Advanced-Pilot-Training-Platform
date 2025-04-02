@@ -1,39 +1,39 @@
 import React from 'react';
-import { useWebSocketStatus } from '@/providers/websocket-provider';
-import { WebSocketStatus } from '@/lib/websocket';
+import { useWebSocket } from '@/providers/websocket-provider';
+import { ConnectionStatus } from '@/lib/websocket';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Loader2, Wifi, WifiOff, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const statusConfig = {
-  [WebSocketStatus.CONNECTED]: {
+  [ConnectionStatus.OPEN]: {
     icon: Wifi,
     color: 'text-green-500',
     label: 'Connected',
     description: 'Real-time connection is active'
   },
-  [WebSocketStatus.CONNECTING]: {
+  [ConnectionStatus.CONNECTING]: {
     icon: Loader2,
     color: 'text-blue-500 animate-spin',
     label: 'Connecting',
     description: 'Establishing real-time connection...'
   },
-  [WebSocketStatus.DISCONNECTED]: {
+  [ConnectionStatus.CLOSED]: {
     icon: WifiOff,
     color: 'text-orange-500',
     label: 'Disconnected',
     description: 'Real-time connection is inactive'
   },
-  [WebSocketStatus.RECONNECTING]: {
+  [ConnectionStatus.CLOSING]: {
     icon: Loader2,
     color: 'text-amber-500 animate-spin',
-    label: 'Reconnecting',
-    description: 'Attempting to restore connection...'
+    label: 'Closing',
+    description: 'Closing WebSocket connection...'
   },
-  [WebSocketStatus.FAILED]: {
+  [ConnectionStatus.ERROR]: {
     icon: AlertTriangle,
     color: 'text-red-500',
-    label: 'Connection Failed',
+    label: 'Connection Error',
     description: 'Unable to establish real-time connection'
   }
 };
@@ -49,8 +49,8 @@ export function WebSocketStatusIndicator({
   showLabel = false,
   size = 16
 }: WebSocketStatusIndicatorProps) {
-  const { status, connectionAttempts } = useWebSocketStatus();
-  const config = statusConfig[status];
+  const { connectionStatus } = useWebSocket();
+  const config = statusConfig[connectionStatus];
   const IconComponent = config.icon;
   
   return (
@@ -66,11 +66,9 @@ export function WebSocketStatusIndicator({
           <div className="flex flex-col">
             <span className="font-semibold">{config.label}</span>
             <span className="text-xs text-muted-foreground">{config.description}</span>
-            {(status === WebSocketStatus.RECONNECTING || status === WebSocketStatus.FAILED) && (
+            {connectionStatus === ConnectionStatus.ERROR && (
               <span className="text-xs mt-1">
-                {status === WebSocketStatus.RECONNECTING 
-                  ? `Attempt ${connectionAttempts}/10`
-                  : 'Try refreshing the page'}
+                Try refreshing the page
               </span>
             )}
           </div>

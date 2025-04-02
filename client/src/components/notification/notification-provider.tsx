@@ -1,8 +1,10 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useWebSocket, WebSocketMessage } from '@/hooks/use-websocket';
+import { useWebSocket } from '@/hooks/use-websocket';
 import { useToast } from '@/hooks/use-toast';
+import { Notification as WebSocketNotification } from '@/providers/websocket-provider';
 
-type Notification = {
+// Our internal notification format with priority levels
+interface Notification {
   id: string;
   type: string;
   title: string;
@@ -21,6 +23,7 @@ type NotificationContextType = {
   removeNotification: (id: string) => void;
   clearAllNotifications: () => void;
   isConnected: boolean;
+  addNotification: (notification: Notification) => void;
 };
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
@@ -29,37 +32,35 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const { toast } = useToast();
   
-  // WebSocket connection
-  const { 
-    isConnected,
-    lastMessage,
-    subscribe 
-  } = useWebSocket({
-    onOpen: () => {
-      // Subscribe to notifications channel when connected
-      subscribe('notifications');
-    },
-    onMessage: (data) => {
-      // Handle different message types
-      if (data.type === 'notification') {
-        addNotification(data);
-      }
+  // Use the WebSocket hook with notification handler
+  const { isConnected } = useWebSocket({
+    onNotification: (notification: WebSocketNotification) => {
+      addNotification({
+        id: notification.id || `notification-${Date.now()}`,
+        type: notification.type || 'info',
+        title: notification.title || 'New Notification',
+        message: notification.message || '',
+        timestamp: notification.timestamp || new Date().toISOString(),
+        read: false,
+        priority: getPriorityFromType(notification.type),
+        metadata: notification.data
+      });
     }
   });
 
+  // Helper to determine priority based on notification type
+  const getPriorityFromType = (type?: string): 'low' | 'medium' | 'high' | 'critical' => {
+    if (!type) return 'low';
+    switch (type) {
+      case 'error': return 'high';
+      case 'warning': return 'medium';
+      case 'critical': return 'critical';
+      default: return 'low';
+    }
+  };
+
   // Add a new notification
-  const addNotification = (data: WebSocketMessage) => {
-    const newNotification: Notification = {
-      id: data.id || `notif-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      type: data.notificationType || 'info',
-      title: data.title || 'New Notification',
-      message: data.message || '',
-      timestamp: data.timestamp || new Date().toISOString(),
-      read: false,
-      priority: data.priority || 'medium',
-      metadata: data.metadata
-    };
-    
+  const addNotification = (newNotification: Notification) => {
     setNotifications(prev => [newNotification, ...prev]);
     
     // Show toast for high priority notifications
@@ -103,9 +104,17 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   // Add sample notification if needed for testing
   useEffect(() => {
-    // This is just for demo purposes - in a real app, notifications would come from the server
-    if (process.env.NODE_ENV === 'development' && notifications.length === 0) {
+    if (import.meta.env.DEV && notifications.length === 0) {
       // Optional: Add a sample notification for testing UI
+      addNotification({
+        id: `sample-${Date.now()}`,
+        type: 'info',
+        title: 'Welcome to Aviation TMS',
+        message: 'Your training platform is ready to use.',
+        timestamp: new Date().toISOString(),
+        read: false,
+        priority: 'low'
+      });
     }
   }, []);
 
@@ -117,7 +126,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       markAllAsRead,
       removeNotification,
       clearAllNotifications,
-      isConnected
+      isConnected,
+      addNotification
     }}>
       {children}
     </NotificationContext.Provider>

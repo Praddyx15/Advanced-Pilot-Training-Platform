@@ -1,357 +1,441 @@
-import { useState, useEffect } from 'react';
+/**
+ * Knowledge Graph Page
+ * Displays an interactive visualization of a knowledge graph
+ */
+
+import { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/use-auth';
-import { apiRequest } from '@/lib/queryClient';
-import GraphVisualization, { KnowledgeGraphData, GraphNode } from '@/components/knowledge-graph/graph-visualization';
-import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Loader2, Info, AlertCircle } from 'lucide-react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { AppLayout } from '@/components/layouts/app-layout';
+import { Link, useParams } from 'wouter';
+import { knowledgeGraphService } from '../services/knowledge-graph-service';
+import { NodeType, EdgeType } from '../../../shared/knowledge-graph-types';
 
-export default function KnowledgeGraphPage() {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [activeTab, setActiveTab] = useState('document');
-  const [documentId, setDocumentId] = useState<number | null>(null);
-  const [programId, setProgramId] = useState<number | null>(null);
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null);
-
-  // Fetch documents for the document graph
-  const { data: documents, isLoading: documentsLoading } = useQuery({
-    queryKey: ['/api/documents'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/documents');
-      return await response.json();
-    },
-  });
-
-  // Fetch programs for the program graph
-  const { data: programs, isLoading: programsLoading } = useQuery({
-    queryKey: ['/api/programs'],
-    queryFn: async () => {
-      const response = await apiRequest('GET', '/api/programs');
-      return await response.json();
-    },
-  });
-
-  // Fetch knowledge graph for a specific document
-  const { 
-    data: documentGraph, 
-    isLoading: documentGraphLoading,
-    refetch: refetchDocumentGraph 
-  } = useQuery({
-    queryKey: ['/api/knowledge-graph/document', documentId],
-    queryFn: async () => {
-      if (!documentId) return null;
-      const response = await apiRequest('GET', `/api/knowledge-graph/document/${documentId}`);
-      return await response.json();
-    },
-    enabled: !!documentId,
-  });
-
-  // Fetch knowledge graph for a specific program
-  const { 
-    data: programGraph, 
-    isLoading: programGraphLoading,
-    refetch: refetchProgramGraph 
-  } = useQuery({
-    queryKey: ['/api/knowledge-graph/program', programId],
-    queryFn: async () => {
-      if (!programId) return null;
-      const response = await apiRequest('GET', `/api/knowledge-graph/program/${programId}`);
-      return await response.json();
-    },
-    enabled: !!programId,
-  });
-
-  // Automatically select first document/program if available
+// This is a placeholder for a real D3 or Three.js visualization
+// In a real application, we would use a proper graph visualization library
+function KnowledgeGraphVisualization({ 
+  graphData, 
+  onSelectNode 
+}: { 
+  graphData: any; 
+  onSelectNode: (nodeId: string) => void 
+}) {
+  const svgRef = useRef<SVGSVGElement>(null);
+  
   useEffect(() => {
-    if (documents?.length && !documentId) {
-      setDocumentId(documents[0].id);
+    if (!graphData || !svgRef.current) return;
+    
+    // This is just a placeholder for demonstration
+    // A real implementation would use D3.js or a similar visualization library
+    const svg = svgRef.current;
+    const width = svg.clientWidth;
+    const height = svg.clientHeight;
+    
+    // Clear existing elements
+    while (svg.firstChild) {
+      svg.removeChild(svg.firstChild);
     }
-    if (programs?.length && !programId) {
-      setProgramId(programs[0].id);
-    }
-  }, [documents, programs, documentId, programId]);
-
-  // Handle graph regeneration
-  const handleRegenerateGraph = async () => {
-    try {
-      if (activeTab === 'document' && documentId) {
-        const response = await apiRequest('POST', `/api/knowledge-graph/document/${documentId}/generate`);
-        if (response.ok) {
-          toast({
-            title: 'Knowledge graph generation started',
-            description: 'This may take a few moments to complete.',
-          });
-          refetchDocumentGraph();
-        }
-      } else if (activeTab === 'program' && programId) {
-        const response = await apiRequest('POST', `/api/knowledge-graph/program/${programId}/generate`);
-        if (response.ok) {
-          toast({
-            title: 'Knowledge graph generation started',
-            description: 'This may take a few moments to complete.',
-          });
-          refetchProgramGraph();
-        }
+    
+    // Place nodes randomly for this demo
+    const nodes = graphData.nodes.map((node: any) => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      const x = Math.random() * (width - 100) + 50;
+      const y = Math.random() * (height - 100) + 50;
+      
+      circle.setAttribute('cx', x.toString());
+      circle.setAttribute('cy', y.toString());
+      circle.setAttribute('r', '10');
+      circle.setAttribute('fill', getNodeColor(node.type));
+      circle.setAttribute('data-id', node.id);
+      circle.addEventListener('click', () => onSelectNode(node.id));
+      
+      const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      text.setAttribute('x', (x + 15).toString());
+      text.setAttribute('y', y.toString());
+      text.setAttribute('dominant-baseline', 'middle');
+      text.setAttribute('fill', '#333');
+      text.setAttribute('font-size', '12px');
+      text.textContent = node.label;
+      
+      svg.appendChild(circle);
+      svg.appendChild(text);
+      
+      return { id: node.id, x, y };
+    });
+    
+    // Draw edges
+    graphData.edges.forEach((edge: any) => {
+      const sourceNode = nodes.find((n: any) => n.id === edge.source);
+      const targetNode = nodes.find((n: any) => n.id === edge.target);
+      
+      if (sourceNode && targetNode) {
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', sourceNode.x.toString());
+        line.setAttribute('y1', sourceNode.y.toString());
+        line.setAttribute('x2', targetNode.x.toString());
+        line.setAttribute('y2', targetNode.y.toString());
+        line.setAttribute('stroke', '#ccc');
+        line.setAttribute('stroke-width', '1');
+        
+        svg.insertBefore(line, svg.firstChild);
       }
-    } catch (error) {
-      toast({
-        title: 'Error generating knowledge graph',
-        description: 'There was a problem generating the knowledge graph. Please try again.',
-        variant: 'destructive',
-      });
+    });
+  }, [graphData, onSelectNode]);
+  
+  const getNodeColor = (type: string) => {
+    switch (type) {
+      case NodeType.Concept:
+        return '#4169E1'; // Royal Blue
+      case NodeType.Entity:
+        return '#32CD32'; // Lime Green
+      case NodeType.Procedure:
+        return '#FF8C00'; // Dark Orange
+      case NodeType.Document:
+        return '#9370DB'; // Medium Purple
+      case NodeType.Regulation:
+        return '#DC143C'; // Crimson
+      case NodeType.Topic:
+        return '#1E90FF'; // Dodger Blue
+      default:
+        return '#666666'; // Gray
     }
   };
-
-  // Handle node click
-  const handleNodeClick = (node: GraphNode) => {
-    setSelectedNode(node);
-  };
-
-  // Graph data based on selected tab
-  const graphData: KnowledgeGraphData = {
-    nodes: (activeTab === 'document' ? documentGraph?.nodes : programGraph?.nodes) || [],
-    edges: (activeTab === 'document' ? documentGraph?.edges : programGraph?.edges) || [],
-  };
-
-  const isLoading = 
-    (activeTab === 'document' && (documentsLoading || documentGraphLoading)) || 
-    (activeTab === 'program' && (programsLoading || programGraphLoading));
-
+  
+  if (!graphData) {
+    return (
+      <div className="flex justify-center items-center h-96 bg-muted/30 rounded-lg">
+        <p className="text-muted-foreground">No graph data available</p>
+      </div>
+    );
+  }
+  
   return (
-    <AppLayout>
-      <div className="container py-6">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight mb-1">Knowledge Graph</h1>
-            <p className="text-muted-foreground">
-              Visualize knowledge relationships between concepts, documents, and training programs
-            </p>
+    <svg
+      ref={svgRef}
+      className="w-full h-96 border rounded-lg"
+      viewBox="0 0 800 600"
+      preserveAspectRatio="xMidYMid meet"
+    ></svg>
+  );
+}
+
+interface KnowledgeGraphPageProps {
+  id?: string;
+}
+
+export default function KnowledgeGraphPage({ id: propId }: KnowledgeGraphPageProps = {}) {
+  const params = useParams<{ id: string }>();
+  const id = propId || params.id;
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [nodeTypeFilter, setNodeTypeFilter] = useState<string[]>([]);
+  
+  const {
+    data: graph,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['/api/knowledge-graphs', id],
+    queryFn: () => knowledgeGraphService.getKnowledgeGraph(id),
+    enabled: !!id,
+  });
+  
+  const {
+    data: searchResults,
+    isLoading: isSearching,
+  } = useQuery({
+    queryKey: ['/api/knowledge-graphs', id, 'search', searchQuery, nodeTypeFilter],
+    queryFn: () => knowledgeGraphService.searchGraph(id, {
+      query: searchQuery,
+      nodeTypes: nodeTypeFilter.length > 0 ? nodeTypeFilter as NodeType[] : undefined,
+    }),
+    enabled: !!id && (searchQuery.length > 0 || nodeTypeFilter.length > 0),
+  });
+  
+  const handleSelectNode = (nodeId: string) => {
+    setSelectedNodeId(nodeId === selectedNodeId ? null : nodeId);
+  };
+  
+  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchQuery(e.target.value);
+  };
+  
+  const handleNodeTypeFilterChange = (type: string) => {
+    setNodeTypeFilter(prev => 
+      prev.includes(type)
+        ? prev.filter(t => t !== type)
+        : [...prev, type]
+    );
+  };
+  
+  const selectedNode = selectedNodeId
+    ? (searchResults?.nodes || graph?.nodes || []).find(node => node.id === selectedNodeId)
+    : null;
+  
+  const connectedEdges = selectedNodeId
+    ? (searchResults?.edges || graph?.edges || []).filter(
+        edge => edge.source === selectedNodeId || edge.target === selectedNodeId
+      )
+    : [];
+  
+  const connectedNodeIds = new Set<string>();
+  if (selectedNodeId) {
+    connectedEdges.forEach(edge => {
+      connectedNodeIds.add(edge.source);
+      connectedNodeIds.add(edge.target);
+    });
+  }
+  
+  const connectedNodes = (searchResults?.nodes || graph?.nodes || []).filter(
+    node => connectedNodeIds.has(node.id) && node.id !== selectedNodeId
+  );
+  
+  const graphData = searchResults || graph;
+  
+  return (
+    <div className="container mx-auto p-4">
+      <div className="mb-4">
+        <Link href="/knowledge-graphs">
+          <a className="text-primary hover:underline">
+            &larr; Back to knowledge graphs
+          </a>
+        </Link>
+      </div>
+      
+      {isLoading ? (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      ) : error ? (
+        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+          <strong className="font-bold">Error:</strong>
+          <span className="block sm:inline"> Failed to load knowledge graph.</span>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col lg:flex-row justify-between lg:items-center mb-6 gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-1">{graph?.name || 'Knowledge Graph'}</h1>
+              <p className="text-muted-foreground">
+                {graph?.description || 'Interactive visualization of knowledge graph'}
+              </p>
+            </div>
+            
+            <div className="flex flex-wrap gap-2 items-center">
+              {graph?.documentIds && graph.documentIds.length > 0 && (
+                <Link href={`/documents/${graph.documentIds[0]}`}>
+                  <a className="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/90">
+                    View Source Document
+                  </a>
+                </Link>
+              )}
+            </div>
           </div>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Info className="h-5 w-5" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent className="max-w-md">
-              <AlertDialogHeader>
-                <AlertDialogTitle>About Knowledge Graphs</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Knowledge graphs visualize the connections between different training elements. You can:
-                  <ul className="list-disc pl-5 mt-2 space-y-1">
-                    <li>View connections between concepts in documents</li>
-                    <li>Explore relationships between training modules</li>
-                    <li>Filter by node types and relationship types</li>
-                    <li>Zoom and pan to navigate complex graphs</li>
-                    <li>Click nodes to see detailed information</li>
-                  </ul>
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogAction>Got it</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-
-        <div className="mb-6">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="document">Document Graphs</TabsTrigger>
-              <TabsTrigger value="program">Program Graphs</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="document" className="mt-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Document Knowledge Graph</CardTitle>
-                  <CardDescription>
-                    Visualize concepts, entities and relationships extracted from documents
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-4 mb-6">
-                    <div className="flex-1">
-                      <Select
-                        value={documentId?.toString() || ''}
-                        onValueChange={(value) => setDocumentId(parseInt(value))}
-                        disabled={documentsLoading}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a document" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {documents?.map((doc) => (
-                            <SelectItem key={doc.id} value={doc.id.toString()}>
-                              {doc.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button 
-                      onClick={handleRegenerateGraph} 
-                      disabled={!documentId || documentGraphLoading}
-                    >
-                      {documentGraphLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : 'Generate Graph'}
-                    </Button>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <GraphVisualization 
-                      data={graphData}
-                      width={800}
-                      height={500}
-                      isLoading={isLoading}
-                      onNodeClick={handleNodeClick}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="program" className="mt-4">
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle>Program Knowledge Graph</CardTitle>
-                  <CardDescription>
-                    Visualize modules, lessons, competencies and their relationships
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex gap-4 mb-6">
-                    <div className="flex-1">
-                      <Select
-                        value={programId?.toString() || ''}
-                        onValueChange={(value) => setProgramId(parseInt(value))}
-                        disabled={programsLoading}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a training program" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {programs?.map((program) => (
-                            <SelectItem key={program.id} value={program.id.toString()}>
-                              {program.title}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button 
-                      onClick={handleRegenerateGraph} 
-                      disabled={!programId || programGraphLoading}
-                    >
-                      {programGraphLoading ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Generating...
-                        </>
-                      ) : 'Generate Graph'}
-                    </Button>
-                  </div>
-
-                  <div className="flex justify-center">
-                    <GraphVisualization 
-                      data={graphData}
-                      width={800}
-                      height={500}
-                      isLoading={isLoading}
-                      onNodeClick={handleNodeClick}
-                      colorScheme="category"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        {selectedNode && (
-          <Card className="mt-4">
-            <CardHeader className="pb-3">
-              <CardTitle>Selected Node: {selectedNode.content}</CardTitle>
-              <CardDescription>
-                Type: {selectedNode.type} | Importance: {selectedNode.importance?.toFixed(2) || 'N/A'}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div>
-                  <h4 className="font-medium mb-1">Node Details</h4>
-                  <div className="text-sm text-muted-foreground">
-                    {selectedNode.content}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="bg-card rounded-lg shadow-md p-4 border">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-semibold">Graph Visualization</h2>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {graphData?.nodes?.length || 0} nodes, {graphData?.edges?.length || 0} edges
+                    </span>
                   </div>
                 </div>
-
-                {selectedNode.metadata && (
-                  <div>
-                    <h4 className="font-medium mb-1">Metadata</h4>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {Object.entries(selectedNode.metadata).map(([key, value]) => (
-                        <div key={key} className="flex">
-                          <span className="font-medium mr-2">{key}:</span>
-                          <span className="text-muted-foreground">
-                            {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                
+                <div className="mb-4 flex flex-wrap gap-2">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={handleSearchChange}
+                    placeholder="Search nodes..."
+                    className="px-3 py-1 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary flex-grow"
+                  />
+                  
+                  <div className="flex flex-wrap gap-1">
+                    {Object.values(NodeType).slice(0, 5).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => handleNodeTypeFilterChange(type)}
+                        className={`px-2 py-1 text-xs rounded-full ${
+                          nodeTypeFilter.includes(type)
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {type}
+                      </button>
+                    ))}
                   </div>
+                </div>
+                
+                {isSearching ? (
+                  <div className="flex justify-center items-center h-64">
+                    <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                  </div>
+                ) : (
+                  <KnowledgeGraphVisualization
+                    graphData={graphData}
+                    onSelectNode={handleSelectNode}
+                  />
                 )}
-
-                <div className="flex justify-end">
-                  <Button variant="outline" onClick={() => setSelectedNode(null)}>
-                    Close
-                  </Button>
+              </div>
+              
+              {selectedNode && (
+                <div className="bg-card rounded-lg shadow-md p-4 border">
+                  <h3 className="text-lg font-medium mb-2">
+                    {selectedNode.label}
+                    <span className="ml-2 px-2 py-0.5 bg-muted rounded-full text-xs">
+                      {selectedNode.type}
+                    </span>
+                  </h3>
+                  
+                  {selectedNode.context && (
+                    <p className="text-muted-foreground mb-4">
+                      {selectedNode.context}
+                    </p>
+                  )}
+                  
+                  <div className="mt-4">
+                    <h4 className="font-medium mb-2">Connected Nodes ({connectedNodes.length})</h4>
+                    {connectedNodes.length === 0 ? (
+                      <p className="text-muted-foreground">No connected nodes</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {connectedNodes.map(node => (
+                          <div
+                            key={node.id}
+                            className="flex items-center p-2 border rounded hover:bg-muted/50 cursor-pointer"
+                            onClick={() => handleSelectNode(node.id)}
+                          >
+                            <div className="h-3 w-3 rounded-full mr-2" style={{
+                              backgroundColor: getNodeTypeColor(node.type)
+                            }}></div>
+                            <span className="truncate">{node.label}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="space-y-6">
+              <div className="bg-card rounded-lg shadow-md p-4 border">
+                <h2 className="text-xl font-semibold mb-4">Graph Information</h2>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Created:</span>
+                    <span className="col-span-2 font-medium">
+                      {graph?.createdAt ? new Date(graph.createdAt).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Updated:</span>
+                    <span className="col-span-2 font-medium">
+                      {graph?.updatedAt ? new Date(graph.updatedAt).toLocaleDateString() : 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Status:</span>
+                    <span className="col-span-2 font-medium">
+                      {graph?.metadata?.status || 'N/A'}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Node Count:</span>
+                    <span className="col-span-2 font-medium">
+                      {graph?.nodes?.length || 0}
+                    </span>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <span className="text-muted-foreground">Edge Count:</span>
+                    <span className="col-span-2 font-medium">
+                      {graph?.edges?.length || 0}
+                    </span>
+                  </div>
+                  
+                  {graph?.metadata?.tags && graph.metadata.tags.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      <span className="text-muted-foreground">Tags:</span>
+                      <div className="col-span-2">
+                        <div className="flex flex-wrap gap-1">
+                          {graph.metadata.tags.map((tag, index) => (
+                            <span
+                              key={index}
+                              className="px-2 py-0.5 bg-muted rounded-full text-xs"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {!graphData.nodes.length && !isLoading && (
-          <div className="bg-muted/50 rounded-lg p-6 flex flex-col items-center justify-center min-h-[300px]">
-            <AlertCircle className="h-10 w-10 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium mb-2">No Knowledge Graph Available</h3>
-            <p className="text-muted-foreground text-center max-w-md mb-6">
-              Select a document or program and click "Generate Graph" to create a knowledge graph visualization.
-            </p>
-            <Button onClick={handleRegenerateGraph} disabled={(!documentId && activeTab === 'document') || (!programId && activeTab === 'program')}>
-              Generate Knowledge Graph
-            </Button>
+              
+              <div className="bg-card rounded-lg shadow-md p-4 border">
+                <h2 className="text-xl font-semibold mb-4">Node Types</h2>
+                <div className="space-y-2">
+                  {Object.values(NodeType).map(type => {
+                    const count = (graphData?.nodes || []).filter(node => node.type === type).length;
+                    return count > 0 ? (
+                      <div key={type} className="flex justify-between items-center">
+                        <div className="flex items-center">
+                          <div className="h-3 w-3 rounded-full mr-2" style={{
+                            backgroundColor: getNodeTypeColor(type)
+                          }}></div>
+                          <span>{type}</span>
+                        </div>
+                        <span className="text-muted-foreground">{count}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+              
+              <div className="bg-card rounded-lg shadow-md p-4 border">
+                <h2 className="text-xl font-semibold mb-4">Edge Types</h2>
+                <div className="space-y-2">
+                  {Object.values(EdgeType).map(type => {
+                    const count = (graphData?.edges || []).filter(edge => edge.type === type).length;
+                    return count > 0 ? (
+                      <div key={type} className="flex justify-between items-center">
+                        <span>{type.replace('_', ' ')}</span>
+                        <span className="text-muted-foreground">{count}</span>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-      </div>
-    </AppLayout>
+        </>
+      )}
+    </div>
   );
+}
+
+function getNodeTypeColor(type: string): string {
+  switch (type) {
+    case NodeType.Concept:
+      return '#4169E1'; // Royal Blue
+    case NodeType.Entity:
+      return '#32CD32'; // Lime Green
+    case NodeType.Procedure:
+      return '#FF8C00'; // Dark Orange
+    case NodeType.Document:
+      return '#9370DB'; // Medium Purple
+    case NodeType.Regulation:
+      return '#DC143C'; // Crimson
+    case NodeType.Topic:
+      return '#1E90FF'; // Dodger Blue
+    default:
+      return '#666666'; // Gray
+  }
 }

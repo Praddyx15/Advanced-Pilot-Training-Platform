@@ -1,140 +1,80 @@
 /**
- * Standard WebSocket connection helper for non-Replit environments
- * This is a version that works in any environment and serves as a direct
- * replacement for the Replit-specific vite-hmr-fix.ts file
+ * Standard Vite HMR WebSocket Fix
+ * 
+ * This is a non-Replit specific version of the WebSocket fix
+ * for deployment outside of Replit. It handles common WebSocket
+ * connection issues in Vite's HMR system.
  */
 
-// Store the original WebSocket constructor for later use
-const OriginalWebSocket = window.WebSocket;
-
-// Create a patched version of WebSocket that ensures connections work in all environments
-class PatchedWebSocket extends OriginalWebSocket {
-  constructor(url: string | URL, protocols?: string | string[]) {
-    // Convert URL object to string if needed
-    const urlString = url instanceof URL ? url.toString() : url;
-    
-    // Handle Vite HMR WebSocket connection
-    if (urlString.includes('vite-hmr') || urlString.includes('__vite_hmr')) {
-      // Fix potential connection issues with localhost
-      if (urlString.includes('ws://localhost:undefined')) {
-        const fixedUrl = urlString.replace('ws://localhost:undefined', 
-                                          `ws://localhost:${window.location.port}`);
-        super(fixedUrl, protocols);
-      } else {
-        super(urlString, protocols);
-      }
-    } 
-    // Handle application WebSocket connection
-    else if (urlString.includes('/ws')) {
-      // Ensure we're using the correct protocol and host for our app WebSockets
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const host = window.location.host;
+// Fix Vite WebSocket connection
+if (typeof window !== 'undefined') {
+  // Store the original WebSocket class
+  const OriginalWebSocket = window.WebSocket;
+  
+  // Create a patched WebSocket constructor function
+  const PatchedWebSocket = function(
+    this: WebSocket, 
+    url: string | URL, 
+    protocols?: string | string[]
+  ) {
+    try {
+      // Parse the URL
+      const urlObj = typeof url === 'string' ? new URL(url) : url;
       
-      // Build the proper WebSocket URL
-      const fixedUrl = `${protocol}//${host}/ws`;
-      super(fixedUrl, protocols);
+      // For Vite HMR websocket connections
+      if (urlObj.pathname === '/' && 
+          urlObj.hostname === 'localhost' && 
+          (urlObj.protocol === 'ws:' || urlObj.protocol === 'wss:')) {
+            
+        // Fix undefined port issue
+        if (urlObj.port === 'undefined') {
+          // Use the current window location port if available, or default to 3000
+          const currentPort = window.location.port || '3000';
+          urlObj.port = currentPort;
+        }
+          
+        // Reconstruct the URL with our fixes
+        url = urlObj.toString();
+        console.log(`[Vite WebSocket Fix] Reconnecting to: ${url}`);
+      }
+      
+      // Create the WebSocket with our fixed URL
+      return new OriginalWebSocket(url, protocols);
+    } catch (error) {
+      console.error('[Vite WebSocket Fix] Error patching WebSocket:', error);
+      
+      // Fall back to original behavior
+      return new OriginalWebSocket(url, protocols);
     }
-    // For all other WebSocket connections, use as-is
-    else {
-      super(urlString, protocols);
-    }
-  }
-}
-
-// Apply the patch by replacing the global WebSocket constructor
-window.WebSocket = PatchedWebSocket;
-
-// Export common WebSocket utilities
-export const socketProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-export const socketHost = window.location.host;
-export const socketUrl = `${socketProtocol}//${socketHost}/ws`;
-
-/**
- * Standardized WebSocket connection for any environment
- * This function attempts to connect to a WebSocket server at the same host
- * on the standard /ws path
- */
-export function connectToWebSocket() {
-  try {
-    console.log('[WebSocket] Connecting to', socketUrl);
-    const socket = new WebSocket(socketUrl);
-    
-    socket.addEventListener('open', () => {
-      console.log('[WebSocket] Connected');
-    });
-    
-    socket.addEventListener('close', (event) => {
-      console.log('[WebSocket] Connection closed', event.code, event.reason);
-    });
-    
-    socket.addEventListener('error', (error) => {
-      console.error('[WebSocket] Error:', error);
-    });
-    
-    return socket;
-  } catch (error) {
-    console.error('[WebSocket] Connection failed:', error);
-    return null;
-  }
-}
-
-/**
- * Create a WebSocket URL based on the current environment
- * @param path - The path to connect to (defaults to "/ws")
- */
-export function createWebSocketURL(path = '/ws'): string {
-  return `${socketProtocol}//${socketHost}${path}`;
-}
-
-/**
- * Standard reconnection logic for WebSockets
- * @param createConnection - Function to create a new WebSocket connection
- * @param maxRetries - Maximum number of reconnection attempts (default: 10)
- * @param retryDelay - Initial delay between retries in ms (default: 1000, increases exponentially)
- */
-export function setupReconnection(
-  createConnection: () => WebSocket | null,
-  maxRetries = 10,
-  retryDelay = 1000
-): WebSocket | null {
-  let retries = 0;
-  let socket: WebSocket | null = null;
+  } as unknown as typeof WebSocket;
   
-  function connect() {
-    socket = createConnection();
-    
-    if (!socket) {
-      scheduleReconnect();
-      return null;
-    }
-    
-    socket.addEventListener('close', () => {
-      scheduleReconnect();
-    });
-    
-    return socket;
-  }
+  // Copy properties from the original WebSocket
+  PatchedWebSocket.prototype = OriginalWebSocket.prototype;
   
-  function scheduleReconnect() {
-    if (retries >= maxRetries) {
-      console.log('[WebSocket] Max retries reached, giving up');
-      return;
-    }
-    
-    const delay = retryDelay * Math.pow(1.5, retries);
-    retries++;
-    
-    console.log(`[WebSocket] Reconnecting in ${Math.round(delay/1000)}s (attempt ${retries}/${maxRetries})`);
-    
-    setTimeout(() => {
-      connect();
-    }, delay);
-  }
+  // Copy the constants using defineProperties to handle readonly properties
+  Object.defineProperties(PatchedWebSocket, {
+    CONNECTING: { value: OriginalWebSocket.CONNECTING },
+    OPEN: { value: OriginalWebSocket.OPEN },
+    CLOSING: { value: OriginalWebSocket.CLOSING },
+    CLOSED: { value: OriginalWebSocket.CLOSED },
+  });
   
-  return connect();
+  // Replace the original WebSocket with our patched version
+  window.WebSocket = PatchedWebSocket;
+  
+  console.log('[Vite WebSocket Fix] WebSocket patched for standard environments');
+  
+  // Add error handler to catch any WebSocket errors
+  window.addEventListener('error', function(event) {
+    // Check if the error is related to WebSocket
+    if (event.message && (
+      event.message.includes('WebSocket') || 
+      event.message.includes('ws:') || 
+      event.message.includes('wss:')
+    )) {
+      // Prevent the error from showing in the console
+      event.preventDefault();
+      console.info('[HMR] WebSocket connection error caught and handled');
+    }
+  }, true);
 }
-
-// Debug output to confirm patch is applied
-console.log('[vite-hmr-fix-standard] WebSocket patch applied for non-Replit environment');
-
-export default {};
